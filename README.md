@@ -1,80 +1,62 @@
-<p align="center">
-  <img src="screenshots/logo.png" width="80" alt="TexTab logo">
-</p>
+<h1 align="center">loucedé</h1>
 
-<h1 align="center">TexTab</h1>
-
-<p align="center">Turn any AI task into a keyboard shortcut.</p>
+<p align="center">L'IA en loucedé, directement depuis votre barre des menus.</p>
 
 <p align="center">
-  <a href="https://textab.me">Website</a> · <a href="https://github.com/ELPROFUG0/TexTab/issues">Issues</a> · <a href="https://x.com/elmoidev">Twitter</a>
+  <a href="https://loucede.app">Site</a> · <a href="https://github.com/poirpom/loucede/issues">Signaler un bug</a>
 </p>
 
 <br />
 
-<p align="center">
-  <img src="screenshots/screenshot1.png" width="100%" alt="Turn any AI task into a Keyboard Shortcut">
-</p>
+## À propos
+
+**loucedé** est une application macOS qui vit dans la barre des menus et déclenche des actions IA sur le texte sélectionné, partout dans le système. Sélectionnez du texte dans n'importe quelle app, appuyez sur `⇧ + ⌥ + A`, choisissez une action — c'est fait.
+
+Votre clé API, votre modèle. Pas d'abonnement, pas d'intermédiaire, les requêtes partent directement chez le fournisseur.
 
 <br />
 
-## About
+## Fonctionnalités
 
-TexTab is a macOS menu bar app that lets you trigger AI-powered text actions with a keyboard shortcut. Select text in any app, press `Cmd+Shift+T`, pick an action — done.
-
-Your API key, your model. No subscriptions, no middlemen.
-
-<br />
-
-<p align="center">
-  <img src="screenshots/screenshot2.png" width="100%" alt="Your AI, your rules">
-</p>
+- **Actions personnalisées** — créez autant de prompts que vous voulez, chacun avec son emoji
+- **Sélection rapide** — touches 1-9, 0, - et = depuis le popup (compatible AZERTY/QWERTY)
+- **Trois fournisseurs** — OpenAI, Anthropic (Claude), Mistral
+- **Streaming** — la réponse s'affiche au fur et à mesure
+- **Confidentialité** — votre clé API parle directement au fournisseur, rien ne passe par nos serveurs
+- **Partout** — fonctionne dans toutes les apps, tous les champs de texte
 
 <br />
 
-## Features
+## Installation
 
-- **Custom actions** — create unlimited prompts, each with its own shortcut
-- **Multiple providers** — OpenAI, Claude, Groq, OpenRouter, Perplexity
-- **Plugins** — Chat, QR Generator, Image Converter, Color Picker
-- **Privacy first** — your API key talks directly to the provider
-- **Works everywhere** — any app, any text field
-
-<br />
-
-<p align="center">
-  <img src="screenshots/screenshot3.png" width="100%" alt="Open Source">
-</p>
-
-<br />
-
-## Getting started
+Téléchargez la dernière version sur la [page des releases](https://github.com/poirpom/loucede/releases/latest), ou compilez depuis les sources :
 
 ```bash
-git clone https://github.com/ELPROFUG0/TexTab.git
+git clone https://github.com/poirpom/loucede.git
+cd loucede
+open loucede.xcodeproj
 ```
 
-1. Open `typo/typo.xcodeproj` in Xcode
-2. Copy the secrets template:
-   ```bash
-   cp Secrets.example.swift typo/typo/Secrets.swift
-   ```
-3. Fill in your values in `Secrets.swift` (gitignored)
-4. Add `Secrets.swift` to the Xcode target
-5. Build and run (`Cmd+R`)
+Puis compilez et lancez (`⌘R`).
 
-### Requirements
+### Configuration minimale
 
-- macOS 13+
-- Xcode 15+
-- An AI provider API key (OpenAI, Anthropic, etc.)
+- macOS 15 (Sequoia) ou plus récent
+- Xcode 26 ou plus récent pour compiler
+- Une clé API chez au moins un fournisseur : [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/settings/keys), ou [Mistral](https://console.mistral.ai/api-keys/)
 
 <br />
 
-## Contributing
+## Contribuer
 
-Fork it, improve it, make it yours. PRs welcome.
+Les PR sont les bienvenues. Ouvrez une issue avant les gros changements pour qu'on discute de la direction.
 
-## License
+<br />
 
-GPL v3 — see [LICENSE](LICENSE).
+## Licence et attribution
+
+loucedé est distribué sous **GPL v3** — voir [LICENSE](LICENSE).
+
+Il s'agit d'un fork francophone de **[TexTab](https://github.com/ELPROFUG0/TexTab)** par [ELPROFUG0](https://github.com/ELPROFUG0), lui aussi sous GPL v3. Merci à l'auteur original pour le travail de base.
+
+Les modifications apportées par loucedé — localisation française, restriction aux trois fournisseurs OpenAI / Anthropic / Mistral, sélection des prompts par touches du haut du clavier, import/export JSON, changements d'architecture de licence, suppression des plugins — s'ajoutent au projet original en respectant la GPL v3. Le code reste libre et toute redistribution doit rester sous la même licence.

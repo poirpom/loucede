@@ -15,12 +15,10 @@ xcuserdata/
 *~
 
 # Secrets (DO NOT commit real credentials)
-typo/typo/Secrets.swift
+loucede/Secrets.swift
 
-# Supabase local
-supabase/.temp/
-supabase/supabase/.temp/
-.temp/
+# Claude Code worktrees / local metadata
+.claude/
 
 # CocoaPods (if used)
 Pods/
