@@ -81,8 +81,8 @@ class ActionsStore: ObservableObject {
     @Published var apiKeys: [AIProvider: String] = [:]
     @Published var selectedProvider: AIProvider = .openai
     @Published var selectedModelIds: [AIProvider: String] = [:]
-    @Published var mainShortcut: String = "A"
-    @Published var mainShortcutModifiers: [String] = ["\u{21E7}", "\u{2325}"]
+    @Published var mainShortcut: String = "Q"
+    @Published var mainShortcutModifiers: [String] = ["^", "\u{2325}"]
 
     private let actionsKey = "loucede_actions"
     private let apiKeysKey = "loucede_api_keys"

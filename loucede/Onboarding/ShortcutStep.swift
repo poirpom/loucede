@@ -166,7 +166,7 @@ struct ShortcutStep: View {
     }
 
     private func loadCurrentShortcut() {
-        let savedKeys = UserDefaults.standard.stringArray(forKey: "loucede_shortcut_keys") ?? ["\u{21E7}", "\u{2325}", "A"]
+        let savedKeys = UserDefaults.standard.stringArray(forKey: "loucede_shortcut_keys") ?? ["^", "\u{2325}", "Q"]
         savedShortcutKeys = savedKeys
     }
 

@@ -211,7 +211,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             if hotKeyID.id == 1 {
                 globalAppDelegate?.pendingAction = nil
-                globalAppDelegate?.showPopover()
+                globalAppDelegate?.showPopover(requireSelection: true)
             }
             return noErr
         }, 1, &eventType, nil, nil)
@@ -279,16 +279,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showPopover() {
-        // Cerrar cualquier popup existente primero
+        showPopover(requireSelection: false)
+    }
+
+    func showPopover(requireSelection: Bool) {
+        // Fermer tout popup existant
         hidePopover()
 
-        // Guardar la app activa antes de mostrar el popup
+        // Mémoriser l'app active avant d'afficher le popup
         previousActiveApp = NSWorkspace.shared.frontmostApplication
 
-        // Capturar texto seleccionado antes de mostrar el popup
+        // Capturer le texte sélectionné
         captureSelectedText()
 
-        // Recrear la ventana para que tome el nuevo texto
+        // Si le raccourci clavier exige une sélection et qu'il n'y en a pas,
+        // on abandonne silencieusement — ouvrir un popup vide n'a pas de sens.
+        if requireSelection && !CapturedTextManager.shared.hasSelection {
+            return
+        }
+
+        // Recréer la fenêtre pour qu'elle prenne le nouveau texte
         popoverWindow = nil
         createPopoverWindow()
 
