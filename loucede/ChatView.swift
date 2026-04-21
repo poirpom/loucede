@@ -158,13 +158,15 @@ struct ChatView: View {
         VStack(spacing: 12) {
             Spacer()
 
-            AnimatedCatLogo(subtitle: "", linkURL: nil, scale: 1.8)
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 48))
+                .foregroundColor(appBlue.opacity(0.7))
 
-            Text("Start a conversation")
+            Text("Commencez une conversation")
                 .font(.nunitoBold(size: 16))
                 .foregroundColor(.primary)
 
-            Text("Ask me anything! I can help with writing,\ncoding, analysis, and more.")
+            Text("Posez-moi ce que vous voulez :\nrédaction, code, analyse, synthèse…")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)

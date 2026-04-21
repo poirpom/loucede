@@ -21,6 +21,9 @@ extension View {
 }
 
 struct PopoverView: View {
+    var onClose: () -> Void
+    var onOpenSettings: () -> Void
+
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
     @State private var selectedIndex = 0
@@ -28,6 +31,12 @@ struct PopoverView: View {
     @State private var resultText: String = ""
     @State private var activeAction: Action?
     @State private var streamTask: Task<Void, Never>?
+
+    init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}, initialAction: Action? = nil) {
+        self.onClose = onClose
+        self.onOpenSettings = onOpenSettings
+        self._activeAction = State(initialValue: initialAction)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +49,17 @@ struct PopoverView: View {
         .frame(width: 320)
         .background(VisualEffectBlur())
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onAppear { selectedIndex = 0 }
+        .onAppear {
+            selectedIndex = 0
+            if let initial = activeAction {
+                runAction(initial)
+            }
+        }
+        .onKeyPress(.escape) {
+            streamTask?.cancel()
+            onClose()
+            return .handled
+        }
     }
 
     // MARK: - Main
@@ -195,7 +214,7 @@ struct PopoverView: View {
                     provider: provider,
                     model: model
                 ) { chunk in
-                    await MainActor.run { resultText += chunk }
+                    resultText += chunk
                 }
             } catch {
                 await MainActor.run {

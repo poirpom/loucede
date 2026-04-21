@@ -603,8 +603,6 @@ struct ActionEditorView: View {
         withAnimation {
             hasUnsavedChanges = false
         }
-        // Show saved notification
-        CopyNotificationWindow.show(message: "Action saved", icon: "checkmark")
     }
 
     func improvePromptWithAI() {
