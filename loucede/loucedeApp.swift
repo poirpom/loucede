@@ -190,11 +190,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyID.id = 1
 
         let modifiers = store.mainCarbonModifiers
-        guard let keyCode = keyCodeForCharacter(store.mainShortcut.uppercased()) else { return }
+        // On utilise le keycode physique stocké (fiable cross-layout) plutôt que
+        // de reconvertir la lettre — le dictionnaire lettre→keycode est QWERTY-only
+        // et produit le mauvais keycode sur un clavier AZERTY.
+        let keyCode = UInt32(store.mainShortcutKeyCode)
 
         RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
 
-        print("Hotkey registered: \(store.mainShortcutModifiers.joined()) + \(store.mainShortcut)")
+        print("Hotkey registered: \(store.mainShortcutModifiers.joined()) + \(store.mainShortcut) (keycode \(keyCode))")
     }
 
     func setupHotkeyEventHandler() {

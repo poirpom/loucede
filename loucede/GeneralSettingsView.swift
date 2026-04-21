@@ -426,7 +426,10 @@ struct GeneralSettingsView: View {
                     return event
                 }
 
-                let key = keyCodeMap[event.keyCode] ?? event.charactersIgnoringModifiers?.uppercased() ?? ""
+                // On prend la lettre telle que le layout courant la produit
+                // (charactersIgnoringModifiers respecte AZERTY/QWERTY), et on
+                // ne retombe sur le dictionnaire QWERTY qu'en dernier recours.
+                let key = event.charactersIgnoringModifiers?.uppercased() ?? keyCodeMap[event.keyCode] ?? ""
                 if !key.isEmpty && key.count == 1 {
                     var finalKeys = currentModifiers
                     finalKeys.append(key)
@@ -461,6 +464,7 @@ struct GeneralSettingsView: View {
                     // Save the new main shortcut
                     self.store.mainShortcutModifiers = currentModifiers
                     self.store.mainShortcut = key
+                    self.store.mainShortcutKeyCode = event.keyCode
                     self.store.saveMainShortcut()
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

@@ -81,8 +81,12 @@ class ActionsStore: ObservableObject {
     @Published var apiKeys: [AIProvider: String] = [:]
     @Published var selectedProvider: AIProvider = .openai
     @Published var selectedModelIds: [AIProvider: String] = [:]
-    @Published var mainShortcut: String = "Q"
+    @Published var mainShortcut: String = "W"
     @Published var mainShortcutModifiers: [String] = ["^", "\u{2325}"]
+    // Keycode Carbon de la touche physique. Source de vérité pour RegisterEventHotKey,
+    // car les dictionnaires lettre→keycode sont QWERTY-only (cassait en AZERTY).
+    // Défaut = 6 (touche "W" sur AZERTY FR, touche "Z" sur QWERTY US).
+    @Published var mainShortcutKeyCode: UInt16 = 6
 
     private let actionsKey = "loucede_actions"
     private let apiKeysKey = "loucede_api_keys"
@@ -90,6 +94,7 @@ class ActionsStore: ObservableObject {
     private let modelIdsKey = "loucede_model_ids"
     private let mainShortcutKey = "loucede_main_shortcut"
     private let mainShortcutModifiersKey = "loucede_main_shortcut_modifiers"
+    private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
 
     static let shared = ActionsStore()
 
@@ -223,11 +228,17 @@ class ActionsStore: ObservableObject {
         if let mods = UserDefaults.standard.stringArray(forKey: mainShortcutModifiersKey) {
             mainShortcutModifiers = mods
         }
+        // Le keycode n'était pas persisté avant ; si absent, laisse la valeur par défaut.
+        let storedKeyCode = UserDefaults.standard.integer(forKey: mainShortcutKeyCodeKey)
+        if storedKeyCode > 0 {
+            mainShortcutKeyCode = UInt16(storedKeyCode)
+        }
     }
 
     func saveMainShortcut() {
         UserDefaults.standard.set(mainShortcut, forKey: mainShortcutKey)
         UserDefaults.standard.set(mainShortcutModifiers, forKey: mainShortcutModifiersKey)
+        UserDefaults.standard.set(Int(mainShortcutKeyCode), forKey: mainShortcutKeyCodeKey)
     }
 
     func addAction(_ action: Action) {
