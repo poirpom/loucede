@@ -65,6 +65,12 @@ class ActionsStore: ObservableObject {
     @Published var apiKeys: [AIProvider: String] = [:]
     @Published var selectedProvider: AIProvider = .openai
     @Published var selectedModelIds: [AIProvider: String] = [:]
+    /// Set d'IDs de modèles retournés par `GET /v1/models` du provider. Si
+    /// présent pour un provider, la Réglages UI filtre `AIModel.allModels`
+    /// dessus. Absent = pas encore vérifié = on garde la liste hard-codée.
+    @Published var verifiedModelIds: [AIProvider: Set<String>] = [:]
+    /// Providers en cours de vérif live (spinner UI).
+    @Published var verifyingProviders: Set<AIProvider> = []
     @Published var mainShortcut: String = "W"
     @Published var mainShortcutModifiers: [String] = ["^", "\u{2325}"]
     // Keycode Carbon de la touche physique. Source de vérité pour RegisterEventHotKey,
@@ -248,6 +254,46 @@ class ActionsStore: ObservableObject {
 
     func modelId(for provider: AIProvider) -> String {
         selectedModelIds[provider] ?? provider.defaultModelId
+    }
+
+    // MARK: - Vérification live des modèles (Phase 4.3)
+
+    /// Interroge `GET /v1/models` du provider pour savoir quels modèles de
+    /// `AIModel.allModels` sont réellement servis. Silencieuse : si la clé
+    /// est vide ou l'appel échoue, `verifiedModelIds[provider]` reste nil
+    /// et la UI garde la liste hard-codée complète.
+    ///
+    /// Si le modèle actuellement sélectionné pour ce provider n'est plus
+    /// servi, bascule automatiquement vers le premier modèle disponible
+    /// parmi ceux hard-codés.
+    @MainActor
+    func verifyAvailableModels(for provider: AIProvider) async {
+        // Dédoublonne : si une vérif est déjà en cours pour ce provider, pas de doublon.
+        guard !verifyingProviders.contains(provider) else { return }
+        let key = apiKey(for: provider)
+        guard !key.isEmpty else {
+            // Pas de clé = pas de filtrage → on retire un éventuel résultat obsolète.
+            verifiedModelIds.removeValue(forKey: provider)
+            return
+        }
+
+        verifyingProviders.insert(provider)
+        let serverIds = await AIService.shared.listAvailableModelIds(provider: provider, apiKey: key)
+        verifyingProviders.remove(provider)
+
+        guard let serverIds else {
+            // Échec (offline, 401, 403…) → conserver la liste hard-codée.
+            return
+        }
+        verifiedModelIds[provider] = serverIds
+
+        // Auto-heal : si le modèle persisté n'est plus servi, bascule vers
+        // le premier hard-codé qui l'est encore.
+        let storedId = selectedModelIds[provider] ?? provider.defaultModelId
+        let available = AIModel.models(for: provider).filter { serverIds.contains($0.id) }
+        if !serverIds.contains(storedId), let first = available.first {
+            saveModel(first.id, for: provider)
+        }
     }
 
     func loadMainShortcut() {

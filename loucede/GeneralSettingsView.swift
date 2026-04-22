@@ -48,8 +48,17 @@ struct GeneralSettingsView: View {
         get { AppTheme(rawValue: appThemeString) ?? .system }
     }
 
+    /// Liste filtrée par la vérif live si disponible, sinon liste hard-codée
+    /// complète. Si l'intersection retombe à 0 (ex. tous nos IDs hard-codés
+    /// obsolètes côté serveur), on retourne tout de même la liste hard-codée
+    /// complète pour ne pas afficher un Picker vide.
     private var availableModels: [AIModel] {
-        AIModel.models(for: selectedProvider)
+        let all = AIModel.models(for: selectedProvider)
+        guard let verified = store.verifiedModelIds[selectedProvider] else {
+            return all
+        }
+        let filtered = all.filter { verified.contains($0.id) }
+        return filtered.isEmpty ? all : filtered
     }
 
     /// Renvoie le modelId persisté pour ce provider s'il est toujours
@@ -59,11 +68,11 @@ struct GeneralSettingsView: View {
     /// (ex. claude-3-5-sonnet-20241022 retiré de la liste) → Picker vide.
     private func resolvedModelId(for provider: AIProvider) -> String {
         let stored = store.modelId(for: provider)
-        let validIds = AIModel.models(for: provider).map(\.id)
+        let validIds = availableModels.map(\.id)
         if validIds.contains(stored) {
             return stored
         }
-        let fallback = provider.defaultModelId
+        let fallback = validIds.first ?? provider.defaultModelId
         store.saveModel(fallback, for: provider)
         return fallback
     }
@@ -102,6 +111,9 @@ struct GeneralSettingsView: View {
                         .labelsHidden()
                         .onChange(of: selectedProvider) { _, newValue in
                             store.saveProvider(newValue)
+                            // Vérif live des modèles pour le nouveau provider
+                            // (la liste filtrée est appliquée quand la réponse arrive).
+                            Task { await store.verifyAvailableModels(for: newValue) }
                             // Load saved model for this provider (auto-fallback si l'ID persisté n'est plus valide)
                             selectedModelId = resolvedModelId(for: newValue)
                             // Load API key for the new provider
@@ -111,6 +123,8 @@ struct GeneralSettingsView: View {
                             selectedProvider = store.selectedProvider
                             selectedModelId = resolvedModelId(for: store.selectedProvider)
                             apiKeyInput = store.apiKey(for: store.selectedProvider)
+                            // Première vérif du provider courant à l'ouverture des Réglages.
+                            Task { await store.verifyAvailableModels(for: store.selectedProvider) }
                         }
 
                         Picker("", selection: $selectedModelId) {
@@ -123,6 +137,11 @@ struct GeneralSettingsView: View {
                         .onChange(of: selectedModelId) { _, newValue in
                             store.saveModel(newValue)
                         }
+                        .onChange(of: store.verifiedModelIds[selectedProvider]) { _, _ in
+                            // Si la vérif vient de retirer le modèle actuellement choisi,
+                            // re-résoudre vers un modèle toujours disponible.
+                            selectedModelId = resolvedModelId(for: selectedProvider)
+                        }
                         .popover(isPresented: $showModelTooltip, arrowEdge: .bottom) {
                             if let model = availableModels.first(where: { $0.id == selectedModelId }) {
                                 ModelSpecsTooltip(model: model)
@@ -130,6 +149,13 @@ struct GeneralSettingsView: View {
                         }
                         .onHover { hovering in
                             showModelTooltip = hovering
+                        }
+
+                        // Spinner discret pendant la vérif live des modèles
+                        if store.verifyingProviders.contains(selectedProvider) {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(width: 16, height: 16)
                         }
 
                         Spacer()

@@ -483,6 +483,55 @@ class AIService {
     }
 }
 
+// MARK: - Model listing (Phase 4.3)
+
+extension AIService {
+    /// Interroge `GET /v1/models` du provider pour obtenir la liste des
+    /// modèles réellement disponibles avec la clé fournie. Utilisé par la
+    /// vérification live dans les Réglages pour retirer les modèles
+    /// hard-codés qui ne sont plus servis (ex. Claude 3.5 retirés).
+    ///
+    /// Retourne `nil` si :
+    /// - la clé est vide,
+    /// - le provider ne supporte pas ce pattern (Anthropic a un endpoint
+    ///   différent, on le gèrera séparément),
+    /// - l'appel HTTP échoue (offline, 401, 403, etc.).
+    ///
+    /// Côté appelant, `nil` signifie « pas d'info → conserver la liste
+    /// hard-codée complète ».
+    func listAvailableModelIds(provider: AIProvider, apiKey: String) async -> Set<String>? {
+        guard !apiKey.isEmpty else { return nil }
+
+        let endpoint: String
+        switch provider {
+        case .openai:  endpoint = "https://api.openai.com/v1/models"
+        case .mistral: endpoint = "https://api.mistral.ai/v1/models"
+        case .anthropic: return nil
+        }
+
+        guard let url = URL(string: endpoint) else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 8
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                return nil
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let models = json["data"] as? [[String: Any]] else {
+                return nil
+            }
+            let ids = models.compactMap { $0["id"] as? String }
+            return Set(ids)
+        } catch {
+            return nil
+        }
+    }
+}
+
 // MARK: - Response models
 
 struct OpenAIResponse: Codable {
