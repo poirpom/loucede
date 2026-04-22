@@ -52,6 +52,22 @@ struct GeneralSettingsView: View {
         AIModel.models(for: selectedProvider)
     }
 
+    /// Renvoie le modelId persisté pour ce provider s'il est toujours
+    /// dans la liste `availableModels`, sinon bascule sur le défaut et
+    /// persiste immédiatement le nouveau choix pour nettoyer l'UserDefaults.
+    /// Évite le cas où le Picker a un selection qui ne match aucun tag
+    /// (ex. claude-3-5-sonnet-20241022 retiré de la liste) → Picker vide.
+    private func resolvedModelId(for provider: AIProvider) -> String {
+        let stored = store.modelId(for: provider)
+        let validIds = AIModel.models(for: provider).map(\.id)
+        if validIds.contains(stored) {
+            return stored
+        }
+        let fallback = provider.defaultModelId
+        store.saveModel(fallback, for: provider)
+        return fallback
+    }
+
     // App accent blue color
     private var appBlue: Color {
         Color(red: 0.0, green: 0.584, blue: 1.0)
@@ -86,14 +102,14 @@ struct GeneralSettingsView: View {
                         .labelsHidden()
                         .onChange(of: selectedProvider) { _, newValue in
                             store.saveProvider(newValue)
-                            // Load saved model for this provider
-                            selectedModelId = store.modelId(for: newValue)
+                            // Load saved model for this provider (auto-fallback si l'ID persisté n'est plus valide)
+                            selectedModelId = resolvedModelId(for: newValue)
                             // Load API key for the new provider
                             apiKeyInput = store.apiKey(for: newValue)
                         }
                         .onAppear {
                             selectedProvider = store.selectedProvider
-                            selectedModelId = store.modelId(for: store.selectedProvider)
+                            selectedModelId = resolvedModelId(for: store.selectedProvider)
                             apiKeyInput = store.apiKey(for: store.selectedProvider)
                         }
 
