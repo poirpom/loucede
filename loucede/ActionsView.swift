@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Actions Settings
 
@@ -50,6 +51,40 @@ struct ActionsSettingsView: View {
                     .padding(.horizontal, 8)
                 }
                 .scrollIndicators(.hidden)
+
+                // Footer sidebar : import / export JSON (Phase 2.4)
+                Divider()
+                HStack(spacing: 8) {
+                    Button {
+                        exportActionsToFile()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 11))
+                            Text("Exporter")
+                                .font(.system(size: 11))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        importActionsFromFile()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 11))
+                            Text("Importer")
+                                .font(.system(size: 11))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             }
             .frame(width: 220)
             .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
@@ -137,6 +172,71 @@ struct ActionsSettingsView: View {
         if let action = selectedAction {
             store.deleteAction(action)
             selectedAction = nil
+        }
+    }
+
+    // MARK: - Export / Import JSON (Phase 2.4)
+
+    private func exportActionsToFile() {
+        guard let data = store.exportActionsData() else {
+            NSSound.beep()
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Exporter les actions"
+        panel.allowedContentTypes = [.json]
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        panel.nameFieldStringValue = "loucede-actions-\(formatter.string(from: Date())).json"
+        panel.canCreateDirectories = true
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                try? data.write(to: url)
+            }
+        }
+    }
+
+    private func importActionsFromFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Importer des actions"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url,
+                  let data = try? Data(contentsOf: url) else { return }
+            DispatchQueue.main.async {
+                askImportStrategyThenImport(data: data)
+            }
+        }
+    }
+
+    /// Demande à l'utilisateur s'il veut remplacer ou fusionner, puis exécute l'import.
+    /// L'alert natif macOS garantit une UX cohérente avec le reste du système.
+    private func askImportStrategyThenImport(data: Data) {
+        let alert = NSAlert()
+        alert.messageText = "Importer les actions"
+        alert.informativeText = "Voulez-vous remplacer les actions actuelles par celles du fichier, ou les ajouter à la liste existante ?"
+        alert.addButton(withTitle: "Remplacer")
+        alert.addButton(withTitle: "Ajouter")
+        alert.addButton(withTitle: "Annuler")
+        let response = alert.runModal()
+        let strategy: ActionsStore.ImportStrategy
+        switch response {
+        case .alertFirstButtonReturn:  strategy = .replace
+        case .alertSecondButtonReturn: strategy = .append
+        default: return
+        }
+        do {
+            try store.importActions(from: data, strategy: strategy)
+            selectedAction = nil
+        } catch {
+            let errorAlert = NSAlert()
+            errorAlert.messageText = "Import impossible"
+            errorAlert.informativeText = error.localizedDescription
+            errorAlert.alertStyle = .warning
+            errorAlert.addButton(withTitle: "OK")
+            errorAlert.runModal()
         }
     }
 }

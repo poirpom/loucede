@@ -242,6 +242,95 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
+    // MARK: - Export / Import JSON (Phase 2.4)
+
+    /// Enveloppe stable pour les fichiers d'export/import. Versionnée via `schema`
+    /// pour pouvoir faire évoluer le format sans casser les anciens exports.
+    struct ExportEnvelope: Codable {
+        let schema: String
+        let exportedAt: Date
+        let actions: [Action]
+    }
+
+    /// Identifiant de schéma courant. À incrémenter si `Action` change de façon
+    /// incompatible (renommage/suppression de champ obligatoire).
+    static let currentExportSchema = "loucede-actions-v1"
+
+    enum ImportStrategy {
+        /// Remplace intégralement la liste actuelle par les actions importées.
+        case replace
+        /// Ajoute les actions importées à la fin de la liste existante.
+        /// Les `id` en collision sont régénérés pour éviter les doublons.
+        case append
+    }
+
+    enum ImportError: LocalizedError {
+        case unsupportedSchema(String)
+        case duplicateIdsInFile
+        case decodingFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedSchema(let s):
+                return "Format de fichier non reconnu : \(s). Attendu : \(ActionsStore.currentExportSchema)."
+            case .duplicateIdsInFile:
+                return "Le fichier contient des identifiants d'action en double."
+            case .decodingFailed(let msg):
+                return "Impossible de lire le fichier : \(msg)"
+            }
+        }
+    }
+
+    /// Sérialise toutes les actions dans un `Data` JSON prêt à écrire sur disque.
+    func exportActionsData() -> Data? {
+        let envelope = ExportEnvelope(
+            schema: Self.currentExportSchema,
+            exportedAt: Date(),
+            actions: actions
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return try? encoder.encode(envelope)
+    }
+
+    /// Charge un fichier JSON précédemment exporté et fusionne ou remplace la liste.
+    /// Lève une `ImportError` si le schéma ne correspond pas ou si le JSON est invalide.
+    func importActions(from data: Data, strategy: ImportStrategy) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let envelope: ExportEnvelope
+        do {
+            envelope = try decoder.decode(ExportEnvelope.self, from: data)
+        } catch {
+            throw ImportError.decodingFailed(error.localizedDescription)
+        }
+        guard envelope.schema == Self.currentExportSchema else {
+            throw ImportError.unsupportedSchema(envelope.schema)
+        }
+        // Validation : pas de doublons d'id dans le fichier lui-même.
+        let fileIds = Set(envelope.actions.map(\.id))
+        guard fileIds.count == envelope.actions.count else {
+            throw ImportError.duplicateIdsInFile
+        }
+        switch strategy {
+        case .replace:
+            actions = envelope.actions
+        case .append:
+            // Régénère les id en collision avec l'existant pour garantir l'unicité.
+            let existingIds = Set(actions.map(\.id))
+            let remapped = envelope.actions.map { imported -> Action in
+                var copy = imported
+                if existingIds.contains(imported.id) {
+                    copy.id = UUID()
+                }
+                return copy
+            }
+            actions.append(contentsOf: remapped)
+        }
+        saveActions()
+    }
+
     // Prompts par défaut français (Phase 2, 2026-04-22). Chaque prompt est associé
     // à un slot clavier (0 = touche 1/&, 1 = touche 2/é, …) via son `slotIndex`.
     // Les keycodes physiques 18-29 sont mappés aux slots 0-9 dans PopoverView,
