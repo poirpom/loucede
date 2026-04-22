@@ -54,8 +54,16 @@ struct PopoverView: View {
         .background(VisualEffectBlur())
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onKeyPress(.escape) {
-            state.streamTask?.cancel()
-            onClose()
+            // Depuis la vue résultat, Esc revient à la liste de prompts
+            // (cohérent avec le bouton "Retour"). Depuis la liste, Esc ferme le popup.
+            if state.activeAction != nil {
+                state.streamTask?.cancel()
+                state.activeAction = nil
+                state.resultText = ""
+            } else {
+                state.streamTask?.cancel()
+                onClose()
+            }
             return .handled
         }
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
@@ -179,29 +187,46 @@ struct PopoverView: View {
             Divider()
 
             HStack(spacing: 8) {
+                // Copier : ⌘↵ — copie le résultat dans le presse-papier (popup reste ouvert)
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(state.resultText, forType: .string)
                 } label: {
-                    Label("Copier", systemImage: "doc.on.doc")
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.on.doc")
+                        Text("Copier")
+                        KeyboardKey("⌘↵")
+                    }
                 }
+                .keyboardShortcut(.return, modifiers: .command)
 
+                // Coller : ↵ — colle dans l'app précédente (ferme le popup)
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(state.resultText, forType: .string)
                     globalAppDelegate?.performPasteInPreviousApp()
                 } label: {
-                    Label("Coller", systemImage: "arrow.down.doc")
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.doc")
+                        Text("Coller")
+                        KeyboardKey("↵")
+                    }
                 }
+                .keyboardShortcut(.return, modifiers: [])
 
                 Spacer()
 
+                // Retour : esc — géré par le handler Esc global au niveau du body,
+                // le bouton reste actionnable à la souris.
                 Button {
                     state.streamTask?.cancel()
                     state.activeAction = nil
                     state.resultText = ""
                 } label: {
-                    Text("Retour")
+                    HStack(spacing: 6) {
+                        Text("Retour")
+                        KeyboardKey("esc")
+                    }
                 }
             }
             .padding(12)
