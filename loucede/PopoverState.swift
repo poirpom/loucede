@@ -21,6 +21,12 @@ final class PopoverState: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var resultText: String = ""
 
+    // Compteur incrémenté à chaque ouverture du popup. Permet à PopoverView
+    // de re-forcer le focus clavier via @FocusState lors de la réutilisation
+    // de la fenêtre préchargée (sinon .onKeyPress reste "stale" et les
+    // flèches directionnelles + Entrée ne sont plus captées).
+    @Published var openCounter: Int = 0
+
     // Le Task de streaming n'est pas @Published car on ne veut pas
     // déclencher de re-render quand il change — c'est juste un handle
     // pour pouvoir l'annuler.
@@ -37,6 +43,7 @@ final class PopoverState: ObservableObject {
         selectedIndex = 0
         isProcessing = false
         resultText = ""
+        openCounter &+= 1
     }
 
     /// Lance une action (prompt) sur le texte capturé.

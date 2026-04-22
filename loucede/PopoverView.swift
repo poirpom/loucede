@@ -20,6 +20,14 @@ extension View {
     }
 }
 
+// Champs de focus possibles dans le popup. Utilisés avec @FocusState pour
+// forcer le focus clavier sur la bonne sous-vue à chaque ouverture — nécessaire
+// depuis que la fenêtre AppKit est préchargée (cf. PopoverState.openCounter).
+private enum PopoverFocus: Hashable {
+    case main
+    case result
+}
+
 struct PopoverView: View {
     var onClose: () -> Void
     var onOpenSettings: () -> Void
@@ -27,6 +35,7 @@ struct PopoverView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
     @ObservedObject private var state = PopoverState.shared
+    @FocusState private var focus: PopoverFocus?
 
     init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
@@ -48,6 +57,20 @@ struct PopoverView: View {
             state.streamTask?.cancel()
             onClose()
             return .handled
+        }
+        // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
+        // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
+        // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
+        .onChange(of: state.openCounter) { _, _ in
+            focus = state.activeAction == nil ? .main : .result
+        }
+        // Focus initial au premier affichage (avant le premier openCounter).
+        .onAppear {
+            focus = state.activeAction == nil ? .main : .result
+        }
+        // Bascule aussi le focus quand on passe de liste → résultat ou retour.
+        .onChange(of: state.activeAction) { _, newValue in
+            focus = newValue == nil ? .main : .result
         }
     }
 
@@ -91,6 +114,9 @@ struct PopoverView: View {
             .padding(.vertical, 8)
             .background(Color.black.opacity(0.1))
         }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focus, equals: .main)
         .onKeyPress(.upArrow) {
             state.selectedIndex = max(0, state.selectedIndex - 1)
             return .handled
@@ -180,6 +206,9 @@ struct PopoverView: View {
             }
             .padding(12)
         }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focus, equals: .result)
     }
 }
 
