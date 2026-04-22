@@ -77,7 +77,10 @@ struct PopoverView: View {
             }
         }
         .frame(width: 400)
-        .background(VisualEffectBlur())
+        // Phase 1.4h : fond popup solide #2E2E2E (remplace le VisualEffectBlur
+        // translucide). Choix délibéré de palette dark unifiée, indépendante
+        // de la transparence macOS.
+        .background(Color(hex: "2E2E2E"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
@@ -145,7 +148,9 @@ struct PopoverView: View {
     // MARK: - Main
 
     private var mainView: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // spacing: 0 (comme resultView) pour que la zone #1B1C1C colle directement
+        // au Divider sous la preview, sans gap visuel dû au spacing du VStack.
+        VStack(alignment: .leading, spacing: 0) {
             if textManager.hasSelection {
                 Text(textManager.capturedText)
                     .font(.system(size: 11))
@@ -153,34 +158,39 @@ struct PopoverView: View {
                     .lineLimit(3)
                     .padding(.horizontal, 12)
                     .padding(.top, 12)
+                    .padding(.bottom, 12)
             }
 
             Divider().opacity(textManager.hasSelection ? 1 : 0)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
-                        actionRow(action: action, index: index)
+            // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
+            // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
+                            actionRow(action: action, index: index)
+                        }
                     }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
-            }
-            .frame(maxHeight: 360)
+                .frame(maxHeight: 360)
 
-            HStack(spacing: 8) {
-                KeyboardKey("↑")
-                KeyboardKey("↓")
-                Text("Naviguer").font(.system(size: 10)).foregroundStyle(.secondary)
-                Spacer()
-                KeyboardKey("↵")
-                Text("Valider").font(.system(size: 10)).foregroundStyle(.secondary)
-                Spacer()
-                KeyboardKey("esc")
-                Text("Fermer").font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    KeyboardKey("↑")
+                    KeyboardKey("↓")
+                    Text("Naviguer").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Spacer()
+                    KeyboardKey("↵")
+                    Text("Valider").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Spacer()
+                    KeyboardKey("esc")
+                    Text("Fermer").font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.black.opacity(0.1))
+            .background(Color(hex: "1B1C1C"))
         }
         .focusable()
         .focusEffectDisabled()
@@ -223,7 +233,8 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(state.selectedIndex == index ? Color.accentColor.opacity(0.25) : Color.clear)
+        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions de la popup.
+        .background(state.selectedIndex == index ? Color(hex: "3F84F7") : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .onTapGesture { state.runAction(action) }
@@ -246,66 +257,70 @@ struct PopoverView: View {
 
             Divider()
 
-            ScrollView {
-                Text(state.resultText)
-                    .font(.system(size: 13))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+            // Phase 1.4i : zone basse du résultat (texte + footer boutons) en #1B1C1C.
+            VStack(spacing: 0) {
+                ScrollView {
+                    Text(state.resultText)
+                        .font(.system(size: 13))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+                .frame(maxHeight: 300)
+
+                Divider()
+
+                HStack(spacing: 8) {
+                    // Copier : ⌘↵ — copie le résultat dans le presse-papier (popup reste ouvert)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(state.resultText, forType: .string)
+                        showConfirmation("Copié")
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.on.doc")
+                            Text("Copier")
+                            KeyboardKey("⌘↵")
+                        }
+                    }
+                    .keyboardShortcut(.return, modifiers: .command)
+
+                    // Coller : ↵ — colle dans l'app précédente (ferme le popup).
+                    // On attend que le toast "Collé" soit visible ~300 ms avant
+                    // d'appeler performPasteInPreviousApp (qui orderOut le popup).
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(state.resultText, forType: .string)
+                        showConfirmation("Collé", duration: 0.3) {
+                            globalAppDelegate?.performPasteInPreviousApp()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.doc")
+                            Text("Coller")
+                            KeyboardKey("↵")
+                        }
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+
+                    Spacer()
+
+                    // Retour : esc — géré par le handler Esc au niveau de la resultView,
+                    // le bouton reste actionnable à la souris.
+                    Button {
+                        state.streamTask?.cancel()
+                        state.activeAction = nil
+                        state.resultText = ""
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Retour")
+                            KeyboardKey("esc")
+                        }
+                    }
+                }
+                .padding(12)
             }
-            .frame(maxHeight: 300)
-
-            Divider()
-
-            HStack(spacing: 8) {
-                // Copier : ⌘↵ — copie le résultat dans le presse-papier (popup reste ouvert)
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(state.resultText, forType: .string)
-                    showConfirmation("Copié")
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.on.doc")
-                        Text("Copier")
-                        KeyboardKey("⌘↵")
-                    }
-                }
-                .keyboardShortcut(.return, modifiers: .command)
-
-                // Coller : ↵ — colle dans l'app précédente (ferme le popup).
-                // On attend que le toast "Collé" soit visible ~300 ms avant
-                // d'appeler performPasteInPreviousApp (qui orderOut le popup).
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(state.resultText, forType: .string)
-                    showConfirmation("Collé", duration: 0.3) {
-                        globalAppDelegate?.performPasteInPreviousApp()
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.doc")
-                        Text("Coller")
-                        KeyboardKey("↵")
-                    }
-                }
-                .keyboardShortcut(.return, modifiers: [])
-
-                Spacer()
-
-                // Retour : esc — géré par le handler Esc au niveau de la resultView,
-                // le bouton reste actionnable à la souris.
-                Button {
-                    state.streamTask?.cancel()
-                    state.activeAction = nil
-                    state.resultText = ""
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Retour")
-                        KeyboardKey("esc")
-                    }
-                }
-            }
-            .padding(12)
+            .background(Color(hex: "1B1C1C"))
         }
         .focusable()
         .focusEffectDisabled()
