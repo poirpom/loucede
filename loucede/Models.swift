@@ -128,10 +128,27 @@ class ActionsStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([Action].self, from: data),
            !decoded.isEmpty {
             actions = decoded
+            migrateLegacySeedIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
         }
+    }
+
+    /// Migration one-shot (Phase 2, 2026-04-22) : si l'utilisateur n'a que
+    /// l'ancien seed unique "Corriger les fautes" (version sans slotIndex),
+    /// remplace-le par les 5 nouveaux prompts FR. Très restrictif pour ne pas
+    /// toucher à une config custom d'un utilisateur qui aurait *vraiment* créé
+    /// un prompt de ce nom.
+    private func migrateLegacySeedIfNeeded() {
+        guard actions.count == 1,
+              let only = actions.first,
+              only.name == "Corriger les fautes",
+              only.slotIndex == nil else {
+            return
+        }
+        actions = Self.defaultActions
+        saveActions()
     }
 
     func saveActions() {
