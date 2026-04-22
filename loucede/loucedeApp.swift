@@ -90,6 +90,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeyEventHandler()
         setupLocalEscapeMonitor()
 
+        // Préchargement : on crée la fenêtre du popup UNE SEULE FOIS
+        // au démarrage. À chaque show on fera juste orderFront + reset
+        // de l'état via PopoverState.shared.reset(). L'ancien code
+        // détruisait/recréait la fenêtre à chaque hotkey → latence
+        // perceptible et instanciation complète de l'arbre SwiftUI.
+        createPopoverWindow()
+
         // Menu bar uniquement, app cachée du dock
         NSApp.setActivationPolicy(.accessory)
 
@@ -234,42 +241,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showPopoverWithAction(skipCapture: Bool = false) {
-        // Cerrar cualquier popup existente primero (excepto si skipCapture, ya que estamos reabriendo)
-        if !skipCapture {
-            hidePopover()
-        }
-
-        // Guardar la app activa antes de mostrar el popup
-        // Skip if reopening from main popup (preserves original previousActiveApp)
+        // Si skipCapture = on réouvre depuis le popup principal, on ne
+        // recapture pas le texte (préserve previousActiveApp original).
         if !skipCapture {
             previousActiveApp = NSWorkspace.shared.frontmostApplication
-            // Capturar texto seleccionado antes de mostrar el popup
             captureSelectedText()
         }
 
-        // Recrear la ventana con la acción pendiente
-        popoverWindow = nil
-        createPopoverWindow(withAction: pendingAction)
-
-        // Posicionar cerca del cursor o centro de pantalla - ventana más grande para acciones
-        if let screen = NSScreen.main {
-            let screenRect = screen.visibleFrame
-            let windowWidth: CGFloat = 560
-            let windowHeight: CGFloat = 600
-            let x = (screenRect.width - windowWidth) / 2 + screenRect.minX
-            let y = (screenRect.height - windowHeight) / 2 + screenRect.minY
-
-            popoverWindow?.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        // Reset de l'état + pré-remplissage de l'action demandée.
+        // Le runAction() sera exécuté dès que la fenêtre est affichée.
+        let action = pendingAction
+        Task { @MainActor in
+            PopoverState.shared.reset()
+            if let action {
+                PopoverState.shared.runAction(action)
+            }
         }
 
+        // Centrer + afficher (fenêtre déjà créée au démarrage)
+        positionPopoverCentered(width: 320, height: 500)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Cerrar al hacer click fuera
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.hidePopover()
-        }
-
+        installOutsideClickMonitor()
         pendingAction = nil
     }
 
@@ -286,9 +280,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showPopover(requireSelection: Bool) {
-        // Fermer tout popup existant
-        hidePopover()
-
         // Mémoriser l'app active avant d'afficher le popup
         previousActiveApp = NSWorkspace.shared.frontmostApplication
 
@@ -301,25 +292,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Recréer la fenêtre pour qu'elle prenne le nouveau texte
-        popoverWindow = nil
-        createPopoverWindow()
-
-        // Posicionar cerca del cursor o centro de pantalla
-        if let screen = NSScreen.main {
-            let screenRect = screen.visibleFrame
-            let windowWidth: CGFloat = 320
-            let windowHeight: CGFloat = 500
-            let x = (screenRect.width - windowWidth) / 2 + screenRect.minX
-            let y = (screenRect.height - windowHeight) / 2 + screenRect.minY
-
-            popoverWindow?.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        // Reset de l'état (active action, result, selection, stream en cours)
+        // — la fenêtre elle-même reste la même, préchargée au démarrage.
+        Task { @MainActor in
+            PopoverState.shared.reset()
         }
 
+        positionPopoverCentered(width: 320, height: 500)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Cerrar al hacer click fuera
+        installOutsideClickMonitor()
+    }
+
+    private func positionPopoverCentered(width: CGFloat, height: CGFloat) {
+        guard let screen = NSScreen.main else { return }
+        let screenRect = screen.visibleFrame
+        let x = (screenRect.width - width) / 2 + screenRect.minX
+        let y = (screenRect.height - height) / 2 + screenRect.minY
+        popoverWindow?.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
+    }
+
+    private func installOutsideClickMonitor() {
+        // Un seul monitor à la fois — on retire l'ancien si présent.
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.hidePopover()
         }
@@ -398,6 +397,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func hidePopover() {
+        // Annule tout stream LLM en cours (le résultat ne sera plus visible)
+        Task { @MainActor in
+            PopoverState.shared.streamTask?.cancel()
+        }
         popoverWindow?.orderOut(nil)
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
@@ -406,12 +409,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func hidePopoverAndRestoreFocus() {
-        popoverWindow?.orderOut(nil)
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
-
+        hidePopover()
         // Restaurar el foco a la app anterior
         if let previousApp = previousActiveApp {
             previousApp.activate()
@@ -456,17 +454,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func createPopoverWindow(withAction action: Action? = nil) {
+    func createPopoverWindow() {
+        // Créé une seule fois au démarrage. L'action initiale passe
+        // désormais par PopoverState.shared (voir showPopoverWithAction).
         let contentView = PopoverView(onClose: { [weak self] in
             self?.hidePopover()
         }, onOpenSettings: { [weak self] in
             self?.hidePopover()
             self?.openSettings()
-        }, initialAction: action)
+        })
 
-        // Tamaño más grande para acciones directas
-        let width: CGFloat = action != nil ? 560 : 320
-        let height: CGFloat = action != nil ? 600 : 500
+        let width: CGFloat = 320
+        let height: CGFloat = 500
 
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),

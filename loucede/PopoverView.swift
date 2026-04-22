@@ -2,9 +2,9 @@
 //  PopoverView.swift
 //  loucede
 //
-//  Vue principale de la popup. Version minimale (Phase 0) — sera
-//  refondue en Phase 1 pour le préchargement en mémoire et en
-//  Phase 2 pour le modèle Prompt enrichi (emoji + slot 1-10).
+//  Vue principale de la popup. Phase 1 — l'état est centralisé dans
+//  PopoverState (singleton) pour permettre le préchargement en mémoire
+//  de la fenêtre (createPopoverWindow appelé une seule fois au démarrage).
 //
 
 import SwiftUI
@@ -26,21 +26,16 @@ struct PopoverView: View {
 
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
-    @State private var selectedIndex = 0
-    @State private var isProcessing = false
-    @State private var resultText: String = ""
-    @State private var activeAction: Action?
-    @State private var streamTask: Task<Void, Never>?
+    @ObservedObject private var state = PopoverState.shared
 
-    init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}, initialAction: Action? = nil) {
+    init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
         self.onOpenSettings = onOpenSettings
-        self._activeAction = State(initialValue: initialAction)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            if let action = activeAction {
+            if let action = state.activeAction {
                 resultView(for: action)
             } else {
                 mainView
@@ -49,14 +44,8 @@ struct PopoverView: View {
         .frame(width: 320)
         .background(VisualEffectBlur())
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onAppear {
-            selectedIndex = 0
-            if let initial = activeAction {
-                runAction(initial)
-            }
-        }
         .onKeyPress(.escape) {
-            streamTask?.cancel()
+            state.streamTask?.cancel()
             onClose()
             return .handled
         }
@@ -103,16 +92,16 @@ struct PopoverView: View {
             .background(Color.black.opacity(0.1))
         }
         .onKeyPress(.upArrow) {
-            selectedIndex = max(0, selectedIndex - 1)
+            state.selectedIndex = max(0, state.selectedIndex - 1)
             return .handled
         }
         .onKeyPress(.downArrow) {
-            selectedIndex = min(store.actions.count - 1, selectedIndex + 1)
+            state.selectedIndex = min(store.actions.count - 1, state.selectedIndex + 1)
             return .handled
         }
         .onKeyPress(.return) {
-            if store.actions.indices.contains(selectedIndex) {
-                runAction(store.actions[selectedIndex])
+            if store.actions.indices.contains(state.selectedIndex) {
+                state.runAction(store.actions[state.selectedIndex])
             }
             return .handled
         }
@@ -129,11 +118,11 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(selectedIndex == index ? Color.accentColor.opacity(0.25) : Color.clear)
+        .background(state.selectedIndex == index ? Color.accentColor.opacity(0.25) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
-        .onTapGesture { runAction(action) }
-        .onHover { hovering in if hovering { selectedIndex = index } }
+        .onTapGesture { state.runAction(action) }
+        .onHover { hovering in if hovering { state.selectedIndex = index } }
     }
 
     // MARK: - Result
@@ -144,7 +133,7 @@ struct PopoverView: View {
                 Image(systemName: action.icon)
                 Text(action.name).font(.system(size: 13, weight: .semibold))
                 Spacer()
-                if isProcessing {
+                if state.isProcessing {
                     ProgressView().controlSize(.small)
                 }
             }
@@ -153,7 +142,7 @@ struct PopoverView: View {
             Divider()
 
             ScrollView {
-                Text(resultText)
+                Text(state.resultText)
                     .font(.system(size: 13))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -166,14 +155,14 @@ struct PopoverView: View {
             HStack(spacing: 8) {
                 Button {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(resultText, forType: .string)
+                    NSPasteboard.general.setString(state.resultText, forType: .string)
                 } label: {
                     Label("Copier", systemImage: "doc.on.doc")
                 }
 
                 Button {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(resultText, forType: .string)
+                    NSPasteboard.general.setString(state.resultText, forType: .string)
                     globalAppDelegate?.performPasteInPreviousApp()
                 } label: {
                     Label("Coller", systemImage: "arrow.down.doc")
@@ -182,46 +171,14 @@ struct PopoverView: View {
                 Spacer()
 
                 Button {
-                    streamTask?.cancel()
-                    activeAction = nil
-                    resultText = ""
+                    state.streamTask?.cancel()
+                    state.activeAction = nil
+                    state.resultText = ""
                 } label: {
                     Text("Retour")
                 }
             }
             .padding(12)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func runAction(_ action: Action) {
-        activeAction = action
-        resultText = ""
-        isProcessing = true
-
-        let apiKey = store.apiKey
-        let provider = store.selectedProvider
-        let model = store.selectedModel
-        let inputText = textManager.capturedText
-        let fullPrompt = inputText.isEmpty ? action.prompt : "\(action.prompt)\n\n\(inputText)"
-
-        streamTask = Task {
-            do {
-                try await AIService.shared.chatStream(
-                    messages: [(role: "user", content: fullPrompt)],
-                    apiKey: apiKey,
-                    provider: provider,
-                    model: model
-                ) { chunk in
-                    resultText += chunk
-                }
-            } catch {
-                await MainActor.run {
-                    resultText = "Erreur : \(error.localizedDescription)"
-                }
-            }
-            await MainActor.run { isProcessing = false }
         }
     }
 }
