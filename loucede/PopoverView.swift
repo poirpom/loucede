@@ -177,15 +177,20 @@ struct PopoverView: View {
                 .frame(maxHeight: 360)
 
                 HStack(spacing: 8) {
+                    // Phase 1.4e : mêmes dimensions typographiques que les boutons
+                    // de la fenêtre résultat (13pt, taille .body par défaut) pour
+                    // cohérence visuelle entre les deux footers.
+                    // Texte en blanc : lisibilité sur le fond #1B1C1C + cohérence
+                    // avec les libellés Copier / Coller / Retour de la vue résultat.
                     KeyboardKey("↑")
                     KeyboardKey("↓")
-                    Text("Naviguer").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Naviguer").font(.system(size: 13)).foregroundStyle(.white)
                     Spacer()
                     KeyboardKey("↵")
-                    Text("Valider").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Valider").font(.system(size: 13)).foregroundStyle(.white)
                     Spacer()
                     KeyboardKey("esc")
-                    Text("Fermer").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Fermer").font(.system(size: 13)).foregroundStyle(.white)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -271,6 +276,11 @@ struct PopoverView: View {
                 Divider()
 
                 HStack(spacing: 8) {
+                    // Phase 1.4 : boutons en .plain pour retirer le chrome bordered
+                    // macOS — cohérence visuelle avec le footer nav de la liste et
+                    // allègement de l'interface.
+                    // Phase 1.4d : pas de picto SF Symbol, KeyboardKey avant le Text
+                    // (même ordre que le footer nav de la liste : touche → libellé).
                     // Copier : ⌘↵ — copie le résultat dans le presse-papier (popup reste ouvert)
                     Button {
                         NSPasteboard.general.clearContents()
@@ -278,11 +288,11 @@ struct PopoverView: View {
                         showConfirmation("Copié")
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "doc.on.doc")
-                            Text("Copier")
                             KeyboardKey("⌘↵")
+                            Text("Copier")
                         }
                     }
+                    .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: .command)
 
                     // Coller : ↵ — colle dans l'app précédente (ferme le popup).
@@ -296,11 +306,11 @@ struct PopoverView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "arrow.down.doc")
-                            Text("Coller")
                             KeyboardKey("↵")
+                            Text("Coller")
                         }
                     }
+                    .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: [])
 
                     Spacer()
@@ -313,10 +323,11 @@ struct PopoverView: View {
                         state.resultText = ""
                     } label: {
                         HStack(spacing: 6) {
-                            Text("Retour")
                             KeyboardKey("esc")
+                            Text("Retour")
                         }
                     }
+                    .buttonStyle(.plain)
                 }
                 .padding(12)
             }
@@ -376,22 +387,25 @@ struct KeyboardKey: View {
 struct ConfirmationToast: View {
     let message: String
 
+    // Phase 1.4a : toutes les dimensions ×3 (+200 %).
+    // Picto 14→42, texte 13→39, padding 14/10→42/30, spacing 8→24, shadow 8→24.
+    // Si trop grand visuellement sur écran, diviser par 1.5 pour retomber à ×2.
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 24) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .font(.system(size: 14))
+                .font(.system(size: 42))
             Text(message)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 39, weight: .medium))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 42)
+        .padding(.vertical, 30)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .overlay(
-            Capsule().stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+            Capsule().stroke(Color.gray.opacity(0.2), lineWidth: 1.5)
         )
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .shadow(color: .black.opacity(0.15), radius: 24, y: 6)
     }
 }
 
