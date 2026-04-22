@@ -149,9 +149,7 @@ struct QuickPromptView: View {
         let quickAction = Action(
             name: "Quick Prompt",
             icon: "bolt.fill",
-            prompt: prompt,
-            shortcut: "",
-            shortcutModifiers: []
+            prompt: prompt
         )
 
         promptText = ""

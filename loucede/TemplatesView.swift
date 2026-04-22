@@ -254,7 +254,6 @@ struct TemplatesView: View {
             name: template.name,
             icon: template.icon,
             prompt: template.prompt,
-            shortcut: "",
             actionType: .ai
         )
         store.addAction(newAction)

@@ -450,31 +450,12 @@ struct GeneralSettingsView: View {
                     var finalKeys = currentModifiers
                     finalKeys.append(key)
 
-                    // Check for conflicts with action shortcuts
-                    let currentModSet = Set(currentModifiers)
-                    let conflictingAction = ActionsStore.shared.actions.first { action in
-                        !action.shortcut.isEmpty &&
-                        action.shortcut.uppercased() == key &&
-                        Set(action.shortcutModifiers) == currentModSet
-                    }
+                    // Depuis Phase 2 (2026-04-22) les actions n'ont plus de raccourci global
+                    // individuel — la sélection se fait via les touches 1-9/0 *à l'intérieur*
+                    // du popup, donc aucun conflit possible avec le main shortcut ici.
 
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         self.mainRecordedKeys = finalKeys
-                    }
-
-                    if let conflict = conflictingAction {
-                        withAnimation {
-                            self.mainShortcutConflict = conflict.name
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            if self.mainShortcutConflict != nil {
-                                withAnimation {
-                                    self.mainShortcutConflict = nil
-                                    self.mainRecordedKeys = []
-                                }
-                            }
-                        }
-                        return nil
                     }
 
                     // Save the new main shortcut

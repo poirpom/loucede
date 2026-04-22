@@ -20,37 +20,23 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     var name: String
     var icon: String
     var prompt: String
-    var shortcut: String
-    var shortcutModifiers: [String]
+    /// Position du raccourci clavier dans le popup : 0 = touche 1/&, 1 = touche 2/é, …, 9 = touche 0/à.
+    /// `nil` = l'action n'a pas de raccourci rapide (accessible seulement via ↑↓↵ ou clic).
+    /// La sélection se fait par keycode physique (18-29) — fonctionne en AZERTY et QWERTY.
+    var slotIndex: Int?
     var actionType: ActionType
 
-    init(id: UUID = UUID(), name: String, icon: String, prompt: String, shortcut: String = "", shortcutModifiers: [String] = ["\u{2318}", "\u{21E7}"], actionType: ActionType = .ai) {
+    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai) {
         self.id = id
         self.name = name
         self.icon = icon
         self.prompt = prompt
-        self.shortcut = shortcut
-        self.shortcutModifiers = shortcutModifiers
+        self.slotIndex = slotIndex
         self.actionType = actionType
     }
 
-    /// Convert stored modifier symbols to Carbon modifier flags
-    var carbonModifiers: UInt32 {
-        var mods: UInt32 = 0
-        for m in shortcutModifiers {
-            switch m {
-            case "\u{2318}": mods |= UInt32(cmdKey)
-            case "\u{21E7}": mods |= UInt32(shiftKey)
-            case "\u{2325}": mods |= UInt32(optionKey)
-            case "^":        mods |= UInt32(controlKey)
-            default: break
-            }
-        }
-        return mods
-    }
-
     private enum CodingKeys: String, CodingKey {
-        case id, name, icon, prompt, shortcut, shortcutModifiers, actionType
+        case id, name, icon, prompt, slotIndex, actionType
     }
 
     init(from decoder: Decoder) throws {
@@ -59,8 +45,7 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         name = try container.decode(String.self, forKey: .name)
         icon = try container.decode(String.self, forKey: .icon)
         prompt = try container.decode(String.self, forKey: .prompt)
-        shortcut = try container.decodeIfPresent(String.self, forKey: .shortcut) ?? ""
-        shortcutModifiers = try container.decodeIfPresent([String].self, forKey: .shortcutModifiers) ?? ["\u{2318}", "\u{21E7}"]
+        slotIndex = try container.decodeIfPresent(Int.self, forKey: .slotIndex)
         actionType = try container.decodeIfPresent(ActionType.self, forKey: .actionType) ?? .ai
     }
 
@@ -70,8 +55,7 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encode(name, forKey: .name)
         try container.encode(icon, forKey: .icon)
         try container.encode(prompt, forKey: .prompt)
-        try container.encode(shortcut, forKey: .shortcut)
-        try container.encode(shortcutModifiers, forKey: .shortcutModifiers)
+        try container.encodeIfPresent(slotIndex, forKey: .slotIndex)
         try container.encode(actionType, forKey: .actionType)
     }
 }
@@ -258,14 +242,75 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
-    // Les prompts par défaut français seront réintroduits en Phase 2
-    // avec le modèle Prompt enrichi (emoji + slot).
+    // Prompts par défaut français (Phase 2, 2026-04-22). Chaque prompt est associé
+    // à un slot clavier (0 = touche 1/&, 1 = touche 2/é, …) via son `slotIndex`.
+    // Les keycodes physiques 18-29 sont mappés aux slots 0-9 dans PopoverView,
+    // ce qui fonctionne identiquement en AZERTY FR et QWERTY US.
     static let defaultActions: [Action] = [
         Action(
-            name: "Corriger les fautes",
+            name: "Traduis en français",
+            icon: "character.book.closed",
+            prompt: """
+            Tu es un traducteur professionnel. Traduis le texte suivant en français.
+            Règles :
+            - Détecte automatiquement la langue source
+            - Adopte un français naturel et courant (ni trop littéral, ni trop libre)
+            - Conserve le ton et le registre de l'original (formel, informel, technique, etc.)
+            - Conserve les noms propres, marques et acronymes tels quels
+            - Si un mot ou une expression n'a pas d'équivalent naturel en français, garde le terme original entre guillemets avec une courte explication entre parenthèses
+            - Conserve exactement la mise en forme du texte original : titres, sous-titres, listes, citations, sauts de ligne, etc.
+            - Si un passage semble incohérent avec le reste (publicité, référence hors-sujet, légende d'image), supprime-le
+            - Réponds uniquement avec la traduction, sans introduction, sans commentaire, sans explication
+            """,
+            slotIndex: 0
+        ),
+        Action(
+            name: "Traduis en anglais",
+            icon: "globe",
+            prompt: """
+            Tu es un traducteur professionnel. Traduis le texte suivant en anglais.
+            Règles :
+            - Détecte automatiquement la langue source
+            - Adopte un anglais naturel et courant (ni trop littéral, ni trop libre)
+            - Conserve le ton et le registre de l'original (formel, informel, technique, etc.)
+            - Conserve les noms propres, marques et acronymes tels quels
+            - Si un mot ou une expression n'a pas d'équivalent naturel en anglais, garde le terme original entre guillemets avec une courte explication entre parenthèses
+            - Conserve exactement la mise en forme du texte original : titres, sous-titres, listes, citations, sauts de ligne, etc.
+            - Réponds uniquement avec la traduction, sans introduction, sans commentaire, sans explication
+            """,
+            slotIndex: 1
+        ),
+        Action(
+            name: "Traduis en emoji",
+            icon: "face.smiling",
+            prompt: "Traduis le texte suivant en une séquence d'emojis qui en capture fidèlement le sens et l'émotion. Réponds uniquement avec les emojis, sans texte, sans explication.",
+            slotIndex: 2
+        ),
+        Action(
+            name: "Corrige les fautes",
             icon: "text.cursor",
-            prompt: "Corrige les fautes d'orthographe et de grammaire du texte suivant. Réponds uniquement avec le texte corrigé, sans commentaire.",
-            shortcut: ""
-        )
+            prompt: """
+            Tu es un correcteur professionnel. Corrige les fautes d'orthographe, de grammaire et de typographie du texte suivant.
+            Règles :
+            - Ne modifie pas le sens, le style ni le ton
+            - Conserve exactement la mise en forme originale
+            - Réponds uniquement avec le texte corrigé, sans commentaire
+            """,
+            slotIndex: 3
+        ),
+        Action(
+            name: "Résume ce texte",
+            icon: "text.append",
+            prompt: """
+            Tu es un rédacteur professionnel. Résume le texte suivant en français.
+            Règles :
+            - Conserve toutes les idées essentielles sans en altérer le sens
+            - Vise une longueur d'environ 30% du texte original
+            - Respecte la structure du texte original : titres, sous-titres, listes, etc.
+            - Conserve le ton et le registre de l'original
+            - Réponds uniquement avec le résumé, sans introduction, sans commentaire, sans explication
+            """,
+            slotIndex: 4
+        ),
     ]
 }

@@ -127,8 +127,7 @@ struct ActionsSettingsView: View {
         let newAction = Action(
             name: "",
             icon: "star",
-            prompt: "",
-            shortcut: ""
+            prompt: ""
         )
         store.addAction(newAction)
         selectedAction = newAction
@@ -200,15 +199,11 @@ struct ActionEditorView: View {
     var onSave: (Action) -> Void
     var onDelete: () -> Void
 
-    @State private var isRecordingShortcut = false
     @State private var isImprovingPrompt = false
-    @State private var recordedKeys: [String] = []
     @State private var hasUnsavedChanges = false
     @State private var showIconPicker = false
     @State private var isNameFocused = false
     @State private var showDeleteConfirmation = false
-    @State private var shortcutConflict: String? = nil
-    @State private var shortcutMonitor: Any? = nil
 
     // Input background color: #f1f1ef for light mode, controlBackgroundColor for dark mode
     var inputBackgroundColor: Color {
@@ -260,50 +255,19 @@ struct ActionEditorView: View {
                             Spacer()
                         }
 
-                    // Shortcut field with tooltip
-                    VStack(spacing: 0) {
-                        // Tooltip appears above
-                        if isRecordingShortcut {
-                            ShortcutTooltip(recordedKeys: recordedKeys, conflictName: shortcutConflict)
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
-                                    removal: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity)
-                                ))
-                                .padding(.bottom, 8)
-                        }
-
-                        Button(action: {
-                            startRecordingShortcut()
-                        }) {
-                            HStack {
-                                if action.shortcut.isEmpty {
-                                    Text("Click to record shortcut...")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(Color.gray.opacity(0.5))
-                                } else {
-                                    HStack(spacing: 6) {
-                                        ForEach(action.shortcutModifiers, id: \.self) { mod in
-                                            ShortcutInputKey(text: mod)
-                                        }
-                                        ShortcutInputKey(text: action.shortcut)
-                                    }
-                                }
-                                Spacer()
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(inputBackgroundColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingShortcut)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: recordedKeys)
+                    // Slot clavier — position dans la rangée de chiffres du popup (1/& à 0/à).
+                    // La sélection par keycode physique garantit la compat AZERTY/QWERTY.
+                    SlotPicker(
+                        slotIndex: $action.slotIndex,
+                        conflictName: conflictName(for: action.slotIndex, excluding: action.id),
+                        onChange: { hasUnsavedChanges = true }
+                    )
+                    .background(inputBackgroundColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
 
                     // Éditeur de prompt (V1 : toutes les actions sont de type .ai)
                     Group {
@@ -459,143 +423,15 @@ struct ActionEditorView: View {
                 .transition(.opacity)
             }
         }
-        .onAppear {
-            // Initialize recorded keys from existing shortcut
-            if !action.shortcut.isEmpty {
-                recordedKeys = action.shortcutModifiers + [action.shortcut]
-            }
-        }
     }
 
-    func stopRecordingShortcut() {
-        if let monitor = shortcutMonitor {
-            NSEvent.removeMonitor(monitor)
-            shortcutMonitor = nil
-        }
-        isRecordingShortcut = false
-        shortcutConflict = nil
-        recordedKeys = []
-        globalAppDelegate?.resumeHotkeys()
-    }
-
-    func startRecordingShortcut() {
-        // Remove any existing monitor first
-        if let monitor = shortcutMonitor {
-            NSEvent.removeMonitor(monitor)
-            shortcutMonitor = nil
-        }
-
-        isRecordingShortcut = true
-        recordedKeys = []
-        shortcutConflict = nil
-
-        // Suspend all hotkeys to prevent actions from firing during recording
-        globalAppDelegate?.suspendHotkeys()
-
-        // Monitor for key events (keyDown + flagsChanged for real-time modifier display)
-        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            guard self.isRecordingShortcut else { return event }
-
-            // Escape cancels recording
-            if event.type == .keyDown && event.keyCode == 53 {
-                withAnimation {
-                    self.stopRecordingShortcut()
-                }
-                return nil
-            }
-
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-
-            // Build current modifier keys array
-            var currentModifiers: [String] = []
-            if modifiers.contains(.control) { currentModifiers.append("^") }
-            if modifiers.contains(.option) { currentModifiers.append("\u{2325}") }
-            if modifiers.contains(.shift) { currentModifiers.append("\u{21E7}") }
-            if modifiers.contains(.command) { currentModifiers.append("\u{2318}") }
-
-            if event.type == .flagsChanged {
-                // Clear conflict when modifiers change
-                self.shortcutConflict = nil
-                // Update recorded keys to show current modifiers in real-time
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                    self.recordedKeys = currentModifiers
-                }
-                return event
-            }
-
-            if event.type == .keyDown {
-                // Must have Command or Option to complete
-                let hasCommand = modifiers.contains(.command)
-                let hasOption = modifiers.contains(.option)
-
-                if !hasCommand && !hasOption {
-                    return event
-                }
-
-                // Add the final key
-                let key = event.charactersIgnoringModifiers?.uppercased() ?? ""
-                if !key.isEmpty && key.count == 1 {
-                    var finalKeys = currentModifiers
-                    finalKeys.append(key)
-
-                    // Check for conflicts with other actions (compare as sets to ignore order)
-                    let currentModSet = Set(currentModifiers)
-                    let conflictingAction = ActionsStore.shared.actions.first { other in
-                        other.id != self.action.id &&
-                        !other.shortcut.isEmpty &&
-                        other.shortcut.uppercased() == key &&
-                        Set(other.shortcutModifiers) == currentModSet
-                    }
-
-                    // Also check against the main popup hotkey (⌘⇧T)
-                    let mainStore = ActionsStore.shared
-                    let isMainHotkeyConflict = key == mainStore.mainShortcut.uppercased() && currentModSet == Set(mainStore.mainShortcutModifiers)
-
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        self.recordedKeys = finalKeys
-                    }
-
-                    // Determine conflict name
-                    var conflictName: String? = nil
-                    if isMainHotkeyConflict {
-                        conflictName = "Ouvrir loucedé"
-                    } else if let conflict = conflictingAction {
-                        conflictName = conflict.name
-                    }
-
-                    if let name = conflictName {
-                        // Show conflict error - don't save
-                        withAnimation {
-                            self.shortcutConflict = name
-                        }
-                        // Keep recording open so user can try again
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            if self.shortcutConflict != nil {
-                                withAnimation {
-                                    self.shortcutConflict = nil
-                                    self.recordedKeys = []
-                                }
-                            }
-                        }
-                        return nil
-                    }
-
-                    self.action.shortcutModifiers = currentModifiers
-                    self.action.shortcut = key
-                    self.hasUnsavedChanges = true
-                    self.shortcutConflict = nil
-
-                    // Close tooltip after a delay and restore hotkeys
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        withAnimation {
-                            self.stopRecordingShortcut()
-                        }
-                    }
-                    return nil
-                }
-            }
-            return event
-        }
+    /// Nom de l'action qui occupe déjà ce slot (hors action en cours d'édition), ou nil.
+    /// Utilisé pour prévenir l'utilisateur qu'il va écraser une assignation existante.
+    private func conflictName(for slot: Int?, excluding actionId: UUID) -> String? {
+        guard let slot = slot else { return nil }
+        return ActionsStore.shared.actions.first {
+            $0.id != actionId && $0.slotIndex == slot
+        }?.name
     }
 
     func saveChanges() {
@@ -762,34 +598,52 @@ struct TooltipArrow: Shape {
     }
 }
 
-// MARK: - Shortcut Input Key (3D effect for input field)
+// MARK: - Slot Picker (Phase 2)
 
-struct ShortcutInputKey: View {
-    @Environment(\.colorScheme) var colorScheme
-    let text: String
+/// Sélecteur de position clavier pour une action. `nil` = aucun raccourci.
+/// Les libellés affichent d'abord la touche AZERTY FR (`&é"'(§è!çà`) puis la touche
+/// QWERTY équivalente (`1234567890`), ce qui correspond au mapping des keycodes
+/// physiques 18-29 utilisé dans PopoverView.
+struct SlotPicker: View {
+    @Binding var slotIndex: Int?
+    let conflictName: String?
+    var onChange: () -> Void = {}
+
+    /// Libellés AZERTY FR de la rangée du haut. L'ordre correspond aux slots 0-9
+    /// c.-à-d. aux keycodes physiques 18, 19, 20, 21, 23, 22, 26, 28, 25, 29.
+    private static let slotLabels = ["&", "é", "\"", "'", "(", "§", "è", "!", "ç", "à"]
 
     var body: some View {
-        ZStack {
-            // Bottom layer (3D effect)
-            RoundedRectangle(cornerRadius: 5)
-                .fill(colorScheme == .dark ? Color(white: 0.25) : Color(white: 0.7))
-                .frame(width: 24, height: 24)
-                .offset(y: 2)
-
-            // Top layer
-            RoundedRectangle(cornerRadius: 5)
-                .fill(colorScheme == .dark ? Color.white : Color(white: 0.95))
-                .frame(width: 24, height: 24)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(Color.gray.opacity(colorScheme == .dark ? 0 : 0.3), lineWidth: 1)
-                )
-
-            Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.black)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Raccourci clavier")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { slotIndex ?? -1 },
+                    set: { newValue in
+                        slotIndex = (newValue == -1) ? nil : newValue
+                        onChange()
+                    }
+                )) {
+                    Text("Aucun").tag(-1)
+                    ForEach(0..<Self.slotLabels.count, id: \.self) { i in
+                        Text("\(Self.slotLabels[i])  (\(i == 9 ? 0 : i + 1))").tag(i)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: 160)
+            }
+            if let name = conflictName {
+                Text("⚠︎ Déjà utilisé par « \(name) » — ce choix écrasera l'assignation précédente.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.orange)
+            }
         }
-        .frame(width: 24, height: 26)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 }
 
