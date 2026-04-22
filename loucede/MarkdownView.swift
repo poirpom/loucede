@@ -143,7 +143,7 @@ struct MarkdownView: View {
             .replacingOccurrences(of: "**", with: "")
             .replacingOccurrences(of: "__", with: "")
         return Text(cleanContent)
-            .font(.nunitoBold(size: fontSize))
+            .font(.system(size: fontSize, weight: .bold))
             .foregroundColor(.primary)
             .padding(.top, level == 1 ? 14 : (level == 2 ? 10 : 6))
             .padding(.bottom, 2)
@@ -152,7 +152,7 @@ struct MarkdownView: View {
     private func bulletView(_ content: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text("•")
-                .font(.nunitoRegularBold(size: 14))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.secondary)
             inlineMarkdown(content)
         }
@@ -162,7 +162,7 @@ struct MarkdownView: View {
     private func numberedView(number: String, content: String) -> some View {
         HStack(alignment: .top, spacing: 4) {
             Text(number)
-                .font(.nunitoRegularBold(size: 14))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.secondary)
                 .frame(minWidth: 20, alignment: .trailing)
             inlineMarkdown(content)
@@ -184,17 +184,17 @@ struct MarkdownView: View {
             switch token {
             case .plain(let str):
                 part = AttributedString(str)
-                part.font = .nunitoRegularBold(size: 14)
+                part.font = .system(size: 14, weight: .semibold)
                 part.foregroundColor = Color.primary.opacity(0.85)
 
             case .bold(let str):
                 part = AttributedString(str)
-                part.font = .nunitoBold(size: 14)
+                part.font = .system(size: 14, weight: .bold)
                 part.foregroundColor = Color.primary
 
             case .italic(let str):
                 part = AttributedString(str)
-                part.font = .nunitoRegularBold(size: 14).italic()
+                part.font = .system(size: 14, weight: .semibold).italic()
                 part.foregroundColor = Color.primary.opacity(0.85)
 
             case .code(let str):
@@ -210,12 +210,12 @@ struct MarkdownView: View {
             case .link(let linkText, let urlString):
                 if let url = URL(string: urlString) {
                     part = AttributedString(linkText)
-                    part.font = .nunitoRegularBold(size: 14)
+                    part.font = .system(size: 14, weight: .semibold)
                     part.foregroundColor = appBlue
                     part.link = url
                 } else {
                     part = AttributedString(linkText)
-                    part.font = .nunitoRegularBold(size: 14)
+                    part.font = .system(size: 14, weight: .semibold)
                     part.foregroundColor = appBlue
                 }
             }

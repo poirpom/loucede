@@ -27,7 +27,7 @@ struct AboutView: View {
             Text("loucedé")
                 .font(.system(size: 28, weight: .bold))
 
-            Text("Assistant IA discret pour macOS")
+            Text("Une IA au bout de tes doigts")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
 

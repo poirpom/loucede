@@ -278,7 +278,7 @@ struct TemplatesView: View {
             VStack(spacing: 12) {
                 HStack {
                     Text("Prompt Templates")
-                        .font(.nunitoBold(size: 18))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(textGrayColor)
 
                     Spacer()
@@ -417,7 +417,7 @@ struct TemplateCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(template.name)
-                            .font(.nunitoRegularBold(size: 13))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(textGrayColor)
                             .lineLimit(1)
 

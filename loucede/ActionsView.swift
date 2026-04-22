@@ -31,12 +31,12 @@ struct ActionsSettingsView: View {
                             }
                         }
 
-                        // New Action button - below last action
+                        // Nouvelle action - sous la dernière action
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 16, weight: .black))
-                            Text("New Action")
-                                .font(.nunitoRegularBold(size: 14))
+                            Text("Nouvelle action")
+                                .font(.system(size: 14, weight: .semibold))
 
                             Spacer()
                         }
@@ -115,23 +115,23 @@ struct ActionsSettingsView: View {
                         Keyboard3DKeyLarge()
 
                         VStack(spacing: 10) {
-                            Text("No Action Selected")
-                                .font(.nunitoBold(size: 20))
+                            Text("Aucune action sélectionnée")
+                                .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.primary)
 
-                            Text("Start by creating a new action or select an\nexisting one from the list.")
+                            Text("Crée une nouvelle action ou sélectionnes-en\nune dans la liste.")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(2)
                         }
 
-                        // New Action button - Duolingo 3D style
+                        // Bouton "Nouvelle action" - style 3D Duolingo
                         Button(action: {
                             addNewAction()
                         }) {
-                            Text("New Action")
-                                .font(.nunitoBold(size: 15))
+                            Text("Nouvelle action")
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 40)
                                 .padding(.vertical, 12)
@@ -274,8 +274,8 @@ struct ActionListRow: View {
                 .frame(width: 24)
 
             // Name
-            Text(action.name.isEmpty ? "New Action" : action.name)
-                .font(.nunitoRegularBold(size: 14))
+            Text(action.name.isEmpty ? "Nouvelle action" : action.name)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(textGrayColor)
                 .lineLimit(1)
 
@@ -339,13 +339,13 @@ struct ActionEditorView: View {
                             }
                             .buttonStyle(.plain)
 
-                            TextField("New Action", text: $action.name, onEditingChanged: { editing in
+                            TextField("Nouvelle action", text: $action.name, onEditingChanged: { editing in
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                                     isNameFocused = editing
                                 }
                             })
                                 .textFieldStyle(.plain)
-                                .font(.nunitoBold(size: 22))
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(textGrayColor)
                                 .scaleEffect(isNameFocused ? 1.05 : 1.0, anchor: .leading)
                                 .onChange(of: action.name) { _, _ in
@@ -374,15 +374,15 @@ struct ActionEditorView: View {
                         VStack(spacing: 0) {
                             ZStack(alignment: .topLeading) {
                                 if action.prompt.isEmpty {
-                                    Text("Enter your prompt here")
-                                        .font(.nunitoRegularBold(size: 14))
+                                    Text("Saisis ton prompt ici")
+                                        .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(textGrayColor.opacity(0.6))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 12)
                                 }
 
                                 TextEditor(text: $action.prompt)
-                                    .font(.nunitoRegularBold(size: 14))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(textGrayColor)
                                     .scrollContentBackground(.hidden)
                                     .background(Color.clear)
@@ -411,7 +411,7 @@ struct ActionEditorView: View {
                                         }
                                         .frame(width: 14, height: 14)
 
-                                        Text("Enhance")
+                                        Text("Améliorer")
                                             .font(.system(size: 12, weight: .medium))
                                     }
                                     .foregroundColor(.primary)
@@ -427,7 +427,7 @@ struct ActionEditorView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(action.prompt.isEmpty || isImprovingPrompt || ActionsStore.shared.apiKey.isEmpty)
-                                .help(ActionsStore.shared.apiKey.isEmpty ? "Connect an API key in the AI tab to use Enhance" : "Enhance prompt with AI")
+                                .help(ActionsStore.shared.apiKey.isEmpty ? "Ajoute une clé API dans l'onglet IA pour utiliser Améliorer" : "Améliorer le prompt avec l'IA")
 
                                 Spacer()
                             }
@@ -464,8 +464,8 @@ struct ActionEditorView: View {
                             }
                         }
                     }) {
-                        Text(showDeleteConfirmation ? "Are you sure?" : "Delete")
-                            .font(.nunitoRegularBold(size: 15))
+                        Text(showDeleteConfirmation ? "Confirmer ?" : "Supprimer")
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.red)
                             .padding(.horizontal, showDeleteConfirmation ? 16 : 0)
                             .padding(.vertical, showDeleteConfirmation ? 8 : 0)
@@ -480,8 +480,8 @@ struct ActionEditorView: View {
 
                     // Save button
                     Button(action: saveChanges) {
-                        Text(hasUnsavedChanges ? "Save" : "Saved")
-                            .font(.nunitoRegularBold(size: 15))
+                        Text(hasUnsavedChanges ? "Enregistrer" : "Enregistré")
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
                             .padding(.horizontal, 20)
                             .padding(.vertical, 8)

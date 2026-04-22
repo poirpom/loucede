@@ -33,7 +33,7 @@ struct QuickPromptView: View {
                     .foregroundColor(.orange)
 
                 Text("Quick Prompt")
-                    .font(.nunitoRegularBold(size: 14))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -79,7 +79,7 @@ struct QuickPromptView: View {
             HStack(spacing: 10) {
                 TextField("Write your prompt...", text: $promptText)
                     .textFieldStyle(.plain)
-                    .font(.nunitoRegularBold(size: 16))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                     .focused($isPromptFocused)
 

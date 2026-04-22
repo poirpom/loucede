@@ -46,14 +46,14 @@ struct WelcomeStep: View {
 
                 // Content - truly centered
                 VStack(spacing: 50) {
-                    // Main title - Nunito Black
+                    // Titre principal - SF Pro Black
                     VStack(spacing: -6) {
-                        Text("Transforme toute tâche IA")
+                        Text("Une IA")
                             .font(.system(size: 44, weight: .black))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
 
-                        Text("en un raccourci clavier")
+                        Text("au bout de tes doigts")
                             .font(.system(size: 44, weight: .black))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)

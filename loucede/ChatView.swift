@@ -90,7 +90,7 @@ struct ChatView: View {
                     .foregroundColor(appBlue)
 
                 Text("Discussion IA")
-                    .font(.nunitoBold(size: 15))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.primary)
             }
 
@@ -163,7 +163,7 @@ struct ChatView: View {
                 .foregroundColor(appBlue.opacity(0.7))
 
             Text("Commencez une conversation")
-                .font(.nunitoBold(size: 16))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundColor(.primary)
 
             Text("Posez-moi ce que vous voulez :\nrédaction, code, analyse, synthèse…")
@@ -344,7 +344,7 @@ struct MessageBubble: View {
                 if message.isUser {
                     // User message - simple text
                     Text(message.content)
-                        .font(.nunitoRegularBold(size: 14))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(textColor)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)

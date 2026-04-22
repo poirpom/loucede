@@ -79,7 +79,7 @@ struct GeneralSettingsView: View {
                 // Section Configuration API
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Configuration API")
-                        .font(.nunitoBold(size: 18))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
 
                     HStack {
@@ -88,7 +88,7 @@ struct GeneralSettingsView: View {
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.purple)
                             Text("Fournisseur IA")
-                                .font(.nunitoRegularBold(size: 15))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.secondary)
                         }
                         .frame(width: 160, alignment: .leading)
@@ -141,14 +141,14 @@ struct GeneralSettingsView: View {
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.orange)
                             Text("Clé API")
-                                .font(.nunitoRegularBold(size: 15))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.secondary)
                         }
                         .frame(width: 160, alignment: .leading)
 
                         SecureField(selectedProvider.apiKeyPlaceholder, text: $apiKeyInput)
                             .textFieldStyle(.plain)
-                            .font(.nunitoRegularBold(size: 13))
+                            .font(.system(size: 13, weight: .semibold))
                             .padding(10)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
@@ -160,7 +160,7 @@ struct GeneralSettingsView: View {
                     }
 
                     Text("Obtenez votre clé API sur \(selectedProvider.websiteURL)")
-                        .font(.nunitoRegularBold(size: 12))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.leading, 160)
                 }
@@ -170,7 +170,7 @@ struct GeneralSettingsView: View {
                 // Section Préférences
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Préférences")
-                        .font(.nunitoBold(size: 18))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
 
                     VStack(spacing: 0) {
@@ -189,7 +189,7 @@ struct GeneralSettingsView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.pink)
                                 Text("Raccourci global")
-                                    .font(.nunitoRegularBold(size: 15))
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
@@ -220,7 +220,7 @@ struct GeneralSettingsView: View {
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.indigo)
                             Text("Apparence")
-                                .font(.nunitoRegularBold(size: 15))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
@@ -236,7 +236,7 @@ struct GeneralSettingsView: View {
                                         Image(systemName: theme.icon)
                                             .font(.system(size: 12))
                                         Text(theme.displayName)
-                                            .font(.nunitoRegularBold(size: 12))
+                                            .font(.system(size: 12, weight: .semibold))
                                     }
                                     .foregroundColor(selectedTheme == theme ? .white : .secondary)
                                     .padding(.horizontal, 12)
@@ -262,7 +262,7 @@ struct GeneralSettingsView: View {
                 // Permissions Section
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Autorisations")
-                        .font(.nunitoBold(size: 18))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
 
                     HStack {
@@ -272,10 +272,10 @@ struct GeneralSettingsView: View {
                                 .foregroundColor(.green)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Accessibilité")
-                                    .font(.nunitoRegularBold(size: 15))
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.secondary)
                                 Text("Requis pour les raccourcis clavier globaux")
-                                    .font(.nunitoRegularBold(size: 12))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(.secondary.opacity(0.7))
                             }
                         }
@@ -286,7 +286,7 @@ struct GeneralSettingsView: View {
                             openAccessibilitySettings()
                         }) {
                             Text("Ouvrir les réglages")
-                                .font(.nunitoRegularBold(size: 13))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(appBlue)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
@@ -305,7 +305,7 @@ struct GeneralSettingsView: View {
                 // Section Développeur (DEBUG uniquement)
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Développeur")
-                        .font(.nunitoBold(size: 18))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
 
                     HStack {
@@ -315,10 +315,10 @@ struct GeneralSettingsView: View {
                                 .foregroundColor(.red)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Réinitialiser l'onboarding")
-                                    .font(.nunitoRegularBold(size: 15))
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.secondary)
                                 Text("Réaffiche l'onboarding au prochain lancement")
-                                    .font(.nunitoRegularBold(size: 12))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(.secondary.opacity(0.7))
                             }
                         }
@@ -330,7 +330,7 @@ struct GeneralSettingsView: View {
                             NSApp.terminate(nil)
                         }) {
                             Text("Réinitialiser et quitter")
-                                .font(.nunitoRegularBold(size: 13))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.red)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
@@ -496,7 +496,7 @@ struct ModelSpecsTooltip: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 18, height: 18)
                 Text(model.name)
-                    .font(.nunitoBold(size: 15))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.primary)
             }
 

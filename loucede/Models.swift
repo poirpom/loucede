@@ -389,7 +389,7 @@ class ActionsStore: ObservableObject {
         Action(
             name: "Traduis en emoji",
             icon: "face.smiling",
-            prompt: "Traduis le texte suivant en une séquence d'emojis qui en capture fidèlement le sens et l'émotion. Réponds uniquement avec les emojis, sans texte, sans explication.",
+            prompt: "Traduis le texte suivant en une séquence d'emojis. Veille à respecter la structure des phrases et du texte, en incluant la ponctuation. Réponds uniquement avec les emojis, sans texte, sans explication.",
             slotIndex: 2
         ),
         Action(

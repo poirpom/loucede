@@ -69,7 +69,7 @@ struct PermissionsStep: View {
 
                         // Help link
                         Button(action: {}) {
-                            Text("I need help")
+                            Text("J'ai besoin d'aide")
                                 .font(.system(size: 13))
                                 .foregroundColor(stepBlue)
                         }
@@ -86,7 +86,7 @@ struct PermissionsStep: View {
                             grantPermissions()
                         }
                     }) {
-                        Text(hasAccessibilityPermission ? "Continue" : "Grant Permissions")
+                        Text(hasAccessibilityPermission ? "Continuer" : "Autoriser l'accès")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)

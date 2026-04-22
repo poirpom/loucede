@@ -60,7 +60,7 @@ struct ShortcutStep: View {
                         }) {
                             HStack(spacing: 8) {
                                 if savedShortcutKeys.isEmpty {
-                                    Text("Click to record shortcut...")
+                                    Text("Cliquez pour enregistrer un raccourci…")
                                         .font(.system(size: 14))
                                         .foregroundColor(Color(hex: "999999"))
                                 } else {
@@ -88,7 +88,7 @@ struct ShortcutStep: View {
                     Spacer()
                         .frame(height: 16)
 
-                    Text("Click the box above to record a new\nshortcut. You can change this anytime in\nthe settings.")
+                    Text("Cliquez sur la case ci-dessus pour enregistrer\nun nouveau raccourci. Modifiable à tout moment\ndans les réglages.")
                         .font(.system(size: 12))
                         .foregroundColor(Color(hex: "999999"))
                         .lineSpacing(2)
@@ -100,7 +100,7 @@ struct ShortcutStep: View {
                         saveShortcut()
                         onNext()
                     }) {
-                        Text("Next")
+                        Text("Suivant")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -274,11 +274,11 @@ struct OnboardingShortcutTooltip: View {
                 }
 
                 VStack(spacing: 4) {
-                    Text("Recording...")
+                    Text("Enregistrement…")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color(hex: "666666"))
 
-                    Text("Press \u{2318} or \u{2325} + key")
+                    Text("Appuyez sur \u{2318} ou \u{2325} + touche")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "999999"))
                 }
@@ -396,7 +396,7 @@ struct KeyboardHintTooltip: View {
 
             // Tooltip content
             HStack(spacing: 12) {
-                Text("Use")
+                Text("Utilisez")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color(hex: "666666"))
 
@@ -407,11 +407,11 @@ struct KeyboardHintTooltip: View {
                     )
                 }
 
-                Text("or")
+                Text("ou")
                     .font(.system(size: 13))
                     .foregroundColor(Color(hex: "999999"))
 
-                Text("+ key")
+                Text("+ touche")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color(hex: "666666"))
             }

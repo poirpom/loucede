@@ -6,22 +6,6 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Font aliases (système SF Pro)
-// Anciens alias Nunito conservés par compatibilité, redirigés vers la police système.
-// Seront remplacés par des appels directs .system(size:weight:) en Phase 1+.
-
-extension Font {
-    static func nunitoBlack(size: CGFloat) -> Font {
-        .system(size: size, weight: .black)
-    }
-    static func nunitoBold(size: CGFloat) -> Font {
-        .system(size: size, weight: .bold)
-    }
-    static func nunitoRegularBold(size: CGFloat) -> Font {
-        .system(size: size, weight: .semibold)
-    }
-}
-
 // MARK: - Helper
 
 func openAccessibilitySettings() {
