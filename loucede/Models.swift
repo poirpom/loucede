@@ -162,23 +162,51 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
+    /// Identifiant Keychain par provider — "openai", "anthropic", "mistral".
+    private func keychainAccount(for provider: AIProvider) -> String {
+        provider.rawValue.lowercased()
+    }
+
     func loadApiKeys() {
-        if let data = UserDefaults.standard.data(forKey: apiKeysKey),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            for (key, value) in decoded {
-                if let provider = AIProvider(rawValue: key) {
-                    apiKeys[provider] = value
-                }
+        // Migration silencieuse (Phase 4.1a, 2026-04-22) : si des clés existent
+        // encore dans UserDefaults (legacy), on les copie vers Keychain et on
+        // vide l'entrée UserDefaults. Exécutée une seule fois car la clé est
+        // supprimée juste après.
+        migrateLegacyApiKeysIfNeeded()
+
+        // Source de vérité : Keychain. Pour chaque provider, on tente une lecture.
+        for provider in AIProvider.allCases {
+            if let value = KeychainService.read(account: keychainAccount(for: provider)),
+               !value.isEmpty {
+                apiKeys[provider] = value
             }
         }
+    }
+
+    /// Migration one-shot UserDefaults → Keychain. Silencieuse, appelée à chaque
+    /// `loadApiKeys()` mais no-op dès que l'entrée UserDefaults a été supprimée.
+    private func migrateLegacyApiKeysIfNeeded() {
+        guard let data = UserDefaults.standard.data(forKey: apiKeysKey),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data),
+              !decoded.isEmpty else {
+            return
+        }
+        for (key, value) in decoded {
+            guard let provider = AIProvider(rawValue: key), !value.isEmpty else { continue }
+            KeychainService.save(account: keychainAccount(for: provider), value: value)
+        }
+        // Purge définitive du stockage en clair.
+        UserDefaults.standard.removeObject(forKey: apiKeysKey)
     }
 
     func saveApiKey(_ key: String, for provider: AIProvider? = nil) {
         let targetProvider = provider ?? selectedProvider
         apiKeys[targetProvider] = key
-        let stringKeyed = Dictionary(uniqueKeysWithValues: apiKeys.map { ($0.key.rawValue, $0.value) })
-        if let encoded = try? JSONEncoder().encode(stringKeyed) {
-            UserDefaults.standard.set(encoded, forKey: apiKeysKey)
+        let account = keychainAccount(for: targetProvider)
+        if key.isEmpty {
+            KeychainService.delete(account: account)
+        } else {
+            KeychainService.save(account: account, value: key)
         }
     }
 
