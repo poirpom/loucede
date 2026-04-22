@@ -259,7 +259,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Centrer + afficher (fenêtre déjà créée au démarrage)
-        positionPopoverCentered(width: 320, height: 500)
+        positionPopoverCentered(width: 400, height: 500)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -298,7 +298,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             PopoverState.shared.reset()
         }
 
-        positionPopoverCentered(width: 320, height: 500)
+        positionPopoverCentered(width: 400, height: 500)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -464,7 +464,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.openSettings()
         })
 
-        let width: CGFloat = 320
+        let width: CGFloat = 400
         let height: CGFloat = 500
 
         let panel = KeyablePanel(

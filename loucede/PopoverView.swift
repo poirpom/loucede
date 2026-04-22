@@ -36,6 +36,8 @@ struct PopoverView: View {
     @StateObject private var textManager = CapturedTextManager.shared
     @ObservedObject private var state = PopoverState.shared
     @FocusState private var focus: PopoverFocus?
+    // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
+    @State private var confirmation: String?
 
     init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
@@ -50,27 +52,15 @@ struct PopoverView: View {
                 mainView
             }
         }
-        .frame(width: 320)
+        .frame(width: 400)
         .background(VisualEffectBlur())
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onKeyPress(.escape) {
-            // Depuis la vue résultat, Esc revient à la liste de prompts
-            // (cohérent avec le bouton "Retour"). Depuis la liste, Esc ferme le popup.
-            if state.activeAction != nil {
-                state.streamTask?.cancel()
-                state.activeAction = nil
-                state.resultText = ""
-            } else {
-                state.streamTask?.cancel()
-                onClose()
-            }
-            return .handled
-        }
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
         .onChange(of: state.openCounter) { _, _ in
             focus = state.activeAction == nil ? .main : .result
+            confirmation = nil
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -79,6 +69,26 @@ struct PopoverView: View {
         // Bascule aussi le focus quand on passe de liste → résultat ou retour.
         .onChange(of: state.activeAction) { _, newValue in
             focus = newValue == nil ? .main : .result
+            confirmation = nil
+        }
+    }
+
+    // MARK: - Confirmation toast helper
+
+    /// Affiche un toast de confirmation au centre de la vue (copie / collage).
+    /// `duration` = temps avant disparition auto. `then` = action à exécuter
+    /// après la disparition (utile pour Coller qui ferme le popup).
+    private func showConfirmation(_ message: String, duration: Double = 1.2, then completion: (() -> Void)? = nil) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            confirmation = message
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            if confirmation == message {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    confirmation = nil
+                }
+            }
+            completion?()
         }
     }
 
@@ -139,6 +149,12 @@ struct PopoverView: View {
             }
             return .handled
         }
+        // Esc depuis la liste : ferme le popup.
+        .onKeyPress(.escape) {
+            state.streamTask?.cancel()
+            onClose()
+            return .handled
+        }
     }
 
     private func actionRow(action: Action, index: Int) -> some View {
@@ -191,6 +207,7 @@ struct PopoverView: View {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(state.resultText, forType: .string)
+                    showConfirmation("Copié")
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "doc.on.doc")
@@ -200,11 +217,15 @@ struct PopoverView: View {
                 }
                 .keyboardShortcut(.return, modifiers: .command)
 
-                // Coller : ↵ — colle dans l'app précédente (ferme le popup)
+                // Coller : ↵ — colle dans l'app précédente (ferme le popup).
+                // On attend que le toast "Collé" soit visible ~300 ms avant
+                // d'appeler performPasteInPreviousApp (qui orderOut le popup).
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(state.resultText, forType: .string)
-                    globalAppDelegate?.performPasteInPreviousApp()
+                    showConfirmation("Collé", duration: 0.3) {
+                        globalAppDelegate?.performPasteInPreviousApp()
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.doc")
@@ -216,7 +237,7 @@ struct PopoverView: View {
 
                 Spacer()
 
-                // Retour : esc — géré par le handler Esc global au niveau du body,
+                // Retour : esc — géré par le handler Esc au niveau de la resultView,
                 // le bouton reste actionnable à la souris.
                 Button {
                     state.streamTask?.cancel()
@@ -234,6 +255,25 @@ struct PopoverView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .result)
+        // Esc depuis la vue résultat : revient à la liste de prompts (comportement
+        // cohérent avec le bouton "Retour"). Attaché directement ici car les
+        // handlers sur le body outer ne se déclenchent pas toujours quand le focus
+        // SwiftUI est ancré sur une sous-vue focusable.
+        .onKeyPress(.escape) {
+            state.streamTask?.cancel()
+            state.activeAction = nil
+            state.resultText = ""
+            return .handled
+        }
+        // Overlay du toast de confirmation (copie / collage). S'affiche brièvement
+        // au centre de la vue résultat et se dissipe automatiquement.
+        .overlay(alignment: .center) {
+            if let msg = confirmation {
+                ConfirmationToast(message: msg)
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
     }
 }
 
@@ -258,6 +298,30 @@ struct KeyboardKey: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
             )
+    }
+}
+
+// MARK: - Confirmation Toast (✓ Copié / ✓ Collé)
+
+struct ConfirmationToast: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.system(size: 14))
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule().stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
     }
 }
 
