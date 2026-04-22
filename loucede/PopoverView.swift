@@ -38,10 +38,34 @@ struct PopoverView: View {
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
     @State private var confirmation: String?
+    // Monitor NSEvent pour capter les keycodes physiques 18-29 (touches 1/& à 0/à)
+    // et exécuter l'action au slot correspondant. Installé une seule fois au premier
+    // .onAppear — NSEvent.addLocalMonitor ne matche que les events de cette app, donc
+    // il ne se déclenche que quand le popup est key window (pas de conflit hors popup).
+    @State private var slotMonitor: Any?
 
     init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
         self.onOpenSettings = onOpenSettings
+    }
+
+    /// Mapping keyCode physique Carbon → index de slot (0 = touche 1/&, …, 9 = touche 0/à).
+    /// Ces keyCodes sont identiques en AZERTY FR et QWERTY US (c'est la position physique
+    /// de la touche sur le clavier). Source : Carbon HIToolbox `kVK_ANSI_1` … `kVK_ANSI_0`.
+    private static func slotIndex(forPhysicalKeyCode keyCode: UInt16) -> Int? {
+        switch keyCode {
+        case 18: return 0 // touche 1 / &
+        case 19: return 1 // touche 2 / é
+        case 20: return 2 // touche 3 / "
+        case 21: return 3 // touche 4 / '
+        case 23: return 4 // touche 5 / (
+        case 22: return 5 // touche 6 / §
+        case 26: return 6 // touche 7 / è
+        case 28: return 7 // touche 8 / !
+        case 25: return 8 // touche 9 / ç
+        case 29: return 9 // touche 0 / à
+        default: return nil
+        }
     }
 
     var body: some View {
@@ -65,6 +89,7 @@ struct PopoverView: View {
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
             focus = state.activeAction == nil ? .main : .result
+            installSlotMonitorIfNeeded()
         }
         // Bascule aussi le focus quand on passe de liste → résultat ou retour.
         .onChange(of: state.activeAction) { _, newValue in
@@ -78,6 +103,31 @@ struct PopoverView: View {
     /// Affiche un toast de confirmation au centre de la vue (copie / collage).
     /// `duration` = temps avant disparition auto. `then` = action à exécuter
     /// après la disparition (utile pour Coller qui ferme le popup).
+    /// Installe le monitor NSEvent qui capte les touches 1/& → 0/à (keycodes 18-29)
+    /// et lance l'action assignée au slot correspondant, quand le popup est en mode liste.
+    /// N'installe qu'une seule fois (pas de leak, pas de double capture).
+    private func installSlotMonitorIfNeeded() {
+        guard slotMonitor == nil else { return }
+        slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Ne capte que si on est dans la liste de prompts (pas en vue résultat),
+            // et si aucun modifier n'est actif (on ne veut pas intercepter ⌘1, ⌥1, etc.).
+            guard state.activeAction == nil else { return event }
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard mods.isEmpty else { return event }
+            // Match keyCode physique → slot.
+            guard let slot = Self.slotIndex(forPhysicalKeyCode: event.keyCode) else {
+                return event
+            }
+            // Cherche l'action assignée à ce slot et l'exécute.
+            if let action = store.actions.first(where: { $0.slotIndex == slot }) {
+                state.runAction(action)
+                return nil // événement consommé
+            }
+            // Slot vide : on laisse passer (ne bloque rien côté utilisateur).
+            return event
+        }
+    }
+
     private func showConfirmation(_ message: String, duration: Double = 1.2, then completion: (() -> Void)? = nil) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             confirmation = message
@@ -165,6 +215,11 @@ struct PopoverView: View {
             Text(action.name)
                 .font(.system(size: 13))
             Spacer()
+            // Badge de slot : affiche le numéro (1-9, 0) correspondant à la touche
+            // physique qui déclenche l'action. Absent si slotIndex == nil.
+            if let slot = action.slotIndex {
+                KeyboardKey(slot == 9 ? "0" : "\(slot + 1)")
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
