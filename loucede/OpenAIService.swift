@@ -493,26 +493,37 @@ extension AIService {
     ///
     /// Retourne `nil` si :
     /// - la clé est vide,
-    /// - le provider ne supporte pas ce pattern (Anthropic a un endpoint
-    ///   différent, on le gèrera séparément),
     /// - l'appel HTTP échoue (offline, 401, 403, etc.).
     ///
     /// Côté appelant, `nil` signifie « pas d'info → conserver la liste
     /// hard-codée complète ».
+    ///
+    /// Phase 4.6 (2026-04-23) : Anthropic supporte aussi `GET /v1/models`
+    /// (pagination cursor `first_id`/`last_id`, headers `x-api-key` +
+    /// `anthropic-version`). Même format de réponse (`{"data": [...]}`),
+    /// seuls les headers diffèrent. Pour l'usage loucedé (~10 modèles
+    /// Claude), la première page par défaut suffit largement.
     func listAvailableModelIds(provider: AIProvider, apiKey: String) async -> Set<String>? {
         guard !apiKey.isEmpty else { return nil }
 
         let endpoint: String
         switch provider {
-        case .openai:  endpoint = "https://api.openai.com/v1/models"
-        case .mistral: endpoint = "https://api.mistral.ai/v1/models"
-        case .anthropic: return nil
+        case .openai:    endpoint = "https://api.openai.com/v1/models"
+        case .mistral:   endpoint = "https://api.mistral.ai/v1/models"
+        case .anthropic: endpoint = "https://api.anthropic.com/v1/models"
         }
 
         guard let url = URL(string: endpoint) else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // Auth headers : Anthropic utilise `x-api-key` + `anthropic-version`,
+        // OpenAI et Mistral utilisent `Authorization: Bearer …`.
+        if provider == .anthropic {
+            request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        } else {
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.timeoutInterval = 8
 
         do {

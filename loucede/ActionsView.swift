@@ -796,28 +796,28 @@ class PromptImprover {
         }
 
         let systemPrompt = """
-        You are an expert at writing prompts for text transformation apps.
+        Tu es expert dans l'écriture de prompts pour des applications de transformation de texte.
 
-        The user gives you a basic idea, and you expand it into a detailed prompt that will guide an AI to transform text.
+        L'utilisateur te donne une idée basique, et tu la développes en un prompt détaillé qui guidera une IA pour transformer du texte.
 
-        RULES:
-        - Write clear instructions describing the desired style, tone, and characteristics
-        - Include specific techniques and qualities the text should have
-        - Do NOT include phrases like "Return only the text" or "without explanations" at the end
-        - Do NOT start with "Rewrite" or "Transform"
-        - Keep it in the same language as the user's input
+        RÈGLES :
+        - Écris des instructions claires décrivant le style, le ton et les caractéristiques attendus
+        - Inclus les techniques et qualités spécifiques que le texte doit avoir
+        - N'inclus PAS de phrases comme « Retourne uniquement le texte » ou « sans explications » à la fin
+        - Ne commence PAS par « Réécris » ou « Transforme »
+        - Conserve la même langue que celle de l'utilisateur
 
-        EXAMPLES:
-        Input: "formal"
-        Output: "Use professional and formal language. Employ sophisticated vocabulary, proper grammar, and a respectful tone suitable for business communication. Avoid contractions and colloquialisms."
+        EXEMPLES :
+        Entrée : « formel »
+        Sortie : « Utilise un langage professionnel et formel. Emploie un vocabulaire soutenu, une grammaire irréprochable et un ton respectueux adapté à la communication d'affaires. Évite les contractions et les tournures familières. »
 
-        Input: "funny"
-        Output: "Add humor and wit to the text. Use playful language, clever wordplay, and a light-hearted tone. Include amusing observations while keeping the core message intact."
+        Entrée : « drôle »
+        Sortie : « Ajoute de l'humour et de l'esprit au texte. Utilise un langage joueur, des jeux de mots astucieux et un ton léger. Glisse des observations amusantes tout en préservant le message de fond. »
 
-        Input: "hazlo romántico"
-        Output: "Utiliza un lenguaje poético y evocador para expresar emociones profundas. Incluye metáforas, descripciones sensoriales y un tono apasionado pero sincero que resalte la belleza y la conexión."
+        Entrée : "make it romantic"
+        Sortie : "Use poetic and evocative language to express deep emotions. Include metaphors, sensory descriptions, and a passionate yet sincere tone that highlights beauty and connection."
 
-        Return ONLY the improved prompt, nothing else.
+        Retourne UNIQUEMENT le prompt amélioré, rien d'autre.
         """
 
         let body: [String: Any]
@@ -828,7 +828,7 @@ class PromptImprover {
                 "max_tokens": 1024,
                 "system": systemPrompt,
                 "messages": [
-                    ["role": "user", "content": "Improve this prompt: \(prompt)"]
+                    ["role": "user", "content": "Améliore ce prompt : \(prompt)"]
                 ]
             ]
         } else {
@@ -836,7 +836,7 @@ class PromptImprover {
                 "model": model.id,
                 "messages": [
                     ["role": "system", "content": systemPrompt],
-                    ["role": "user", "content": "Improve this prompt: \(prompt)"]
+                    ["role": "user", "content": "Améliore ce prompt : \(prompt)"]
                 ]
             ]
         }
