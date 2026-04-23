@@ -380,9 +380,9 @@ struct PopoverView: View {
 
     private func actionRow(action: Action, index: Int) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: action.icon)
-                .font(.system(size: 14))
-                .frame(width: 20)
+            // Phase 6.4 : emoji via ActionIconView (fallback placeholder
+            // gris pour les SF legacy). Boîte fixe pour aligner la liste.
+            ActionIconView(icon: action.icon, boxSize: 20, fontSize: 14)
             Text(action.name)
                 .font(.system(size: 13))
             Spacer()
@@ -410,7 +410,8 @@ struct PopoverView: View {
     private func resultView(for action: Action) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Image(systemName: action.icon)
+                // Phase 6.4 : emoji via ActionIconView dans le header résultat
+                ActionIconView(icon: action.icon, boxSize: 20, fontSize: 14)
                 Text(action.name).font(.system(size: 13, weight: .semibold))
                 Spacer()
                 if state.isProcessing {

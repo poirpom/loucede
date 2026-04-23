@@ -7,6 +7,28 @@ import Foundation
 import Combine
 import Carbon.HIToolbox
 
+// MARK: - String emoji detection (Phase 6.4, 2026-04-23)
+
+extension String {
+    /// `true` si la chaîne est composée exclusivement de scalars emoji
+    /// (y compris modificateurs de teinte, variation selectors et ZWJ
+    /// pour les emojis composés type famille / drapeaux régionaux).
+    /// Utilisé pour distinguer un `Action.icon` emoji d'un SF Symbol
+    /// legacy non migré (ex. `"text.cursor"`) afin d'afficher un
+    /// placeholder gris en fallback dans la UI.
+    var isEmojiOnly: Bool {
+        guard !isEmpty else { return false }
+        return unicodeScalars.allSatisfy { scalar in
+            scalar.properties.isEmoji
+                || scalar.properties.isEmojiModifier
+                || scalar.properties.isEmojiModifierBase
+                || scalar.value == 0x200D  // Zero-Width Joiner
+                || scalar.value == 0xFE0F  // Variation Selector-16
+                || (0x1F1E6...0x1F1FF).contains(scalar.value)  // Regional indicators (drapeaux)
+        }
+    }
+}
+
 // MARK: - Action Type
 
 enum ActionType: String, Codable, CaseIterable {
@@ -86,6 +108,22 @@ class ActionsStore: ObservableObject {
     private let mainShortcutModifiersKey = "loucede_main_shortcut_modifiers"
     private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
     private let seed26MigrationKey = "loucede_migration_seed_26_done"
+    private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
+
+    /// Mapping SF Symbols → emoji pour les icônes du seed (Phase 6.4).
+    /// Appliqué par `migrateIconsToEmojiIfNeeded()` aux configs existantes.
+    /// Toute icône non présente dans cette table sera affichée en
+    /// placeholder gris (fallback UI) — l'utilisateur pourra alors
+    /// rouvrir l'action et choisir un emoji dans le picker système.
+    private static let sfToEmojiMapping: [String: String] = [
+        "character.book.closed": "🇫🇷",
+        "globe": "🇬🇧",
+        "face.smiling": "😀",
+        "text.cursor": "✍️",
+        "text.append": "🤏",
+        "bubble.left": "💬",
+        "fork.knife": "🍳",
+    ]
 
     static let shared = ActionsStore()
 
@@ -137,13 +175,16 @@ class ActionsStore: ObservableObject {
             actions = decoded
             migrateLegacySeedIfNeeded()
             migrateSeed26IfNeeded()
+            migrateIconsToEmojiIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
-            // Premier lancement : le seed contient déjà les actions 2.6,
-            // on pose le flag pour ne pas re-déclencher la migration si
-            // l'utilisateur vide sa config plus tard.
+            // Premier lancement : le seed contient déjà les actions 2.6
+            // et les emojis 6.4, on pose les deux flags pour ne pas
+            // re-déclencher les migrations si l'utilisateur vide sa
+            // config plus tard.
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
+            UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
         }
     }
 
@@ -189,7 +230,7 @@ class ActionsStore: ObservableObject {
             let freeSlot = (0..<10).first { !usedSlots.contains($0) }
             actions.append(Action(
                 name: "Extrais la recette",
-                icon: "fork.knife",
+                icon: "🍳",
                 prompt: Self.recipeExtractionPrompt,
                 slotIndex: freeSlot
             ))
@@ -200,6 +241,31 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: seed26MigrationKey)
+    }
+
+    /// Migration one-shot (Phase 6.4, 2026-04-23) : convertit les icônes
+    /// SF Symbols des actions persistées en emojis pour les 7 icônes du
+    /// seed historique (table `sfToEmojiMapping`). Les icônes non-mappées
+    /// (actions custom avec SF exotique) sont laissées telles quelles —
+    /// la UI détectera que ce n'est pas un emoji via `isEmojiOnly` et
+    /// affichera un placeholder gris. L'utilisateur pourra rouvrir
+    /// l'action et choisir un emoji via le picker système.
+    private func migrateIconsToEmojiIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: iconsEmojiMigrationKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            let currentIcon = actions[idx].icon
+            if let emoji = Self.sfToEmojiMapping[currentIcon] {
+                actions[idx].icon = emoji
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
     }
 
     func saveActions() {
@@ -474,7 +540,7 @@ class ActionsStore: ObservableObject {
     static let defaultActions: [Action] = [
         Action(
             name: "Traduis en français",
-            icon: "character.book.closed",
+            icon: "🇫🇷",
             prompt: """
             Tu es un traducteur professionnel. Traduis le texte suivant en français.
             Règles :
@@ -491,7 +557,7 @@ class ActionsStore: ObservableObject {
         ),
         Action(
             name: "Traduis en anglais",
-            icon: "globe",
+            icon: "🇬🇧",
             prompt: """
             Tu es un traducteur professionnel. Traduis le texte suivant en anglais.
             Règles :
@@ -507,13 +573,13 @@ class ActionsStore: ObservableObject {
         ),
         Action(
             name: "Traduis en emoji",
-            icon: "face.smiling",
+            icon: "😀",
             prompt: "Traduis le texte suivant en une séquence d'emojis. Veille à respecter la structure des phrases et du texte, en incluant la ponctuation. Réponds uniquement avec les emojis, sans texte, sans explication.",
             slotIndex: 2
         ),
         Action(
             name: "Corrige les fautes",
-            icon: "text.cursor",
+            icon: "✍️",
             prompt: """
             Tu es un correcteur professionnel. Corrige les fautes d'orthographe, de grammaire et de typographie du texte suivant.
             Règles :
@@ -525,7 +591,7 @@ class ActionsStore: ObservableObject {
         ),
         Action(
             name: "Résume ce texte",
-            icon: "text.append",
+            icon: "🤏",
             prompt: """
             Tu es un rédacteur professionnel. Résume le texte suivant en français.
             Règles :
@@ -539,13 +605,13 @@ class ActionsStore: ObservableObject {
         ),
         Action(
             name: "Commente ce post LinkedIn",
-            icon: "bubble.left",
+            icon: "💬",
             prompt: "Tu es un expert en sarcasme poli. Rédige un commentaire LinkedIn court (1-2 phrases maximum), cinglant et sarcastique, en réponse au texte suivant. Le ton doit rester juste assez acceptable pour ne pas être signalé. Réponds uniquement avec le commentaire.",
             slotIndex: 5
         ),
         Action(
             name: "Extrais la recette",
-            icon: "fork.knife",
+            icon: "🍳",
             prompt: recipeExtractionPrompt,
             slotIndex: 6
         ),

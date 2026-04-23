@@ -267,11 +267,9 @@ struct ActionListRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Icon
-            Image(systemName: action.icon)
-                .font(.system(size: 18, weight: .black))
-                .foregroundColor(textGrayColor)
-                .frame(width: 24)
+            // Icon (Phase 6.4 : emoji via ActionIconView, avec fallback
+            // placeholder gris pour les SF legacy non migrés)
+            ActionIconView(icon: action.icon, boxSize: 24, fontSize: 18)
 
             // Name — Phase 1.5d : .semibold → .bold pour lisibilité / hiérarchie visuelle
             Text(action.name.isEmpty ? "Nouvelle action" : action.name)
@@ -326,16 +324,13 @@ struct ActionEditorView: View {
                 VStack(alignment: .leading, spacing: 20) {
                         // Header with icon and name
                         HStack(spacing: 12) {
-                            // Custom Icon Picker Button
+                            // Custom Icon Picker Button (Phase 6.4 : emoji)
                             Button(action: {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                     showIconPicker.toggle()
                                 }
                             }) {
-                                Image(systemName: action.icon)
-                                    .font(.system(size: 24, weight: .black))
-                                    .foregroundColor(textGrayColor)
-                                    .frame(width: 36, height: 36)
+                                ActionIconView(icon: action.icon, boxSize: 36, fontSize: 24)
                             }
                             .buttonStyle(.plain)
 
@@ -509,7 +504,7 @@ struct ActionEditorView: View {
                         }
                     }
 
-                IconPickerView(
+                EmojiPickerView(
                     selectedIcon: action.icon,
                     onSelect: { icon in
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
