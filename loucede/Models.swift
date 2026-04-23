@@ -85,6 +85,7 @@ class ActionsStore: ObservableObject {
     private let mainShortcutKey = "loucede_main_shortcut"
     private let mainShortcutModifiersKey = "loucede_main_shortcut_modifiers"
     private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
+    private let seed26MigrationKey = "loucede_migration_seed_26_done"
 
     static let shared = ActionsStore()
 
@@ -135,9 +136,14 @@ class ActionsStore: ObservableObject {
            !decoded.isEmpty {
             actions = decoded
             migrateLegacySeedIfNeeded()
+            migrateSeed26IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
+            // Premier lancement : le seed contient déjà les actions 2.6,
+            // on pose le flag pour ne pas re-déclencher la migration si
+            // l'utilisateur vide sa config plus tard.
+            UserDefaults.standard.set(true, forKey: seed26MigrationKey)
         }
     }
 
@@ -155,6 +161,45 @@ class ActionsStore: ObservableObject {
         }
         actions = Self.defaultActions
         saveActions()
+    }
+
+    /// Migration one-shot (Phase 2.6, 2026-04-23) : pour les utilisateurs
+    /// ayant déjà une config persistée avant l'ajout des actions 2.6a/2.6b
+    /// au seed :
+    /// - renomme « Réponds à ce post LinkedIn » → « Commente ce post LinkedIn »
+    ///   si l'action existe (évite le doublon si l'utilisateur avait créé
+    ///   l'ancienne version manuellement)
+    /// - ajoute « Extrais la recette » si absente, sur le premier slot libre
+    /// Les actions custom de l'utilisateur ne sont pas touchées. Après
+    /// exécution, le flag `seed26MigrationKey` empêche toute ré-exécution.
+    private func migrateSeed26IfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: seed26MigrationKey) else { return }
+
+        var changed = false
+
+        // a) Renommage LinkedIn (si l'ancienne existe)
+        if let idx = actions.firstIndex(where: { $0.name == "Réponds à ce post LinkedIn" }) {
+            actions[idx].name = "Commente ce post LinkedIn"
+            changed = true
+        }
+
+        // b) Ajout recette (si absente)
+        if !actions.contains(where: { $0.name == "Extrais la recette" }) {
+            let usedSlots = Set(actions.compactMap { $0.slotIndex })
+            let freeSlot = (0..<10).first { !usedSlots.contains($0) }
+            actions.append(Action(
+                name: "Extrais la recette",
+                icon: "fork.knife",
+                prompt: Self.recipeExtractionPrompt,
+                slotIndex: freeSlot
+            ))
+            changed = true
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: seed26MigrationKey)
     }
 
     func saveActions() {
@@ -492,5 +537,40 @@ class ActionsStore: ObservableObject {
             """,
             slotIndex: 4
         ),
+        Action(
+            name: "Commente ce post LinkedIn",
+            icon: "bubble.left",
+            prompt: "Tu es un expert en sarcasme poli. Rédige un commentaire LinkedIn court (1-2 phrases maximum), cinglant et sarcastique, en réponse au texte suivant. Le ton doit rester juste assez acceptable pour ne pas être signalé. Réponds uniquement avec le commentaire.",
+            slotIndex: 5
+        ),
+        Action(
+            name: "Extrais la recette",
+            icon: "fork.knife",
+            prompt: recipeExtractionPrompt,
+            slotIndex: 6
+        ),
     ]
+
+    /// Prompt partagé entre le seed `defaultActions` (nouveaux utilisateurs)
+    /// et la migration `migrateSeed26IfNeeded()` (utilisateurs existants)
+    /// pour garantir que les deux chemins produisent strictement la même
+    /// action "Extrais la recette".
+    static let recipeExtractionPrompt: String = """
+    Tu extrais une recette de cuisine depuis le texte fourni et la restitues en français, au système métrique.
+    Règles :
+    - Détecte automatiquement la langue source
+    - Traduis intégralement en français naturel
+    - Convertis toutes les mesures au système métrique :
+      - Volumes en millilitres (ml) ou litres (l)
+      - Poids en grammes (g) ou kilogrammes (kg)
+      - Températures en degrés Celsius (°C)
+      - Tasses US (cups), cuillères à soupe/café, onces → équivalents métriques
+    - Structure la sortie en Markdown avec :
+      - Titre en `#`
+      - `## Ingrédients` (liste à puces, quantité + unité + ingrédient)
+      - `## Préparation` (liste numérotée, une étape par ligne)
+      - Optionnel : `## Notes` si le texte contient astuces/variantes
+    - Ignore le contenu hors-recette (publicité, anecdotes, commentaires, histoire personnelle du blogueur)
+    - Réponds uniquement avec la recette structurée, sans introduction
+    """
 }
