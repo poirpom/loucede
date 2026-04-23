@@ -9,6 +9,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 // MARK: - Shared UI helpers
 
@@ -43,6 +44,14 @@ struct PopoverView: View {
     // .onAppear — NSEvent.addLocalMonitor ne matche que les events de cette app, donc
     // il ne se déclenche que quand le popup est key window (pas de conflit hors popup).
     @State private var slotMonitor: Any?
+    // Curseur clignotant du champ de recherche. Toggle via un Timer.publish
+    // pour signaler visuellement que le champ est actif (la saisie clavier est
+    // captée en permanence par .onKeyPress — le focus SwiftUI est toujours sur .main).
+    @State private var cursorVisible: Bool = true
+    // Phase 1.4b : état « fenêtre résultat agrandie » (touche F).
+    // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
+    // du popup), pour que chaque nouvelle action reparte en format compact.
+    @State private var resultExpanded: Bool = false
 
     init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
@@ -76,7 +85,10 @@ struct PopoverView: View {
                 mainView
             }
         }
-        .frame(width: 400)
+        // Phase 1.4b : largeur responsive (400 compact → 500 agrandi). Nécessaire
+        // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
+        // on verrait une bande transparente de chaque côté.
+        .frame(width: resultExpanded ? 500 : 400)
         // Phase 1.4h : fond popup solide #2E2E2E (remplace le VisualEffectBlur
         // translucide). Choix délibéré de palette dark unifiée, indépendante
         // de la transparence macOS.
@@ -88,6 +100,9 @@ struct PopoverView: View {
         .onChange(of: state.openCounter) { _, _ in
             focus = state.activeAction == nil ? .main : .result
             confirmation = nil
+            // Reset : showPopover remet déjà la fenêtre à 400×500, on n'a
+            // qu'à synchroniser l'état local.
+            resultExpanded = false
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -98,6 +113,14 @@ struct PopoverView: View {
         .onChange(of: state.activeAction) { _, newValue in
             focus = newValue == nil ? .main : .result
             confirmation = nil
+            // Retour liste depuis résultat agrandi → replier la fenêtre en
+            // animant les deux côtés (NSWindow + SwiftUI) comme toggleResultExpanded.
+            if newValue == nil, resultExpanded {
+                globalAppDelegate?.resizePopover(expanded: false)
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    resultExpanded = false
+                }
+            }
         }
     }
 
@@ -111,23 +134,70 @@ struct PopoverView: View {
     /// N'installe qu'une seule fois (pas de leak, pas de double capture).
     private func installSlotMonitorIfNeeded() {
         guard slotMonitor == nil else { return }
+        // Capture locale : évite que le closure du monitor ne retienne `self`.
+        let closeHandler = onClose
         slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // Ne capte que si on est dans la liste de prompts (pas en vue résultat),
-            // et si aucun modifier n'est actif (on ne veut pas intercepter ⌘1, ⌥1, etc.).
+            // Vue résultat : on ne touche à rien, le handler SwiftUI gère.
             guard state.activeAction == nil else { return event }
+
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard mods.isEmpty else { return event }
-            // Match keyCode physique → slot.
-            guard let slot = Self.slotIndex(forPhysicalKeyCode: event.keyCode) else {
+
+            // --- Sans modifier : Backspace / Esc gérés ici, le reste passe à SwiftUI.
+            // Raison : .onKeyPress(.delete) et .onKeyPress(.escape) sont peu fiables
+            // sur macOS (le système intercepte souvent avant SwiftUI), alors que le
+            // NSEvent monitor voit toutes les touches physiques sans ambigüité.
+            if mods.isEmpty {
+                switch event.keyCode {
+                case 51: // ⌫ Backspace
+                    if !state.searchQuery.isEmpty {
+                        state.searchQuery.removeLast()
+                        return nil
+                    }
+                    return event
+                case 53: // ⎋ Escape
+                    if !state.searchQuery.isEmpty {
+                        state.searchQuery = ""
+                        return nil
+                    }
+                    // Esc sans recherche active : ferme le popup.
+                    state.streamTask?.cancel()
+                    closeHandler()
+                    return nil
+                default:
+                    return event // chiffres, lettres, ponctuation → SwiftUI onKeyPress
+                }
+            }
+
+            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g).
+            // On passe les slots derrière ⌘ pour libérer les frappes nues (chiffres
+            // inclus) au profit du champ de recherche libre de la liste.
+            if mods == [.command] {
+                guard let slot = Self.slotIndex(forPhysicalKeyCode: event.keyCode) else {
+                    return event
+                }
+                if let action = store.actions.first(where: { $0.slotIndex == slot }) {
+                    state.runAction(action)
+                    return nil
+                }
                 return event
             }
-            // Cherche l'action assignée à ce slot et l'exécute.
-            if let action = store.actions.first(where: { $0.slotIndex == slot }) {
-                state.runAction(action)
-                return nil // événement consommé
-            }
-            // Slot vide : on laisse passer (ne bloque rien côté utilisateur).
+
             return event
+        }
+    }
+
+    /// Phase 1.4b : bascule le format de la fenêtre résultat (compact ↔ agrandi).
+    /// Deux animations jouent en parallèle et de même durée (0.25 s easeInOut) :
+    /// 1) la NSWindow via NSAnimationContext (AppDelegate.resizePopover)
+    /// 2) les frames SwiftUI via withAnimation
+    /// La 2e évite le saut abrupt à la réduction : sans elle, SwiftUI recalcule
+    /// instantanément maxHeight=300, ce qui crée un espace vide avant que la
+    /// fenêtre elle-même n'ait fini de rétrécir.
+    private func toggleResultExpanded() {
+        let newExpanded = !resultExpanded
+        globalAppDelegate?.resizePopover(expanded: newExpanded)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            resultExpanded = newExpanded
         }
     }
 
@@ -146,6 +216,17 @@ struct PopoverView: View {
     }
 
     // MARK: - Main
+
+    /// Liste d'actions filtrée par `state.searchQuery` (Phase 1.4g).
+    /// Recherche case-insensitive sur le nom, trim des espaces en bord.
+    /// Vide → renvoie toutes les actions (pas de filtrage).
+    private var filteredActions: [Action] {
+        let q = state.searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return store.actions }
+        return store.actions.filter {
+            $0.name.range(of: q, options: .caseInsensitive) != nil
+        }
+    }
 
     private var mainView: some View {
         // spacing: 0 (comme resultView) pour que la zone #1B1C1C colle directement
@@ -166,13 +247,74 @@ struct PopoverView: View {
             // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
             // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
             VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
-                            actionRow(action: action, index: index)
+                // Phase 1.4g : bandeau de recherche toujours visible, avec
+                // placeholder « Rechercher » pour signaler la fonction à
+                // l'utilisateur. Alimenté par la frappe directe (onKeyPress
+                // ci-dessous), backspace supprime le dernier char.
+                // Curseur clignotant : feedback visuel « champ actif » — le popup
+                // reçoit la saisie en permanence via onKeyPress, donc il n'y a pas
+                // de vrai @FocusState sur un TextField à refléter. On affiche
+                // simplement un curseur qui clignote pour que l'utilisateur
+                // comprenne qu'il peut taper directement.
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    if state.searchQuery.isEmpty {
+                        // Empty : curseur à gauche + placeholder grisé à droite
+                        // (convention macOS : Spotlight, champ de recherche Finder…).
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 1.5, height: 14)
+                            .opacity(cursorVisible ? 1 : 0)
+                        Text("Rechercher")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        // Non-empty : saisie + curseur à la fin (position d'insertion).
+                        HStack(spacing: 1) {
+                            Text(state.searchQuery)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Rectangle()
+                                .fill(Color.white)
+                                .frame(width: 1.5, height: 14)
+                                .opacity(cursorVisible ? 1 : 0)
                         }
                     }
-                    .padding(.horizontal, 8)
+                    Spacer()
+                    if !state.searchQuery.isEmpty {
+                        Text("⌫")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .onTapGesture { focus = .main }
+                // Timer de clignotement ~530 ms (rythme caret macOS). Auto-démarré
+                // via autoconnect, s'arrête naturellement quand la vue disparaît.
+                .onReceive(Timer.publish(every: 0.53, on: .main, in: .common).autoconnect()) { _ in
+                    cursorVisible.toggle()
+                }
+                Divider()
+
+                ScrollView {
+                    if filteredActions.isEmpty {
+                        Text("Aucune action trouvée")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 24)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(Array(filteredActions.enumerated()), id: \.element.id) { index, action in
+                                actionRow(action: action, index: index)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                    }
                 }
                 .frame(maxHeight: 360)
 
@@ -200,25 +342,39 @@ struct PopoverView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .main)
-        .onKeyPress(.upArrow) {
-            state.selectedIndex = max(0, state.selectedIndex - 1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            state.selectedIndex = min(store.actions.count - 1, state.selectedIndex + 1)
-            return .handled
-        }
-        .onKeyPress(.return) {
-            if store.actions.indices.contains(state.selectedIndex) {
-                state.runAction(store.actions[state.selectedIndex])
+        // Handler clavier SwiftUI pour flèches + Entrée + saisie de recherche.
+        // Backspace (⌫) et Esc (⎋) sont gérés par le monitor NSEvent
+        // (cf. installSlotMonitorIfNeeded) car .onKeyPress(.delete/.escape) est
+        // peu fiable sur macOS quand la fenêtre est préchargée (NSHostingView) —
+        // le système intercepte souvent avant que SwiftUI ne reçoive l'event.
+        .onKeyPress(phases: .down) { press in
+            switch press.key {
+            case .upArrow:
+                state.selectedIndex = max(0, state.selectedIndex - 1)
+                return .handled
+            case .downArrow:
+                state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
+                return .handled
+            case .return:
+                if filteredActions.indices.contains(state.selectedIndex) {
+                    state.runAction(filteredActions[state.selectedIndex])
+                }
+                return .handled
+            default:
+                // Phase 1.4g : tout caractère imprimable mono-char alimente
+                // la recherche (lettres, accents, chiffres, espace, ponctuation).
+                if press.characters.count == 1, let ch = press.characters.first,
+                   ch.isLetter || ch.isNumber || ch.isPunctuation || ch == " " {
+                    state.searchQuery.append(ch)
+                    return .handled
+                }
+                return .ignored
             }
-            return .handled
         }
-        // Esc depuis la liste : ferme le popup.
-        .onKeyPress(.escape) {
-            state.streamTask?.cancel()
-            onClose()
-            return .handled
+        // Reset l'index sélectionné quand la liste filtrée change, sinon on peut
+        // pointer hors-bornes après filtrage.
+        .onChange(of: state.searchQuery) { _, _ in
+            state.selectedIndex = 0
         }
     }
 
@@ -230,10 +386,13 @@ struct PopoverView: View {
             Text(action.name)
                 .font(.system(size: 13))
             Spacer()
-            // Badge de slot : affiche le numéro (1-9, 0) correspondant à la touche
-            // physique qui déclenche l'action. Absent si slotIndex == nil.
+            // Badge de slot : affiche ⌘1 … ⌘9 / ⌘0 correspondant au raccourci
+            // qui déclenche l'action (Option B — Phase 1.4g). Les chiffres nus
+            // alimentent le champ de recherche, d'où le préfixe ⌘. On affiche
+            // le chiffre logique plutôt que le label AZERTY car c'est ce que
+            // l'utilisateur tape réellement avec ⌘, quel que soit son layout.
             if let slot = action.slotIndex {
-                KeyboardKey(slot == 9 ? "0" : "\(slot + 1)")
+                KeyboardKey("⌘\(slot == 9 ? 0 : slot + 1)")
             }
         }
         .padding(.horizontal, 10)
@@ -271,7 +430,12 @@ struct PopoverView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                 }
-                .frame(maxHeight: 300)
+                // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
+                // la hauteur disponible. En format compact, plafonné à 300.
+                // Valeur finie (2000) plutôt que .infinity pour permettre à SwiftUI
+                // d'interpoler la hauteur sous withAnimation (depuis/vers .infinity
+                // produit un saut abrupt, surtout à la réduction).
+                .frame(maxHeight: resultExpanded ? 2000 : 300)
 
                 Divider()
 
@@ -315,6 +479,18 @@ struct PopoverView: View {
 
                     Spacer()
 
+                    // Phase 1.4b : indicateur F Agrandir / F Réduire. Clic souris
+                    // bascule aussi pour cohérence (sinon seule la touche F marcherait).
+                    Button { toggleResultExpanded() } label: {
+                        HStack(spacing: 6) {
+                            KeyboardKey("F")
+                            Text(resultExpanded ? "Réduire" : "Agrandir")
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
                     // Retour : esc — géré par le handler Esc au niveau de la resultView,
                     // le bouton reste actionnable à la souris.
                     Button {
@@ -336,15 +512,24 @@ struct PopoverView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .result)
-        // Esc depuis la vue résultat : revient à la liste de prompts (comportement
-        // cohérent avec le bouton "Retour"). Attaché directement ici car les
-        // handlers sur le body outer ne se déclenchent pas toujours quand le focus
-        // SwiftUI est ancré sur une sous-vue focusable.
-        .onKeyPress(.escape) {
-            state.streamTask?.cancel()
-            state.activeAction = nil
-            state.resultText = ""
-            return .handled
+        // Handler clavier vue résultat : Esc (retour liste) + F (bascule taille).
+        // Unifié en un seul .onKeyPress(phases:) plutôt que plusieurs handlers
+        // empilés, pour avoir un dispatch explicite et prévisible.
+        .onKeyPress(phases: .down) { press in
+            switch press.key {
+            case .escape:
+                state.streamTask?.cancel()
+                state.activeAction = nil
+                state.resultText = ""
+                return .handled
+            default:
+                // F / f → bascule format. lowercased() pour accepter caps lock.
+                if press.characters.lowercased() == "f" {
+                    toggleResultExpanded()
+                    return .handled
+                }
+                return .ignored
+            }
         }
         // Overlay du toast de confirmation (copie / collage). S'affiche brièvement
         // au centre de la vue résultat et se dissipe automatiquement.

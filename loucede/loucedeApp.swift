@@ -313,6 +313,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popoverWindow?.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 
+    /// Dimensions par défaut du popup (format « petit »), utilisées au premier
+    /// affichage et au retour à la taille normale depuis l'agrandissement.
+    static let popoverDefaultWidth: CGFloat = 400
+    static let popoverDefaultHeight: CGFloat = 500
+    /// Phase 1.4b : format « agrandi » (touche F sur la vue résultat).
+    /// Largeur fixe ; hauteur = 70 % de la visibleFrame de l'écran (15 % de
+    /// marge haut + 15 % bas). Recentré à chaque resize pour rester équilibré.
+    static let popoverExpandedWidth: CGFloat = 500
+
+    /// Bascule la fenêtre popup entre format normal et format agrandi avec
+    /// animation fluide (NSAnimationContext). Recalcule le centrage pour
+    /// compenser le changement de dimensions. Appelé depuis PopoverView
+    /// sur appui de la touche F quand la vue résultat est affichée.
+    func resizePopover(expanded: Bool) {
+        guard let screen = NSScreen.main, let window = popoverWindow else { return }
+        let screenRect = screen.visibleFrame
+        let width: CGFloat = expanded ? Self.popoverExpandedWidth : Self.popoverDefaultWidth
+        let height: CGFloat = expanded ? (screenRect.height * 0.7) : Self.popoverDefaultHeight
+        let x = (screenRect.width - width) / 2 + screenRect.minX
+        let y = (screenRect.height - height) / 2 + screenRect.minY
+        let newFrame = NSRect(x: x, y: y, width: width, height: height)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(newFrame, display: true)
+        }
+    }
+
     private func installOutsideClickMonitor() {
         // Un seul monitor à la fois — on retire l'ancien si présent.
         if let monitor = eventMonitor {

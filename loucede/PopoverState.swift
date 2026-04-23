@@ -21,6 +21,11 @@ final class PopoverState: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var resultText: String = ""
 
+    // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
+    // via les frappes dans mainView (.onKeyPress générique). Quand non vide,
+    // la liste est filtrée par substring case-insensitive sur le nom.
+    @Published var searchQuery: String = ""
+
     // Compteur incrémenté à chaque ouverture du popup. Permet à PopoverView
     // de re-forcer le focus clavier via @FocusState lors de la réutilisation
     // de la fenêtre préchargée (sinon .onKeyPress reste "stale" et les
@@ -43,6 +48,7 @@ final class PopoverState: ObservableObject {
         selectedIndex = 0
         isProcessing = false
         resultText = ""
+        searchQuery = ""
         openCounter &+= 1
     }
 

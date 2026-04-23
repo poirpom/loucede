@@ -17,7 +17,8 @@ func openAccessibilitySettings() {
 struct SettingsView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var updateChecker = UpdateChecker.shared
-    @State private var selectedTab = 1
+    // Phase 1.5a : onglet "Général" (index 0) par défaut au lieu de "Actions" (1).
+    @State private var selectedTab = 0
     @State private var selectedAction: Action?
 
     @AppStorage("appTheme") private var appTheme: String = "System"
@@ -36,7 +37,9 @@ struct SettingsView: View {
                 TabTextButton(title: "Général", isSelected: selectedTab == 0) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 0 }
                 }
-                TabTextButton(title: "Prompts", isSelected: selectedTab == 1) {
+                // Phase 1.5b : "Prompts" renommé "Actions" pour cohérence avec
+                // le reste du vocabulaire (ActionsStore, Action, actionRow…).
+                TabTextButton(title: "Actions", isSelected: selectedTab == 1) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
                 }
                 TabTextButton(title: "Modèles", isSelected: selectedTab == 2) {

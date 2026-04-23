@@ -273,9 +273,9 @@ struct ActionListRow: View {
                 .foregroundColor(textGrayColor)
                 .frame(width: 24)
 
-            // Name
+            // Name — Phase 1.5d : .semibold → .bold pour lisibilité / hiérarchie visuelle
             Text(action.name.isEmpty ? "Nouvelle action" : action.name)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundColor(textGrayColor)
                 .lineLimit(1)
 
@@ -360,6 +360,7 @@ struct ActionEditorView: View {
                     SlotPicker(
                         slotIndex: $action.slotIndex,
                         conflictName: conflictName(for: action.slotIndex, excluding: action.id),
+                        usedSlots: usedSlots(excluding: action.id),
                         onChange: { hasUnsavedChanges = true }
                     )
                     .background(inputBackgroundColor)
@@ -527,11 +528,23 @@ struct ActionEditorView: View {
 
     /// Nom de l'action qui occupe déjà ce slot (hors action en cours d'édition), ou nil.
     /// Utilisé pour prévenir l'utilisateur qu'il va écraser une assignation existante.
+    /// En pratique, avec `usedSlots` qui désactive les slots déjà pris, ce chemin
+    /// ne devrait plus se déclencher à la sélection — gardé comme garde-fou pour
+    /// les états existants (import de config, migration, etc.).
     private func conflictName(for slot: Int?, excluding actionId: UUID) -> String? {
         guard let slot = slot else { return nil }
         return ActionsStore.shared.actions.first {
             $0.id != actionId && $0.slotIndex == slot
         }?.name
+    }
+
+    /// Ensemble des slots occupés par d'autres actions (hors celle éditée).
+    /// Passé à SlotPicker pour désactiver l'entrée correspondante dans le menu
+    /// et éviter qu'un utilisateur attribue le même raccourci à deux actions.
+    private func usedSlots(excluding actionId: UUID) -> Set<Int> {
+        Set(ActionsStore.shared.actions
+            .filter { $0.id != actionId }
+            .compactMap { $0.slotIndex })
     }
 
     func saveChanges() {
@@ -707,11 +720,12 @@ struct TooltipArrow: Shape {
 struct SlotPicker: View {
     @Binding var slotIndex: Int?
     let conflictName: String?
+    /// Slots déjà attribués à d'autres actions — désactivés dans le menu pour
+    /// empêcher l'utilisateur d'attribuer le même raccourci à deux actions.
+    /// Le slot actuellement sélectionné par CETTE action n'y est PAS inclus
+    /// (il reste sélectionnable / affichable).
+    let usedSlots: Set<Int>
     var onChange: () -> Void = {}
-
-    /// Libellés AZERTY FR de la rangée du haut. L'ordre correspond aux slots 0-9
-    /// c.-à-d. aux keycodes physiques 18, 19, 20, 21, 23, 22, 26, 28, 25, 29.
-    private static let slotLabels = ["&", "é", "\"", "'", "(", "§", "è", "!", "ç", "à"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -728,8 +742,14 @@ struct SlotPicker: View {
                     }
                 )) {
                     Text("Aucun").tag(-1)
-                    ForEach(0..<Self.slotLabels.count, id: \.self) { i in
-                        Text("\(Self.slotLabels[i])  (\(i == 9 ? 0 : i + 1))").tag(i)
+                    ForEach(0..<10, id: \.self) { i in
+                        // Phase 1.4g / Option B : raccourci déclenché par ⌘+chiffre
+                        // (i=9 → ⌘0 par convention rangée clavier). Les chiffres
+                        // sont affichés tels quels car indépendants du layout :
+                        // ⌘+1 fonctionne identiquement en AZERTY et QWERTY.
+                        Text("⌘\(i == 9 ? 0 : i + 1)")
+                            .tag(i)
+                            .disabled(usedSlots.contains(i))
                     }
                 }
                 .labelsHidden()
