@@ -10,6 +10,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import MarkdownUI
 
 // MARK: - Shared UI helpers
 
@@ -425,8 +426,17 @@ struct PopoverView: View {
             // Phase 1.4i : zone basse du résultat (texte + footer boutons) en #1B1C1C.
             VStack(spacing: 0) {
                 ScrollView {
-                    Text(state.resultText)
-                        .font(.system(size: 13))
+                    // Phase 6.5 (2026-04-23) : rendu Markdown via MarkdownUI
+                    // (gonzalezreal/swift-markdown-ui, MIT). Les actions
+                    // "Extrais la recette" et "Expliquer" produisent du
+                    // Markdown structuré (titres `#`/`##`, listes, gras,
+                    // code…) — l'afficher en texte brut rendait les marques
+                    // visibles. Le bouton Copier continue de coller le
+                    // Markdown brut (cf. `state.resultText` préservé).
+                    Markdown(state.resultText)
+                        .markdownTextStyle(\.text) {
+                            FontSize(13)
+                        }
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)

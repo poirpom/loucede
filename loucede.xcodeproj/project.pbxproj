@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		85257E4A2F9AB3100045D5D0 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 85257E492F9AB3100045D5D0 /* MarkdownUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		409C5B1F2F23E0FA0088B219 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				85257E4A2F9AB3100045D5D0 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +130,7 @@
 			);
 			name = loucede;
 			packageProductDependencies = (
+				85257E492F9AB3100045D5D0 /* MarkdownUI */,
 			);
 			productName = loucede;
 			productReference = 409C5B112F23E0F90088B219 /* loucede.app */;
@@ -210,6 +216,7 @@
 			mainGroup = 409C5B082F23E0F90088B219;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				85257E482F9AB3100045D5D0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 409C5B122F23E0F90088B219 /* Products */;
@@ -607,6 +614,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		85257E482F9AB3100045D5D0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		85257E492F9AB3100045D5D0 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 85257E482F9AB3100045D5D0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 409C5B092F23E0F90088B219 /* Project object */;
 }

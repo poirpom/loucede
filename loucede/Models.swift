@@ -109,6 +109,7 @@ class ActionsStore: ObservableObject {
     private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
     private let seed26MigrationKey = "loucede_migration_seed_26_done"
     private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
+    private let seed27MigrationKey = "loucede_migration_seed_27_done"
 
     /// Mapping SF Symbols → emoji pour les icônes du seed (Phase 6.4).
     /// Appliqué par `migrateIconsToEmojiIfNeeded()` aux configs existantes.
@@ -176,15 +177,17 @@ class ActionsStore: ObservableObject {
             migrateLegacySeedIfNeeded()
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
+            migrateSeed27IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
-            // Premier lancement : le seed contient déjà les actions 2.6
-            // et les emojis 6.4, on pose les deux flags pour ne pas
-            // re-déclencher les migrations si l'utilisateur vide sa
-            // config plus tard.
+            // Premier lancement : le seed contient déjà les actions 2.6,
+            // les emojis 6.4 et l'action "Expliquer" (2.7), on pose
+            // les trois flags pour ne pas re-déclencher les migrations
+            // si l'utilisateur vide sa config plus tard.
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
             UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
+            UserDefaults.standard.set(true, forKey: seed27MigrationKey)
         }
     }
 
@@ -266,6 +269,30 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
+    }
+
+    /// Migration one-shot (Phase 2.7, 2026-04-23) : ajoute « Expliquer »
+    /// au seed pour les utilisateurs ayant déjà une config persistée
+    /// avant cet ajout. Pose l'action sur le premier slot libre (0-9).
+    /// Si tous les slots sont occupés, l'action est ajoutée sans slot —
+    /// l'utilisateur pourra la réordonner manuellement via l'UI.
+    /// Les actions custom de l'utilisateur ne sont pas touchées.
+    private func migrateSeed27IfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: seed27MigrationKey) else { return }
+
+        if !actions.contains(where: { $0.name == "Expliquer" }) {
+            let usedSlots = Set(actions.compactMap { $0.slotIndex })
+            let freeSlot = (0..<10).first { !usedSlots.contains($0) }
+            actions.append(Action(
+                name: "Expliquer",
+                icon: "💡",
+                prompt: Self.explainPrompt,
+                slotIndex: freeSlot
+            ))
+            saveActions()
+        }
+
+        UserDefaults.standard.set(true, forKey: seed27MigrationKey)
     }
 
     func saveActions() {
@@ -615,6 +642,12 @@ class ActionsStore: ObservableObject {
             prompt: recipeExtractionPrompt,
             slotIndex: 6
         ),
+        Action(
+            name: "Expliquer",
+            icon: "💡",
+            prompt: explainPrompt,
+            slotIndex: 7
+        ),
     ]
 
     /// Prompt partagé entre le seed `defaultActions` (nouveaux utilisateurs)
@@ -638,5 +671,27 @@ class ActionsStore: ObservableObject {
       - Optionnel : `## Notes` si le texte contient astuces/variantes
     - Ignore le contenu hors-recette (publicité, anecdotes, commentaires, histoire personnelle du blogueur)
     - Réponds uniquement avec la recette structurée, sans introduction
+    """
+
+    /// Prompt partagé entre le seed `defaultActions` (nouveaux utilisateurs)
+    /// et la migration `migrateSeed27IfNeeded()` (utilisateurs existants)
+    /// pour garantir que les deux chemins produisent strictement la même
+    /// action "Expliquer".
+    static let explainPrompt: String = """
+    Tu es un pédagogue chaleureux, expert en vulgarisation — imagine que tu expliques à un ami curieux autour d'un café. Explique la notion principale identifiée dans le texte suivant à une personne qui n'y connaît rien.
+    Règles :
+    - Identifie LA notion centrale à expliquer (si le texte en contient plusieurs, choisis la plus importante)
+    - Rédige en français naturel, accessible et chaleureux (évite le ton magistral ou scolaire)
+    - Procède du simple au complexe :
+      1. Une phrase de définition "en une ligne" (punchy, claire, sans jargon)
+      2. Une analogie ou un exemple concret tiré du quotidien
+      3. 2 ou 3 points clés à retenir (en liste à puces)
+    - Bannis le jargon ; si un terme technique est indispensable, explique-le au passage entre parenthèses
+    - Vise la concision : 150 à 250 mots maximum
+    - Structure la sortie en Markdown :
+      - Titre `#` avec le nom de la notion
+      - Corps de texte libre pour la définition et l'analogie
+      - `## À retenir` pour la liste finale
+    - Réponds uniquement avec l'explication, sans introduction ni méta-commentaire
     """
 }
