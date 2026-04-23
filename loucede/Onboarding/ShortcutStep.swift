@@ -10,10 +10,18 @@ struct ShortcutStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
+    @ObservedObject private var store = ActionsStore.shared
     @State private var recordedKeys: [String] = []
     @State private var isRecording = false
-    @State private var savedShortcutKeys: [String] = ["\u{2318}", "\u{21E7}", "T"] // Default: Command + Shift + T
     @State private var eventMonitor: Any?
+
+    /// Phase 3 : affichage du raccourci courant = modifiers + lettre, lu depuis
+    /// ActionsStore (source de vérité unique partagée avec GeneralSettingsView
+    /// et le handler Carbon). Remplace l'ancien @State + clé UserDefaults
+    /// orpheline `loucede_shortcut_keys` qui n'était jamais lue ailleurs.
+    private var savedShortcutKeys: [String] {
+        store.mainShortcutModifiers + [store.mainShortcut]
+    }
 
     private let brandOrange = Color(hex: "ff7300")
 
@@ -97,7 +105,6 @@ struct ShortcutStep: View {
 
                     // Next button
                     Button(action: {
-                        saveShortcut()
                         onNext()
                     }) {
                         Text("Suivant")
@@ -157,23 +164,17 @@ struct ShortcutStep: View {
             .frame(maxWidth: .infinity)
         }
         .ignoresSafeArea()
-        .onAppear {
-            loadCurrentShortcut()
-        }
         .onDisappear {
             stopRecording()
         }
     }
 
-    private func loadCurrentShortcut() {
-        let savedKeys = UserDefaults.standard.stringArray(forKey: "loucede_shortcut_keys") ?? ["^", "\u{2325}", "Q"]
-        savedShortcutKeys = savedKeys
-    }
-
-    private func saveShortcut() {
-        UserDefaults.standard.set(savedShortcutKeys, forKey: "loucede_shortcut_keys")
-    }
-
+    /// Phase 3 : capture du raccourci principal sur le modèle de
+    /// `GeneralSettingsView.startRecordingMainShortcut`. Écrit dans
+    /// `ActionsStore` (modifiers + lettre + keyCode) puis appelle
+    /// `saveMainShortcut()` pour persister les 3 clés UserDefaults.
+    /// Le publisher Combine de loucedeApp ré-enregistre le hotkey Carbon
+    /// automatiquement (debounce 500 ms).
     private func startRecording() {
         stopRecording() // Clean up any existing monitor
         isRecording = true
@@ -220,9 +221,16 @@ struct ShortcutStep: View {
                         self.recordedKeys = finalKeys
                     }
 
-                    // Save and close after a short delay
+                    // Persiste dans ActionsStore (source unique) puis
+                    // enregistre ; le publisher re-register Carbon.
+                    let capturedKey = key
+                    let capturedModifiers = currentModifiers
+                    let capturedKeyCode = event.keyCode
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.savedShortcutKeys = finalKeys
+                        self.store.mainShortcutModifiers = capturedModifiers
+                        self.store.mainShortcut = capturedKey
+                        self.store.mainShortcutKeyCode = capturedKeyCode
+                        self.store.saveMainShortcut()
                         withAnimation {
                             self.isRecording = false
                         }
