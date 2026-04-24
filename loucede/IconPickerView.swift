@@ -130,11 +130,13 @@ struct EmojiPickerView: View {
 
             Button {
                 // Focus le champ avant d'ouvrir la palette pour que l'emoji
-                // choisi y soit inséré automatiquement par le système.
+                // choisi y soit inséré automatiquement par le système. Ce
+                // bouton sert de repli si l'utilisateur a fermé la palette
+                // ouverte automatiquement en 6.8f.
                 isFocused = true
                 NSApp.orderFrontCharacterPalette(nil)
             } label: {
-                Label("Ouvrir le sélecteur d'emoji", systemImage: "face.smiling")
+                Label("Rouvrir le sélecteur d'emoji", systemImage: "face.smiling")
                     .font(.system(size: 12))
             }
             .buttonStyle(.bordered)
@@ -157,6 +159,13 @@ struct EmojiPickerView: View {
             // Léger délai pour que la focus prise après l'animation d'ouverture.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isFocused = true
+                // Phase 6.8f : ouvre directement la palette emoji native au
+                // survol de l'icône. L'utilisateur atterrit donc d'un seul clic
+                // dans le sélecteur système complet (recherche, catégories),
+                // plutôt que d'avoir à cliquer sur « Ouvrir le sélecteur » à
+                // chaque fois. Le bouton reste disponible comme repli si la
+                // palette a été fermée.
+                NSApp.orderFrontCharacterPalette(nil)
             }
         }
     }
