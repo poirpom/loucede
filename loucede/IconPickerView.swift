@@ -85,23 +85,39 @@ struct EmojiPickerView: View {
             // Grand champ éditable — l'utilisateur tape / colle / sélectionne
             // via le sélecteur système. Le `.onChange` ci-dessous normalise
             // le contenu à un seul emoji et déclenche le callback.
-            TextField("", text: $input)
-                .textFieldStyle(.plain)
-                .font(.system(size: 48))
-                .multilineTextAlignment(.center)
-                .focused($isFocused)
-                .frame(width: 80, height: 80)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.12))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isFocused ? Color.accentColor.opacity(0.6) : Color.gray.opacity(0.2), lineWidth: 1)
-                )
-                .onChange(of: input) { _, newValue in
-                    handleInputChange(newValue)
+            //
+            // Phase 6.8e : le champ démarre toujours vide, l'emoji actuel
+            // s'affiche en placeholder grisé derrière. Avant ce changement, le
+            // champ pré-remplissait selectedIcon, et la frappe / l'insertion
+            // via le palette produisait des concaténations douteuses
+            // (« 🇫🇷🇬🇧 » selon la position du curseur) qui empêchaient la
+            // modification propre d'un emoji déjà attribué.
+            ZStack {
+                if input.isEmpty && selectedIcon.isEmojiOnly {
+                    Text(selectedIcon)
+                        .font(.system(size: 48))
+                        .opacity(0.25)
+                        .allowsHitTesting(false)
                 }
+
+                TextField("", text: $input)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 48))
+                    .multilineTextAlignment(.center)
+                    .focused($isFocused)
+                    .onChange(of: input) { _, newValue in
+                        handleInputChange(newValue)
+                    }
+            }
+            .frame(width: 80, height: 80)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isFocused ? Color.accentColor.opacity(0.6) : Color.gray.opacity(0.2), lineWidth: 1)
+            )
 
             VStack(spacing: 2) {
                 Text("Tape un emoji, colle-le,")
@@ -133,9 +149,11 @@ struct EmojiPickerView: View {
         )
         .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
         .onAppear {
-            // Pré-remplit avec l'emoji courant si c'en est un ; sinon champ vide
-            // pour inciter l'utilisateur à choisir (cas SF legacy non migré).
-            input = selectedIcon.isEmojiOnly ? selectedIcon : ""
+            // Phase 6.8e : champ toujours vide à l'ouverture. L'emoji actuel
+            // s'affiche en placeholder grisé (cf. ZStack ci-dessus) pour éviter
+            // les concaténations « 🇫🇷🇬🇧 » lorsque l'utilisateur tape un nouvel
+            // emoji ou en sélectionne un via la palette système.
+            input = ""
             // Léger délai pour que la focus prise après l'animation d'ouverture.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isFocused = true
@@ -162,8 +180,9 @@ struct EmojiPickerView: View {
             }
         }
 
-        // Saisie non-emoji : rejette et restaure.
-        input = selectedIcon.isEmojiOnly ? selectedIcon : ""
+        // Saisie non-emoji : rejette et revide le champ (le placeholder grisé
+        // continue d'afficher l'emoji actuel, cf. ZStack plus haut).
+        input = ""
     }
 }
 
