@@ -37,7 +37,14 @@ struct PopoverView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
     @ObservedObject private var state = PopoverState.shared
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme) private var systemColorScheme
+    // Phase 6.7 : même source de vérité que MenuBarMenuView — le réglage
+    // utilisateur `appTheme` (System/Light/Dark) override le colorScheme
+    // système, et NSApp.appearance n'est appliqué qu'à l'ouverture des
+    // Réglages (GeneralSettingsView.onAppear). Lire `appThemeString` ici
+    // garantit que la popup reflète le choix utilisateur dès le premier
+    // affichage, sans dépendre de l'ordre d'init.
+    @AppStorage("appTheme") private var appThemeString: String = "System"
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
     @State private var confirmation: String?
@@ -64,15 +71,29 @@ struct PopoverView: View {
     //
     // Phase 6.7 (2026-04-24) : la palette Phase 1.4h/1.4i était codée en dur
     // pour le mode sombre ; en mode clair les fonds #2E2E2E et #1B1C1C
-    // rendaient les textes illisibles (blanc sur blanc quasi). Bascule via
-    // `@Environment(\.colorScheme)` pour préserver la palette sombre telle
-    // qu'elle a été travaillée, et exposer un équivalent clair cohérent
-    // (hiérarchie gris clair haut / blanc pur bas, miroir du sombre).
+    // rendaient les textes illisibles. Source de vérité : pattern
+    // `MenuBarMenuView.isDarkMode` — on combine le réglage utilisateur
+    // (`appTheme` AppStorage : System/Light/Dark) et le colorScheme système.
+    // `@Environment(\.colorScheme)` seul ne suffit pas : si le user a choisi
+    // "Light" mais n'a pas rouvert les Réglages depuis le dernier démarrage,
+    // `NSApp.appearance` n'est pas initialisé et le colorScheme hérite du
+    // système, ce qui fait diverger popup et menu bar.
+
+    /// Indique si la popup doit s'afficher en palette sombre, en tenant
+    /// compte du réglage utilisateur ET du mode système.
+    private var isDarkMode: Bool {
+        switch appThemeString {
+        case "Light": return false
+        case "Dark":  return true
+        default:      return systemColorScheme == .dark
+        }
+    }
 
     /// Fond principal de la popup (chrome supérieur, preview texte).
-    /// Sombre : `#2E2E2E` (Phase 1.4h). Clair : gris très clair.
+    /// Sombre : `#2E2E2E` (Phase 1.4h). Clair : gris très clair, miroir
+    /// de la hiérarchie sombre.
     private var popupBackground: Color {
-        colorScheme == .dark ? Color(hex: "2E2E2E") : Color(hex: "F5F5F5")
+        isDarkMode ? Color(hex: "2E2E2E") : Color(hex: "F5F5F5")
     }
 
     /// Fond de la zone basse (liste + résultat + footers).
@@ -80,7 +101,7 @@ struct PopoverView: View {
     /// Clair : blanc pur, plus clair que `popupBackground` — on conserve
     /// la hiérarchie visuelle bas/haut par inversion de polarité.
     private var lowerBackground: Color {
-        colorScheme == .dark ? Color(hex: "1B1C1C") : Color(hex: "FFFFFF")
+        isDarkMode ? Color(hex: "1B1C1C") : Color(hex: "FFFFFF")
     }
 
     /// Mapping keyCode physique Carbon → index de slot (0 = touche 1/&, …, 9 = touche 0/à).
@@ -119,6 +140,12 @@ struct PopoverView: View {
         // gris très clair en mode clair.
         .background(popupBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        // Phase 6.7 : force le colorScheme SwiftUI à suivre notre `isDarkMode`
+        // (combiné appTheme + système). Sans ça, `Color.primary`, `.secondary`,
+        // le rendu `Markdown`, etc., se basent sur NSApp.appearance — lequel
+        // n'est pas toujours synchro avec le choix utilisateur (initialisé
+        // uniquement à l'ouverture des Réglages). Même pattern que `QuickPromptView`.
+        .preferredColorScheme(isDarkMode ? .dark : .light)
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
