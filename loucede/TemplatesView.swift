@@ -277,13 +277,13 @@ struct TemplatesView: View {
             // Header with category filter
             VStack(spacing: 12) {
                 HStack {
-                    Text("Prompt Templates")
+                    Text("Modèles de prompts")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(textGrayColor)
 
                     Spacer()
 
-                    Text("Click to add to Actions")
+                    Text("Clique pour ajouter aux Actions")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
@@ -291,7 +291,7 @@ struct TemplatesView: View {
                 // Category pills
                 HStack(spacing: 8) {
                     TemplateCategoryPill(
-                        title: "All",
+                        title: "Tous",
                         isSelected: selectedCategory == nil,
                         textColor: textGrayColor,
                         backgroundColor: inputBackgroundColor

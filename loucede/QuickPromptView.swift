@@ -32,7 +32,7 @@ struct QuickPromptView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.orange)
 
-                Text("Quick Prompt")
+                Text("Prompt rapide")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
 
@@ -77,7 +77,7 @@ struct QuickPromptView: View {
 
             // Prompt input
             HStack(spacing: 10) {
-                TextField("Write your prompt...", text: $promptText)
+                TextField("Écris ton prompt…", text: $promptText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
@@ -100,14 +100,14 @@ struct QuickPromptView: View {
             HStack {
                 HStack(spacing: 4) {
                     KeyboardKey("esc")
-                    Text("close")
+                    Text("fermer")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
                 Spacer()
                 HStack(spacing: 4) {
                     KeyboardKey("↵")
-                    Text("run")
+                    Text("exécuter")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }

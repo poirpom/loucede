@@ -261,7 +261,7 @@ struct OnboardingShortcutTooltip: View {
             // Tooltip content
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
-                    Text("e.g.")
+                    Text("ex.")
                         .font(.system(size: 13))
                         .foregroundColor(Color(hex: "999999"))
 

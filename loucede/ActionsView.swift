@@ -624,21 +624,21 @@ struct ShortcutTooltip: View {
 
                 if let conflictName = conflictName {
                     VStack(spacing: 4) {
-                        Text("Already in use")
+                        Text("Déjà utilisé")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.red)
 
-                        Text("Used by \"\(conflictName)\"")
+                        Text("Utilisé par « \(conflictName) »")
                             .font(.system(size: 11))
                             .foregroundColor(.red.opacity(0.8))
                     }
                 } else {
                     VStack(spacing: 4) {
-                        Text("Recording...")
+                        Text("Enregistrement…")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
 
-                        Text("Press \u{2318} or \u{2325} + key")
+                        Text("Appuie sur \u{2318} ou \u{2325} + touche")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary.opacity(0.7))
                     }

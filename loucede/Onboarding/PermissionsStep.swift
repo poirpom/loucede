@@ -156,7 +156,7 @@ struct PermissionsStep: View {
                     }
                     .animation(.spring(response: 0.4, dampingFraction: 0.6), value: hasAccessibilityPermission)
 
-                    Text(hasAccessibilityPermission ? "Permission Granted!" : "Waiting for Permissions")
+                    Text(hasAccessibilityPermission ? "Accès accordé !" : "En attente d'accès")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundColor(hasAccessibilityPermission ? accentGreen : accentYellow)
                 }
