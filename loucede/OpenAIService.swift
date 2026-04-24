@@ -140,7 +140,7 @@ class AIService {
     // MARK: - Single-shot text processing
     func processText(prompt: String, text: String, apiKey: String, provider: AIProvider, model: AIModel) async throws -> String {
         guard !apiKey.isEmpty else {
-            return "Aucune clé API renseignée. Rendez-vous dans les réglages (dans la barre de menus) pour arranger ça :)"
+            return "Aucune clé API renseignée. Va dans les réglages (dans la barre de menus) pour arranger ça :)"
         }
 
         switch provider {
@@ -154,7 +154,7 @@ class AIService {
     // MARK: - Multi-turn chat
     func chat(messages: [(role: String, content: String)], apiKey: String, provider: AIProvider, model: AIModel) async throws -> String {
         guard !apiKey.isEmpty else {
-            return "Aucune clé API renseignée. Rendez-vous dans les réglages (dans la barre de menus) pour arranger ça :)"
+            return "Aucune clé API renseignée. Va dans les réglages (dans la barre de menus) pour arranger ça :)"
         }
 
         switch provider {
@@ -174,7 +174,7 @@ class AIService {
         onChunk: @escaping (String) -> Void
     ) async throws {
         guard !apiKey.isEmpty else {
-            onChunk("Aucune clé API renseignée. Rendez-vous dans les réglages (dans la barre de menus) pour arranger ça :)")
+            onChunk("Aucune clé API renseignée. Va dans les réglages (dans la barre de menus) pour arranger ça :)")
             return
         }
 

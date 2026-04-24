@@ -59,9 +59,9 @@ struct PermissionsStep: View {
                         .padding(.vertical, 8)
                     } else {
                         VStack(spacing: 12) {
-                            StepRow(number: 1, text: "Cliquez sur « Autoriser »")
-                            StepRow(number: 2, text: "Trouvez loucedé dans la liste")
-                            StepRow(number: 3, text: "Activez l'interrupteur")
+                            StepRow(number: 1, text: "Clique sur « Autoriser »")
+                            StepRow(number: 2, text: "Trouve loucedé dans la liste")
+                            StepRow(number: 3, text: "Active l'interrupteur")
                         }
 
                         Spacer()

@@ -162,7 +162,7 @@ struct GeneralSettingsView: View {
                             }
                     }
 
-                    Text("Obtenez votre clé API sur \(selectedProvider.websiteURL)")
+                    Text("Obtiens ta clé API sur \(selectedProvider.websiteURL)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.leading, 160)

@@ -162,11 +162,11 @@ struct ChatView: View {
                 .font(.system(size: 48))
                 .foregroundColor(appBlue.opacity(0.7))
 
-            Text("Commencez une conversation")
+            Text("Commence une conversation")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundColor(.primary)
 
-            Text("Posez-moi ce que vous voulez :\nrédaction, code, analyse, synthèse…")
+            Text("Pose-moi ce que tu veux :\nrédaction, code, analyse, synthèse…")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -399,7 +399,7 @@ struct ChatInputField: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: .greatestFiniteMagnitude)
 
         // Placeholder
-        textView.placeholderString = "Écrivez un message… (Maj+Entrée pour aller à la ligne)"
+        textView.placeholderString = "Écris un message… (Maj+Entrée pour aller à la ligne)"
 
         // Set the callback for sending
         textView.onSend = onSend

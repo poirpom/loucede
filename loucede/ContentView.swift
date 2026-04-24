@@ -17,10 +17,10 @@ struct ContentView: View {
             Text("loucedé est actif")
                 .font(.title2.bold())
 
-            Text("Appuyez sur ⇧ + ⌥ + A pour ouvrir")
+            Text("Appuie sur ⇧ + ⌥ + A pour ouvrir")
                 .foregroundColor(.secondary)
 
-            Text("Ou cliquez sur l'icône dans la barre des menus")
+            Text("Ou clique sur l'icône dans la barre des menus")
                 .foregroundColor(.secondary)
                 .font(.caption)
         }

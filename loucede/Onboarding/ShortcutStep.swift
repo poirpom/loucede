@@ -42,7 +42,7 @@ struct ShortcutStep: View {
                     Spacer()
                         .frame(height: 10)
 
-                    Text("Définissez votre raccourci clavier\npour invoquer loucedé partout.")
+                    Text("Définis ton raccourci clavier\npour invoquer loucedé partout.")
                         .font(.system(size: 14))
                         .foregroundColor(Color(hex: "666666"))
                         .lineSpacing(3)
@@ -68,7 +68,7 @@ struct ShortcutStep: View {
                         }) {
                             HStack(spacing: 8) {
                                 if savedShortcutKeys.isEmpty {
-                                    Text("Cliquez pour enregistrer un raccourci…")
+                                    Text("Clique pour enregistrer un raccourci…")
                                         .font(.system(size: 14))
                                         .foregroundColor(Color(hex: "999999"))
                                 } else {
@@ -96,7 +96,7 @@ struct ShortcutStep: View {
                     Spacer()
                         .frame(height: 16)
 
-                    Text("Cliquez sur la case ci-dessus pour enregistrer\nun nouveau raccourci. Modifiable à tout moment\ndans les réglages.")
+                    Text("Clique sur la case ci-dessus pour enregistrer\nun nouveau raccourci. Modifiable à tout moment\ndans les réglages.")
                         .font(.system(size: 12))
                         .foregroundColor(Color(hex: "999999"))
                         .lineSpacing(2)
@@ -286,7 +286,7 @@ struct OnboardingShortcutTooltip: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color(hex: "666666"))
 
-                    Text("Appuyez sur \u{2318} ou \u{2325} + touche")
+                    Text("Appuie sur \u{2318} ou \u{2325} + touche")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "999999"))
                 }

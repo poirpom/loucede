@@ -216,7 +216,7 @@ struct ActionsSettingsView: View {
     private func askImportStrategyThenImport(data: Data) {
         let alert = NSAlert()
         alert.messageText = "Importer les actions"
-        alert.informativeText = "Voulez-vous remplacer les actions actuelles par celles du fichier, ou les ajouter à la liste existante ?"
+        alert.informativeText = "Veux-tu remplacer les actions actuelles par celles du fichier, ou les ajouter à la liste existante ?"
         alert.addButton(withTitle: "Remplacer")
         alert.addButton(withTitle: "Ajouter")
         alert.addButton(withTitle: "Annuler")
