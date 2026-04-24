@@ -7,46 +7,23 @@
 
 import SwiftUI
 
-// MARK: - App Theme
-
-enum AppTheme: String, CaseIterable {
-    case system = "System"
-    case light = "Light"
-    case dark = "Dark"
-
-    var displayName: String {
-        switch self {
-        case .system: return "Système"
-        case .light:  return "Clair"
-        case .dark:   return "Sombre"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .system: return "circle.lefthalf.filled"
-        case .light: return "sun.max.fill"
-        case .dark: return "moon.fill"
-        }
-    }
-}
+// Phase 6.7b (2026-04-24) : loucedé est dark-only. L'enum AppTheme,
+// l'AppStorage "appTheme" et le picker associé ont été retirés.
+// `NSApp.appearance` est forcée à `.darkAqua` dans AppDelegate.
+// La clé UserDefaults "appTheme" reste orpheline chez les users
+// existants (inoffensive).
 
 struct GeneralSettingsView: View {
     @StateObject private var store = ActionsStore.shared
     @State private var apiKeyInput: String = ""
     @State private var selectedProvider: AIProvider = .openai
     @State private var selectedModelId: String = ""
-    @AppStorage("appTheme") private var appThemeString: String = "System"
     @State private var showModelTooltip: Bool = false
     @State private var isRecordingMainShortcut = false
     @State private var mainRecordedKeys: [String] = []
     @State private var mainShortcutConflict: String? = nil
     @State private var mainShortcutMonitor: Any? = nil
     @Environment(\.colorScheme) var colorScheme
-
-    private var selectedTheme: AppTheme {
-        get { AppTheme(rawValue: appThemeString) ?? .system }
-    }
 
     /// Liste filtrée par la vérif live si disponible, sinon liste hard-codée
     /// complète. Si l'intersection retombe à 0 (ex. tous nos IDs hard-codés
@@ -239,48 +216,6 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingMainShortcut)
-
-                    HStack {
-                        HStack(spacing: 10) {
-                            Image(systemName: "paintbrush.fill")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.indigo)
-                            Text("Apparence")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        HStack(spacing: 0) {
-                            ForEach(AppTheme.allCases, id: \.self) { theme in
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        appThemeString = theme.rawValue
-                                        applyTheme(theme)
-                                    }
-                                }) {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: theme.icon)
-                                            .font(.system(size: 12))
-                                        Text(theme.displayName)
-                                            .font(.system(size: 12, weight: .semibold))
-                                    }
-                                    .foregroundColor(selectedTheme == theme ? .white : .secondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(selectedTheme == theme ? appBlue : Color.clear)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.gray.opacity(0.1))
-                        )
-                    }
                 }
 
                 Divider()
@@ -376,29 +311,6 @@ struct GeneralSettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
-        .onAppear {
-            loadSavedTheme()
-        }
-    }
-
-    private func applyTheme(_ theme: AppTheme) {
-        let appearance: NSAppearance?
-        switch theme {
-        case .system:
-            appearance = nil
-        case .light:
-            appearance = NSAppearance(named: .aqua)
-        case .dark:
-            appearance = NSAppearance(named: .darkAqua)
-        }
-
-        NSApp.appearance = appearance
-        // appThemeString is already set via @AppStorage, no need to save again
-    }
-
-    private func loadSavedTheme() {
-        // Apply the theme from @AppStorage on appear
-        applyTheme(selectedTheme)
     }
 
     private func stopRecordingMainShortcut() {

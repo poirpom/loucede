@@ -9,8 +9,6 @@ import SwiftUI
 import AppKit
 
 struct MenuBarMenuView: View {
-    @Environment(\.colorScheme) var systemColorScheme
-    @AppStorage("appTheme") private var appThemeString: String = "System"
     @State private var isVisible = false
     @State private var hoveredItem: String? = nil
 
@@ -19,18 +17,14 @@ struct MenuBarMenuView: View {
     var onQuit: () -> Void
     var onDismiss: () -> Void
 
-    var isDarkMode: Bool {
-        switch appThemeString {
-        case "Light": return false
-        case "Dark": return true
-        default: return systemColorScheme == .dark
-        }
-    }
+    // Phase 6.7b (2026-04-24) : loucedé est dark-only. `isDarkMode`
+    // reste exposé comme constante `true` pour limiter le refactor des
+    // sous-vues (`MenuBarMenuItemWithAsset`, etc.) qui attendent ce flag.
+    // À nettoyer plus tard si on veut retirer la prop côté sous-vues.
+    let isDarkMode: Bool = true
 
     var backgroundColor: Color {
-        isDarkMode
-            ? Color(NSColor.windowBackgroundColor)
-            : Color.white
+        Color(NSColor.windowBackgroundColor)
     }
 
     var body: some View {

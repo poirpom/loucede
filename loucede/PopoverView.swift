@@ -37,14 +37,6 @@ struct PopoverView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
     @ObservedObject private var state = PopoverState.shared
-    @Environment(\.colorScheme) private var systemColorScheme
-    // Phase 6.7 : même source de vérité que MenuBarMenuView — le réglage
-    // utilisateur `appTheme` (System/Light/Dark) override le colorScheme
-    // système, et NSApp.appearance n'est appliqué qu'à l'ouverture des
-    // Réglages (GeneralSettingsView.onAppear). Lire `appThemeString` ici
-    // garantit que la popup reflète le choix utilisateur dès le premier
-    // affichage, sans dépendre de l'ordre d'init.
-    @AppStorage("appTheme") private var appThemeString: String = "System"
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
     @State private var confirmation: String?
@@ -67,42 +59,10 @@ struct PopoverView: View {
         self.onOpenSettings = onOpenSettings
     }
 
-    // MARK: - Couleurs adaptatives (mode clair / sombre)
-    //
-    // Phase 6.7 (2026-04-24) : la palette Phase 1.4h/1.4i était codée en dur
-    // pour le mode sombre ; en mode clair les fonds #2E2E2E et #1B1C1C
-    // rendaient les textes illisibles. Source de vérité : pattern
-    // `MenuBarMenuView.isDarkMode` — on combine le réglage utilisateur
-    // (`appTheme` AppStorage : System/Light/Dark) et le colorScheme système.
-    // `@Environment(\.colorScheme)` seul ne suffit pas : si le user a choisi
-    // "Light" mais n'a pas rouvert les Réglages depuis le dernier démarrage,
-    // `NSApp.appearance` n'est pas initialisé et le colorScheme hérite du
-    // système, ce qui fait diverger popup et menu bar.
-
-    /// Indique si la popup doit s'afficher en palette sombre, en tenant
-    /// compte du réglage utilisateur ET du mode système.
-    private var isDarkMode: Bool {
-        switch appThemeString {
-        case "Light": return false
-        case "Dark":  return true
-        default:      return systemColorScheme == .dark
-        }
-    }
-
-    /// Fond principal de la popup (chrome supérieur, preview texte).
-    /// Sombre : `#2E2E2E` (Phase 1.4h). Clair : gris très clair, miroir
-    /// de la hiérarchie sombre.
-    private var popupBackground: Color {
-        isDarkMode ? Color(hex: "2E2E2E") : Color(hex: "F5F5F5")
-    }
-
-    /// Fond de la zone basse (liste + résultat + footers).
-    /// Sombre : `#1B1C1C` (Phase 1.4i), plus sombre que `popupBackground`.
-    /// Clair : blanc pur, plus clair que `popupBackground` — on conserve
-    /// la hiérarchie visuelle bas/haut par inversion de polarité.
-    private var lowerBackground: Color {
-        isDarkMode ? Color(hex: "1B1C1C") : Color(hex: "FFFFFF")
-    }
+    // Phase 6.7b (2026-04-24) : loucedé est dark-only. `NSApp.appearance`
+    // est forcée à `.darkAqua` au démarrage (AppDelegate). Les couleurs
+    // de fond Phase 1.4h/1.4i (#2E2E2E, #1B1C1C) reviennent donc codées
+    // en dur, comme avant les tentatives d'adaptation clair/sombre.
 
     /// Mapping keyCode physique Carbon → index de slot (0 = touche 1/&, …, 9 = touche 0/à).
     /// Ces keyCodes sont identiques en AZERTY FR et QWERTY US (c'est la position physique
@@ -135,10 +95,9 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Phase 1.4h : fond popup solide (remplace le VisualEffectBlur translucide).
-        // Palette adaptative Phase 6.7 via `popupBackground` — #2E2E2E en sombre,
-        // gris très clair en mode clair.
-        .background(popupBackground)
+        // Phase 1.4h : fond popup solide #2E2E2E (remplace le VisualEffectBlur
+        // translucide). Dark-only depuis Phase 6.7b (app forcée en darkAqua).
+        .background(Color(hex: "2E2E2E"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
@@ -317,9 +276,6 @@ struct PopoverView: View {
                     if state.searchQuery.isEmpty {
                         // Empty : curseur à gauche + placeholder grisé à droite
                         // (convention macOS : Spotlight, champ de recherche Finder…).
-                        // Phase 6.7 : `.primary` pour s'adapter clair/sombre (blanc
-                        // en sombre, noir en clair) — un `Color.white` en dur
-                        // disparaissait sur le fond blanc en mode clair.
                         Rectangle()
                             .fill(Color.primary)
                             .frame(width: 1.5, height: 14)
@@ -386,8 +342,6 @@ struct PopoverView: View {
                     // Phase 1.4e : mêmes dimensions typographiques que les boutons
                     // de la fenêtre résultat (13pt, taille .body par défaut) pour
                     // cohérence visuelle entre les deux footers.
-                    // Phase 6.7 : `.primary` au lieu de `.white` en dur — s'adapte
-                    // au colorScheme (blanc en sombre, noir en clair).
                     KeyboardKey("↑")
                     KeyboardKey("↓")
                     Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
@@ -401,7 +355,7 @@ struct PopoverView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .background(lowerBackground)
+            .background(Color(hex: "1B1C1C"))
         }
         .focusable()
         .focusEffectDisabled()
@@ -467,10 +421,8 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions.
-        // Phase 6.7 : texte forcé en blanc quand sélectionné, pour garantir
-        // le contraste sur le fond bleu dans les deux modes (sans ça, en
-        // mode clair le texte `primary` serait noir → peu lisible).
+        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions,
+        // texte forcé blanc pour contraste sur le bleu.
         .foregroundStyle(isSelected ? Color.white : Color.primary)
         .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -619,7 +571,7 @@ struct PopoverView: View {
                 }
                 .padding(12)
             }
-            .background(lowerBackground)
+            .background(Color(hex: "1B1C1C"))
         }
         .focusable()
         .focusEffectDisabled()
