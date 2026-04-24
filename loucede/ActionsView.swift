@@ -86,7 +86,7 @@ struct ActionsSettingsView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             }
-            .frame(width: 220)
+            .frame(width: 280)
             .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
 
             Divider()
@@ -278,6 +278,14 @@ struct ActionListRow: View {
                 .lineLimit(1)
 
             Spacer()
+
+            // Phase 6.8b : raccourci clavier attribué affiché à droite.
+            // Même mapping que la popup (slot 0→⌘1, …, slot 9→⌘0) pour
+            // aider l'utilisateur à repérer visuellement ses actions sans
+            // ouvrir chaque éditeur.
+            if let slot = action.slotIndex {
+                KeyboardKey("⌘\(slot == 9 ? 0 : slot + 1)")
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)

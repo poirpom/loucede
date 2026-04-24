@@ -76,7 +76,7 @@ struct SettingsView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-        .frame(width: 700, height: 540)
+        .frame(width: 800, height: 540)
         .preferredColorScheme(savedColorScheme)
     }
 }
