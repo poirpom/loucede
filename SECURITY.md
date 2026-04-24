@@ -1,23 +1,36 @@
-# Security & Bug Reports
+# Sécurité & signalement de bugs
 
-## Reporting a Bug or Issue
+## Signaler un bug
 
-Found something broken? Please [open an issue](https://github.com/ELPROFUG0/TexTab/issues) with:
+Un comportement anormal ? [Ouvre une issue](https://github.com/poirpom/loucede/issues) avec :
 
-- What happened and what you expected
-- Steps to reproduce
-- Your macOS version
+- Ce qui s'est passé et ce que tu attendais
+- Les étapes pour reproduire
+- Ta version de macOS (loucedé cible macOS 15.0+)
+- Le provider et le modèle utilisés le cas échéant
 
-## Reporting a Security Concern
+## Signaler une vulnérabilité de sécurité
 
-If you find something security-related (like API keys being mishandled or data being sent somewhere it shouldn't), please DM me on [X (@elmoidev)](https://x.com/elmoidev) instead of opening a public issue.
+Si tu découvres un problème de sécurité (clés API mal protégées, données
+envoyées vers un endpoint inattendu, exécution non sollicitée…),
+**n'ouvre pas d'issue publique**.
 
-- You'll get a response within a few days.
-- Your report stays confidential.
-- You'll be credited in the fix if you want.
+Contacte directement l'auteur par email : **fabrice@poirpom.com**
 
-## How TexTab handles your data
+- Réponse sous quelques jours.
+- Le signalement reste confidentiel jusqu'à la publication du correctif.
+- Tu seras crédité·e dans le correctif si tu le souhaites.
 
-- Your API keys are stored locally on your Mac.
-- Text is sent directly to your chosen AI provider — nothing passes through our servers.
-- No analytics, no tracking, no telemetry.
+## Comment loucedé gère tes données
+
+- **Clés API** : stockées localement dans le Keychain macOS (service
+  `app.loucede.loucede.apikey`). Jamais envoyées ailleurs que vers le
+  provider correspondant (OpenAI, Anthropic, Mistral).
+- **Texte sélectionné** : envoyé uniquement au provider que tu as choisi,
+  pour exécuter l'action sélectionnée.
+- **Aucune télémétrie** : aucun suivi, aucun analytics, aucune connexion
+  réseau vers des serveurs tiers autres que le provider choisi.
+- **Aucun compte** : loucedé fonctionne sans authentification, sans OAuth,
+  sans backend.
+- **Mises à jour** : l'app vérifie périodiquement les [GitHub Releases](https://github.com/poirpom/loucede/releases)
+  du dépôt officiel (connexion HTTPS à api.github.com, aucune donnée envoyée).

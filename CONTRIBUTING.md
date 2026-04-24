@@ -1,48 +1,50 @@
-# Contributing to TexTab
+# Contribuer à loucedé
 
-Thanks for considering contributing to TexTab!
+Merci de l'intérêt porté à loucedé !
 
-## Good first issues
+**loucedé** est un fork français de [TexTab](https://github.com/ELPROFUG0/TexTab),
+sous licence GPL v3. C'est une app macOS de barre de menu pour piloter des
+LLMs (OpenAI, Anthropic, Mistral) via un raccourci clavier configurable.
+Entièrement local : pas de télémétrie, pas d'authentification, pas de serveur.
 
-Good first issues are a great way to start contributing and get familiar with the codebase. You can find them by filtering on the [good first issue](https://github.com/ELPROFUG0/TexTab/labels/good%20first%20issue) label.
+## Bonnes premières contributions
 
-## How to Contribute
+Les issues marquées `good first issue` sont des points d'entrée accessibles
+pour découvrir le codebase.
 
-1. **Fork the Repository:** Click on the 'Fork' button in the upper right corner of the repository's GitHub page.
+## Comment contribuer
 
-2. **Clone the Repository:**
+1. **Forke** le dépôt depuis l'interface GitHub.
+2. **Clone** ton fork :
    ```bash
-   git clone https://github.com/yourusername/TexTab.git
-   cd TexTab
+   git clone https://github.com/<ton-user>/loucede.git
+   cd loucede
    ```
-
-3. **Create a New Branch:**
+3. **Crée une branche** :
    ```bash
-   git checkout -b your-branch-name
+   git checkout -b ma-branche
    ```
+4. **Setup** : ouvre `loucede.xcodeproj` dans Xcode (macOS 15.0+).
+   Les dépendances SPM sont résolues automatiquement au premier build.
+   Aucun `Secrets.swift` requis — les clés API sont saisies par l'utilisateur
+   dans les Réglages et stockées dans le Keychain macOS.
+5. **Code** : vérifie que le build passe (⌘B) et que l'app se lance (⌘R).
+6. **Commit** : messages courts et descriptifs en français, préfixés par la
+   phase du plan quand c'est pertinent (ex. `Phase 6.6 : rendu Markdown`).
+7. **Pull request** : décris clairement le *quoi* et le *pourquoi* du changement.
 
-4. **Set up the project:** Follow the [Getting Started](README.md#getting-started) guide to get the app running locally. You'll need to create your own `Secrets.swift` from the template.
+## Style de code
 
-5. **Make Changes:** Make your desired changes and ensure your code builds without errors in Xcode.
+- **Swift 5+**, **SwiftUI** pour la UI, **AppKit** quand nécessaire
+  (barre de menu, événements globaux, Keychain, panneau emoji système).
+- **Commentaires et documentation interne en français** (le projet est
+  francophone).
+- **Textes UI** : hard-codés en FR pour l'instant. La Phase 5 (i18n) les
+  migrera vers un String Catalog (`Localizable.xcstrings`) ; en attendant
+  pas de `String(localized:)` requis.
+- **Pas de dépendance externe sans bonne raison** — les ajouts SPM doivent
+  être compatibles GPL v3 (MIT, BSD, Apache 2.0 OK).
 
-6. **Test Locally:** Run the app and verify your changes work as expected.
+## Questions
 
-7. **Commit Changes:**
-   ```bash
-   git commit -m "Add your detailed description here"
-   ```
-
-8. **Push Changes:**
-   ```bash
-   git push origin your-branch-name
-   ```
-
-9. **Create a Pull Request:** Go to the original TexTab repository and create a pull request. Please provide a clear description of what you changed and why.
-
-10. **Code Review:** Your pull request will undergo a code review.
-
-11. **Merge:** Once approved, your pull request will be merged into the main repository.
-
-## Reporting Issues
-
-If you find a bug or have a suggestion, feel free to [create an issue](https://github.com/ELPROFUG0/TexTab/issues). Please include steps to reproduce the problem and your macOS version.
+Ouvre une issue sur [le dépôt GitHub](https://github.com/poirpom/loucede/issues).

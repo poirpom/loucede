@@ -20,6 +20,10 @@ loucede/Secrets.swift
 # Claude Code worktrees / local metadata
 .claude/
 
+# Dossier strictement personnel (notes, brouillons, docs privés)
+# Ne doit JAMAIS être versionné
+documents-persos/
+
 # CocoaPods (if used)
 Pods/
 
