@@ -109,7 +109,11 @@ class ActionsStore: ObservableObject {
     private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
     private let seed26MigrationKey = "loucede_migration_seed_26_done"
     private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
-    private let seed27MigrationKey = "loucede_migration_seed_27_done"
+    // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
+    // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
+    // "Expliquer" a été retirée du seed. On ne supprime pas la clé
+    // UserDefaults côté users (no-op défensif), on arrête juste de la poser
+    // et de s'appuyer dessus.
 
     /// Mapping SF Symbols → emoji pour les icônes du seed (Phase 6.4).
     /// Appliqué par `migrateIconsToEmojiIfNeeded()` aux configs existantes.
@@ -177,17 +181,14 @@ class ActionsStore: ObservableObject {
             migrateLegacySeedIfNeeded()
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
-            migrateSeed27IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
-            // Premier lancement : le seed contient déjà les actions 2.6,
-            // les emojis 6.4 et l'action "Expliquer" (2.7), on pose
-            // les trois flags pour ne pas re-déclencher les migrations
-            // si l'utilisateur vide sa config plus tard.
+            // Premier lancement : le seed contient déjà les actions 2.6 et les
+            // emojis 6.4 ; on pose les deux flags pour ne pas re-déclencher
+            // les migrations si l'utilisateur vide sa config plus tard.
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
             UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
-            UserDefaults.standard.set(true, forKey: seed27MigrationKey)
         }
     }
 
@@ -269,30 +270,6 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
-    }
-
-    /// Migration one-shot (Phase 2.7, 2026-04-23) : ajoute « Expliquer »
-    /// au seed pour les utilisateurs ayant déjà une config persistée
-    /// avant cet ajout. Pose l'action sur le premier slot libre (0-9).
-    /// Si tous les slots sont occupés, l'action est ajoutée sans slot —
-    /// l'utilisateur pourra la réordonner manuellement via l'UI.
-    /// Les actions custom de l'utilisateur ne sont pas touchées.
-    private func migrateSeed27IfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: seed27MigrationKey) else { return }
-
-        if !actions.contains(where: { $0.name == "Expliquer" }) {
-            let usedSlots = Set(actions.compactMap { $0.slotIndex })
-            let freeSlot = (0..<10).first { !usedSlots.contains($0) }
-            actions.append(Action(
-                name: "Expliquer",
-                icon: "💡",
-                prompt: Self.explainPrompt,
-                slotIndex: freeSlot
-            ))
-            saveActions()
-        }
-
-        UserDefaults.standard.set(true, forKey: seed27MigrationKey)
     }
 
     func saveActions() {
@@ -583,26 +560,10 @@ class ActionsStore: ObservableObject {
             slotIndex: 0
         ),
         Action(
-            name: "Traduis en anglais",
-            icon: "🇬🇧",
-            prompt: """
-            Tu es un traducteur professionnel. Traduis le texte suivant en anglais.
-            Règles :
-            - Détecte automatiquement la langue source
-            - Adopte un anglais naturel et courant (ni trop littéral, ni trop libre)
-            - Conserve le ton et le registre de l'original (formel, informel, technique, etc.)
-            - Conserve les noms propres, marques et acronymes tels quels
-            - Si un mot ou une expression n'a pas d'équivalent naturel en anglais, garde le terme original entre guillemets avec une courte explication entre parenthèses
-            - Conserve exactement la mise en forme du texte original : titres, sous-titres, listes, citations, sauts de ligne, etc.
-            - Réponds uniquement avec la traduction, sans introduction, sans commentaire, sans explication
-            """,
-            slotIndex: 1
-        ),
-        Action(
             name: "Traduis en emoji",
             icon: "😀",
             prompt: "Traduis le texte suivant en une séquence d'emojis. Veille à respecter la structure des phrases et du texte, en incluant la ponctuation. Réponds uniquement avec les emojis, sans texte, sans explication.",
-            slotIndex: 2
+            slotIndex: 1
         ),
         Action(
             name: "Corrige les fautes",
@@ -614,7 +575,7 @@ class ActionsStore: ObservableObject {
             - Conserve exactement la mise en forme originale
             - Réponds uniquement avec le texte corrigé, sans commentaire
             """,
-            slotIndex: 3
+            slotIndex: 2
         ),
         Action(
             name: "Résume ce texte",
@@ -628,25 +589,13 @@ class ActionsStore: ObservableObject {
             - Conserve le ton et le registre de l'original
             - Réponds uniquement avec le résumé, sans introduction, sans commentaire, sans explication
             """,
-            slotIndex: 4
-        ),
-        Action(
-            name: "Commente ce post LinkedIn",
-            icon: "💬",
-            prompt: "Tu es un expert en sarcasme poli. Rédige un commentaire LinkedIn court (1-2 phrases maximum), cinglant et sarcastique, en réponse au texte suivant. Le ton doit rester juste assez acceptable pour ne pas être signalé. Réponds uniquement avec le commentaire.",
-            slotIndex: 5
+            slotIndex: 3
         ),
         Action(
             name: "Extrais la recette",
             icon: "🍳",
             prompt: recipeExtractionPrompt,
-            slotIndex: 6
-        ),
-        Action(
-            name: "Expliquer",
-            icon: "💡",
-            prompt: explainPrompt,
-            slotIndex: 7
+            slotIndex: 4
         ),
     ]
 
@@ -671,27 +620,5 @@ class ActionsStore: ObservableObject {
       - Optionnel : `## Notes` si le texte contient astuces/variantes
     - Ignore le contenu hors-recette (publicité, anecdotes, commentaires, histoire personnelle du blogueur)
     - Réponds uniquement avec la recette structurée, sans introduction
-    """
-
-    /// Prompt partagé entre le seed `defaultActions` (nouveaux utilisateurs)
-    /// et la migration `migrateSeed27IfNeeded()` (utilisateurs existants)
-    /// pour garantir que les deux chemins produisent strictement la même
-    /// action "Expliquer".
-    static let explainPrompt: String = """
-    Tu es un pédagogue chaleureux, expert en vulgarisation — imagine que tu expliques à un ami curieux autour d'un café. Explique la notion principale identifiée dans le texte suivant à une personne qui n'y connaît rien.
-    Règles :
-    - Identifie LA notion centrale à expliquer (si le texte en contient plusieurs, choisis la plus importante)
-    - Rédige en français naturel, accessible et chaleureux (évite le ton magistral ou scolaire)
-    - Procède du simple au complexe :
-      1. Une phrase de définition "en une ligne" (punchy, claire, sans jargon)
-      2. Une analogie ou un exemple concret tiré du quotidien
-      3. 2 ou 3 points clés à retenir (en liste à puces)
-    - Bannis le jargon ; si un terme technique est indispensable, explique-le au passage entre parenthèses
-    - Vise la concision : 150 à 250 mots maximum
-    - Structure la sortie en Markdown :
-      - Titre `#` avec le nom de la notion
-      - Corps de texte libre pour la définition et l'analogie
-      - `## À retenir` pour la liste finale
-    - Réponds uniquement avec l'explication, sans introduction ni méta-commentaire
     """
 }

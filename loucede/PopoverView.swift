@@ -37,6 +37,7 @@ struct PopoverView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
     @ObservedObject private var state = PopoverState.shared
+    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
     @State private var confirmation: String?
@@ -57,6 +58,29 @@ struct PopoverView: View {
     init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
         self.onClose = onClose
         self.onOpenSettings = onOpenSettings
+    }
+
+    // MARK: - Couleurs adaptatives (mode clair / sombre)
+    //
+    // Phase 6.7 (2026-04-24) : la palette Phase 1.4h/1.4i était codée en dur
+    // pour le mode sombre ; en mode clair les fonds #2E2E2E et #1B1C1C
+    // rendaient les textes illisibles (blanc sur blanc quasi). Bascule via
+    // `@Environment(\.colorScheme)` pour préserver la palette sombre telle
+    // qu'elle a été travaillée, et exposer un équivalent clair cohérent
+    // (hiérarchie gris clair haut / blanc pur bas, miroir du sombre).
+
+    /// Fond principal de la popup (chrome supérieur, preview texte).
+    /// Sombre : `#2E2E2E` (Phase 1.4h). Clair : gris très clair.
+    private var popupBackground: Color {
+        colorScheme == .dark ? Color(hex: "2E2E2E") : Color(hex: "F5F5F5")
+    }
+
+    /// Fond de la zone basse (liste + résultat + footers).
+    /// Sombre : `#1B1C1C` (Phase 1.4i), plus sombre que `popupBackground`.
+    /// Clair : blanc pur, plus clair que `popupBackground` — on conserve
+    /// la hiérarchie visuelle bas/haut par inversion de polarité.
+    private var lowerBackground: Color {
+        colorScheme == .dark ? Color(hex: "1B1C1C") : Color(hex: "FFFFFF")
     }
 
     /// Mapping keyCode physique Carbon → index de slot (0 = touche 1/&, …, 9 = touche 0/à).
@@ -90,10 +114,10 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Phase 1.4h : fond popup solide #2E2E2E (remplace le VisualEffectBlur
-        // translucide). Choix délibéré de palette dark unifiée, indépendante
-        // de la transparence macOS.
-        .background(Color(hex: "2E2E2E"))
+        // Phase 1.4h : fond popup solide (remplace le VisualEffectBlur translucide).
+        // Palette adaptative Phase 6.7 via `popupBackground` — #2E2E2E en sombre,
+        // gris très clair en mode clair.
+        .background(popupBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
@@ -137,6 +161,7 @@ struct PopoverView: View {
         guard slotMonitor == nil else { return }
         // Capture locale : évite que le closure du monitor ne retienne `self`.
         let closeHandler = onClose
+        let settingsHandler = onOpenSettings
         slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // Vue résultat : on ne touche à rien, le handler SwiftUI gère.
             guard state.activeAction == nil else { return event }
@@ -169,10 +194,17 @@ struct PopoverView: View {
                 }
             }
 
-            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g).
+            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g) + ⌘, Réglages.
             // On passe les slots derrière ⌘ pour libérer les frappes nues (chiffres
             // inclus) au profit du champ de recherche libre de la liste.
             if mods == [.command] {
+                // ⌘, — raccourci standard macOS pour ouvrir les Réglages (Phase 6.7).
+                // charactersIgnoringModifiers pour être indépendant du layout clavier
+                // (la virgule n'est pas à la même position physique en AZERTY / QWERTY).
+                if event.charactersIgnoringModifiers == "," {
+                    settingsHandler()
+                    return nil
+                }
                 guard let slot = Self.slotIndex(forPhysicalKeyCode: event.keyCode) else {
                     return event
                 }
@@ -264,8 +296,11 @@ struct PopoverView: View {
                     if state.searchQuery.isEmpty {
                         // Empty : curseur à gauche + placeholder grisé à droite
                         // (convention macOS : Spotlight, champ de recherche Finder…).
+                        // Phase 6.7 : `.primary` pour s'adapter clair/sombre (blanc
+                        // en sombre, noir en clair) — un `Color.white` en dur
+                        // disparaissait sur le fond blanc en mode clair.
                         Rectangle()
-                            .fill(Color.white)
+                            .fill(Color.primary)
                             .frame(width: 1.5, height: 14)
                             .opacity(cursorVisible ? 1 : 0)
                         Text("Rechercher")
@@ -276,9 +311,9 @@ struct PopoverView: View {
                         HStack(spacing: 1) {
                             Text(state.searchQuery)
                                 .font(.system(size: 13))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Rectangle()
-                                .fill(Color.white)
+                                .fill(Color.primary)
                                 .frame(width: 1.5, height: 14)
                                 .opacity(cursorVisible ? 1 : 0)
                         }
@@ -319,26 +354,33 @@ struct PopoverView: View {
                 }
                 .frame(maxHeight: 360)
 
+                // Phase 6.7 : ligne Réglages fixe sous la liste, toujours accessible.
+                // Séparateur visuel + item navigable (↑↓+↵) + raccourci ⌘, standard macOS.
+                Divider()
+                settingsRow()
+                    .padding(.horizontal, 8)
+                    .padding(.top, 2)
+
                 HStack(spacing: 8) {
                     // Phase 1.4e : mêmes dimensions typographiques que les boutons
                     // de la fenêtre résultat (13pt, taille .body par défaut) pour
                     // cohérence visuelle entre les deux footers.
-                    // Texte en blanc : lisibilité sur le fond #1B1C1C + cohérence
-                    // avec les libellés Copier / Coller / Retour de la vue résultat.
+                    // Phase 6.7 : `.primary` au lieu de `.white` en dur — s'adapte
+                    // au colorScheme (blanc en sombre, noir en clair).
                     KeyboardKey("↑")
                     KeyboardKey("↓")
-                    Text("Naviguer").font(.system(size: 13)).foregroundStyle(.white)
+                    Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
                     Spacer()
                     KeyboardKey("↵")
-                    Text("Valider").font(.system(size: 13)).foregroundStyle(.white)
+                    Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
                     Spacer()
                     KeyboardKey("esc")
-                    Text("Fermer").font(.system(size: 13)).foregroundStyle(.white)
+                    Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .background(Color(hex: "1B1C1C"))
+            .background(lowerBackground)
         }
         .focusable()
         .focusEffectDisabled()
@@ -354,10 +396,15 @@ struct PopoverView: View {
                 state.selectedIndex = max(0, state.selectedIndex - 1)
                 return .handled
             case .downArrow:
-                state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
+                // Phase 6.7 : +1 pour inclure le settings row (index = filteredActions.count).
+                state.selectedIndex = min(filteredActions.count, state.selectedIndex + 1)
                 return .handled
             case .return:
-                if filteredActions.indices.contains(state.selectedIndex) {
+                // Phase 6.7 : si selectedIndex pointe sur le settings row (dernier
+                // index = filteredActions.count), on ouvre les Réglages.
+                if state.selectedIndex == filteredActions.count {
+                    onOpenSettings()
+                } else if filteredActions.indices.contains(state.selectedIndex) {
                     state.runAction(filteredActions[state.selectedIndex])
                 }
                 return .handled
@@ -380,7 +427,8 @@ struct PopoverView: View {
     }
 
     private func actionRow(action: Action, index: Int) -> some View {
-        HStack(spacing: 10) {
+        let isSelected = state.selectedIndex == index
+        return HStack(spacing: 10) {
             // Phase 6.4 : emoji via ActionIconView (fallback placeholder
             // gris pour les SF legacy). Boîte fixe pour aligner la liste.
             ActionIconView(icon: action.icon, boxSize: 20, fontSize: 14)
@@ -398,12 +446,44 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions de la popup.
-        .background(state.selectedIndex == index ? Color(hex: "3F84F7") : Color.clear)
+        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions.
+        // Phase 6.7 : texte forcé en blanc quand sélectionné, pour garantir
+        // le contraste sur le fond bleu dans les deux modes (sans ça, en
+        // mode clair le texte `primary` serait noir → peu lisible).
+        .foregroundStyle(isSelected ? Color.white : Color.primary)
+        .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .onTapGesture { state.runAction(action) }
         .onHover { hovering in if hovering { state.selectedIndex = index } }
+    }
+
+    /// Ligne « Réglages » fixe sous la liste d'actions (Phase 6.7).
+    /// Toujours accessible : navigable ↑↓+↵ (index = `filteredActions.count`)
+    /// + raccourci ⌘, standard macOS (géré dans le monitor NSEvent).
+    /// Visuellement alignée sur `actionRow` (même padding, même radius, même
+    /// couleur de sélection #3F84F7) pour cohérence.
+    private func settingsRow() -> some View {
+        let isSelected = state.selectedIndex == filteredActions.count
+        return HStack(spacing: 10) {
+            // Icône engrenage SF Symbol, calibrée sur la boîte 20×20 des
+            // ActionIconView pour alignement vertical avec les actions.
+            Image(systemName: "gearshape")
+                .font(.system(size: 14))
+                .frame(width: 20, height: 20)
+            Text("Réglages")
+                .font(.system(size: 13))
+            Spacer()
+            KeyboardKey("⌘,")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .foregroundStyle(isSelected ? Color.white : Color.primary)
+        .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onTapGesture { onOpenSettings() }
+        .onHover { hovering in if hovering { state.selectedIndex = filteredActions.count } }
     }
 
     // MARK: - Result
@@ -427,12 +507,12 @@ struct PopoverView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     // Phase 6.5 (2026-04-23) : rendu Markdown via MarkdownUI
-                    // (gonzalezreal/swift-markdown-ui, MIT). Les actions
-                    // "Extrais la recette" et "Expliquer" produisent du
-                    // Markdown structuré (titres `#`/`##`, listes, gras,
-                    // code…) — l'afficher en texte brut rendait les marques
-                    // visibles. Le bouton Copier continue de coller le
-                    // Markdown brut (cf. `state.resultText` préservé).
+                    // (gonzalezreal/swift-markdown-ui, MIT). L'action
+                    // "Extrais la recette" produit du Markdown structuré
+                    // (titres `#`/`##`, listes, gras, code…) — l'afficher
+                    // en texte brut rendait les marques visibles. Le bouton
+                    // Copier continue de coller le Markdown brut
+                    // (cf. `state.resultText` préservé).
                     Markdown(state.resultText)
                         .markdownTextStyle(\.text) {
                             FontSize(13)
@@ -518,7 +598,7 @@ struct PopoverView: View {
                 }
                 .padding(12)
             }
-            .background(Color(hex: "1B1C1C"))
+            .background(lowerBackground)
         }
         .focusable()
         .focusEffectDisabled()

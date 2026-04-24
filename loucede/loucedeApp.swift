@@ -259,7 +259,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Centrer + afficher (fenêtre déjà créée au démarrage)
-        positionPopoverCentered(width: 400, height: 500)
+        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.popoverDefaultHeight)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -298,7 +298,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             PopoverState.shared.reset()
         }
 
-        positionPopoverCentered(width: 400, height: 500)
+        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.popoverDefaultHeight)
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -315,8 +315,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Dimensions par défaut du popup (format « petit »), utilisées au premier
     /// affichage et au retour à la taille normale depuis l'agrandissement.
+    /// Phase 6.7 (2026-04-24) : hauteur portée de 500 à 540 pour loger la ligne
+    /// « Réglages » (fixe sous la liste) + les 10 slots d'actions + l'aperçu
+    /// texte sans que le contenu ne dépasse de la fenêtre.
     static let popoverDefaultWidth: CGFloat = 400
-    static let popoverDefaultHeight: CGFloat = 500
+    static let popoverDefaultHeight: CGFloat = 540
     /// Phase 1.4b : format « agrandi » (touche F sur la vue résultat).
     /// Largeur fixe ; hauteur = 70 % de la visibleFrame de l'écran (15 % de
     /// marge haut + 15 % bas). Recentré à chaque resize pour rester équilibré.
@@ -492,8 +495,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.openSettings()
         })
 
-        let width: CGFloat = 400
-        let height: CGFloat = 500
+        let width: CGFloat = Self.popoverDefaultWidth
+        let height: CGFloat = Self.popoverDefaultHeight
 
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
