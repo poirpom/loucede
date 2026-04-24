@@ -66,10 +66,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             andEventID: AEEventID(kAEGetURL)
         )
 
+        // Phase 6.7 (2026-04-24) : initialise NSApp.appearance selon le thème
+        // utilisateur (`appTheme` AppStorage) AVANT de créer la popup window.
+        // Sans ça, `NSApp.appearance` reste nil tant que GeneralSettingsView
+        // n'a pas été ouverte, et `@Environment(\.colorScheme)` de la popup
+        // hérite du système au lieu du choix user. Résultat : popup affichée
+        // en palette sombre alors que le user a choisi « Clair » (ou vice
+        // versa). Cet appel se propage via l'observer KVO installé juste
+        // après, pour suivre les changements live depuis les Réglages.
+        applyAppTheme()
+        observeAppThemeChanges()
+
         if !OnboardingManager.shared.hasCompletedOnboarding {
             showOnboarding()
         } else {
             setupApp()
+        }
+    }
+
+    /// Lit la préférence `appTheme` (System/Light/Dark) depuis UserDefaults
+    /// et applique l'NSAppearance correspondante à NSApp. Miroir de
+    /// `GeneralSettingsView.applyTheme(_:)`, mais appelé dès le démarrage
+    /// pour que la popup préchargée hérite du bon colorScheme.
+    func applyAppTheme() {
+        let themeString = UserDefaults.standard.string(forKey: "appTheme") ?? "System"
+        switch themeString {
+        case "Light":
+            NSApp.appearance = NSAppearance(named: .aqua)
+        case "Dark":
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+        default:
+            NSApp.appearance = nil // suit le système
+        }
+    }
+
+    /// Observe les changements de `appTheme` via UserDefaults (KVO) pour
+    /// maintenir `NSApp.appearance` synchronisée quand le user change de
+    /// thème depuis les Réglages. Sans ça, seule la fenêtre Réglages
+    /// voyait le changement immédiat (via `onAppear → applyTheme`), et la
+    /// popup préchargée restait figée sur l'ancien thème.
+    private func observeAppThemeChanges() {
+        UserDefaults.standard.addObserver(
+            self,
+            forKeyPath: "appTheme",
+            options: [.new],
+            context: nil
+        )
+    }
+
+    override func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey: Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        if keyPath == "appTheme" {
+            applyAppTheme()
         }
     }
 

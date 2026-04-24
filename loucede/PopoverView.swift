@@ -140,12 +140,6 @@ struct PopoverView: View {
         // gris très clair en mode clair.
         .background(popupBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        // Phase 6.7 : force le colorScheme SwiftUI à suivre notre `isDarkMode`
-        // (combiné appTheme + système). Sans ça, `Color.primary`, `.secondary`,
-        // le rendu `Markdown`, etc., se basent sur NSApp.appearance — lequel
-        // n'est pas toujours synchro avec le choix utilisateur (initialisé
-        // uniquement à l'ouverture des Réglages). Même pattern que `QuickPromptView`.
-        .preferredColorScheme(isDarkMode ? .dark : .light)
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
