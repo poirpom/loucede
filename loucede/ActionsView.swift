@@ -306,10 +306,23 @@ struct ActionEditorView: View {
     var onDelete: () -> Void
 
     @State private var isImprovingPrompt = false
-    @State private var hasUnsavedChanges = false
     @State private var showIconPicker = false
     @State private var isNameFocused = false
     @State private var showDeleteConfirmation = false
+
+    /// Phase 6.8c : sauvegarde automatique debouncée (300 ms). Le bouton
+    /// « Enregistrer » a été retiré — l'utilisateur oubliait systématiquement
+    /// de cliquer. À la disparition du composant (changement d'action sélectionnée
+    /// dans la sidebar), on flush un dernier `onSave` pour ne jamais perdre la
+    /// frappe en cours.
+    @State private var saveDebounceTimer: Timer?
+
+    private func scheduleSave() {
+        saveDebounceTimer?.invalidate()
+        saveDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+            onSave(action)
+        }
+    }
 
     // Input background color: #f1f1ef for light mode, controlBackgroundColor for dark mode
     var inputBackgroundColor: Color {
@@ -352,7 +365,7 @@ struct ActionEditorView: View {
                                 .foregroundColor(textGrayColor)
                                 .scaleEffect(isNameFocused ? 1.05 : 1.0, anchor: .leading)
                                 .onChange(of: action.name) { _, _ in
-                                    hasUnsavedChanges = true
+                                    scheduleSave()
                                 }
 
                             Spacer()
@@ -364,7 +377,7 @@ struct ActionEditorView: View {
                         slotIndex: $action.slotIndex,
                         conflictName: conflictName(for: action.slotIndex, excluding: action.id),
                         usedSlots: usedSlots(excluding: action.id),
-                        onChange: { hasUnsavedChanges = true }
+                        onChange: { scheduleSave() }
                     )
                     .background(inputBackgroundColor)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -393,7 +406,7 @@ struct ActionEditorView: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
                                     .onChange(of: action.prompt) { _, _ in
-                                        hasUnsavedChanges = true
+                                        scheduleSave()
                                     }
                             }
                             .frame(height: 220)
@@ -451,7 +464,10 @@ struct ActionEditorView: View {
                 }
                 .scrollIndicators(.hidden)
 
-                // Footer with Delete and Saved buttons (fixed at bottom)
+                // Footer : Supprimer (gauche) + hint auto-save (droite).
+                // Phase 6.8c : bouton « Enregistrer » retiré, remplacé par un
+                // simple hint pour rassurer l'utilisateur que la sauvegarde
+                // se fait bien en tâche de fond à chaque modification.
                 HStack {
                     Button(action: {
                         if showDeleteConfirmation {
@@ -482,24 +498,20 @@ struct ActionEditorView: View {
 
                     Spacer()
 
-                    // Save button
-                    Button(action: saveChanges) {
-                        Text(hasUnsavedChanges ? "Enregistrer" : "Enregistré")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color(red: 0.0, green: 0.584, blue: 1.0).opacity(0.2))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!hasUnsavedChanges)
+                    Text("Sauvegarde auto")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
                 .background(Color(NSColor.windowBackgroundColor))
+            }
+            .onDisappear {
+                // Flush la sauvegarde en attente si l'utilisateur change d'action
+                // avant l'expiration du debounce 300 ms — on ne perd jamais la
+                // dernière frappe.
+                saveDebounceTimer?.invalidate()
+                onSave(action)
             }
 
             // Floating Icon Picker - above everything
@@ -517,7 +529,7 @@ struct ActionEditorView: View {
                     onSelect: { icon in
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             action.icon = icon
-                            hasUnsavedChanges = true
+                            scheduleSave()
                             showIconPicker = false
                         }
                     }
@@ -550,13 +562,6 @@ struct ActionEditorView: View {
             .compactMap { $0.slotIndex })
     }
 
-    func saveChanges() {
-        onSave(action)
-        withAnimation {
-            hasUnsavedChanges = false
-        }
-    }
-
     func improvePromptWithAI() {
         let store = ActionsStore.shared
         guard !store.apiKey.isEmpty else { return }
@@ -577,7 +582,7 @@ struct ActionEditorView: View {
                 )
                 await MainActor.run {
                     action.prompt = improvedPrompt
-                    hasUnsavedChanges = true
+                    scheduleSave()
                     isImprovingPrompt = false
                 }
             } catch {
@@ -615,7 +620,7 @@ struct ShortcutTooltip: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     if !hasConflict {
-                        Text("e.g.")
+                        Text("ex.")
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
