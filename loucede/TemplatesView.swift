@@ -544,7 +544,11 @@ struct TemplateCard: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
                 // Icon and name header
-                HStack(spacing: 10) {
+                // Phase 6.12 polish (2026-04-25) : `alignment: .top` pour
+                // que l'icône reste alignée avec le début du titre quand
+                // celui-ci passe sur 2 lignes (sinon center default = icône
+                // qui flotte au milieu d'un VStack devenu plus haut).
+                HStack(alignment: .top, spacing: 10) {
                     // Phase 6.12 (2026-04-25) : `template.icon` est désormais
                     // un emoji (ex. 🇪🇸, ⚠️, 🧩) plutôt qu'un nom de SF Symbol.
                     // On garde la boîte 3D colorée (couleur catégorie) en
@@ -565,10 +569,16 @@ struct TemplateCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
+                        // Phase 6.12 polish : `lineLimit(2)` pour les titres
+                        // longs (ex. « Extrais les actions concrètes »,
+                        // « Détecte les incohérences ») qui débordaient et
+                        // se faisaient tronquer en `lineLimit(1)`.
                         Text(template.name)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(textGrayColor)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         Text(template.category.rawValue)
                             .font(.system(size: 10))
@@ -604,7 +614,18 @@ struct TemplateCard: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .padding(12)
+
+                // Phase 6.12 polish : Spacer en bas pour que le contenu
+                // reste collé en haut quand le `frame(minHeight:)` ci-
+                // dessous étire la card. Sans ça, SwiftUI distribuerait
+                // l'espace mort entre les enfants du VStack.
+                Spacer(minLength: 0)
             }
+            // Phase 6.12 polish : hauteur minimale pour uniformiser les
+            // cards dans la grille — sinon une card à titre court (1 ligne)
+            // serait plus petite que celle d'à côté à titre long (2 lignes),
+            // créant un effet escalier entre colonnes.
+            .frame(minHeight: 130, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isAdded ? Color.green.opacity(0.05) : inputBackgroundColor)
