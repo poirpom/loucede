@@ -109,14 +109,25 @@ struct PopoverView: View {
         .onChange(of: state.activeAction) { _, newValue in
             focus = newValue == nil ? .main : .result
             confirmation = nil
-            // Retour liste depuis résultat agrandi → replier la fenêtre en
-            // animant les deux côtés (NSWindow + SwiftUI) comme toggleResultExpanded.
-            if newValue == nil, resultExpanded {
-                globalAppDelegate?.resizePopover(expanded: false)
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    resultExpanded = false
+            // Phase 6.9b (2026-04-25) : la fenêtre est désormais dimensionnée
+            // dynamiquement selon le mode. Sans resize au passage liste→résultat,
+            // le résultat (~394pt) déborderait d'une fenêtre liste compacte
+            // (ex. 296pt avec 5 actions). Inversement, le retour à la liste
+            // doit recalculer la hauteur (les actions ont pu changer depuis).
+            if newValue == nil {
+                globalAppDelegate?.resizePopover(to: .list)
+                if resultExpanded {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        resultExpanded = false
+                    }
                 }
+            } else if !resultExpanded {
+                globalAppDelegate?.resizePopover(to: .resultCompact)
             }
+            // Si newValue != nil ET resultExpanded == true, on ne resize pas :
+            // l'utilisateur reste en mode résultat agrandi (cas extrême : il
+            // déclenche une nouvelle action depuis le résultat agrandi, ce
+            // qui n'arrive pas dans l'UX actuelle mais reste safe).
         }
     }
 
@@ -197,7 +208,8 @@ struct PopoverView: View {
     /// fenêtre elle-même n'ait fini de rétrécir.
     private func toggleResultExpanded() {
         let newExpanded = !resultExpanded
-        globalAppDelegate?.resizePopover(expanded: newExpanded)
+        // Phase 6.9b : nouveau mode-based API.
+        globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact)
         withAnimation(.easeInOut(duration: 0.25)) {
             resultExpanded = newExpanded
         }
@@ -318,7 +330,12 @@ struct PopoverView: View {
                         .padding(.horizontal, 8)
                     }
                 }
-                .frame(maxHeight: 360)
+                // Phase 6.9b : cap aligné sur le calcul de hauteur côté
+                // AppDelegate (10 actions × 36pt + 9 spacings × 2pt = 378pt).
+                // En dessous de 10 actions, la liste prend sa hauteur naturelle
+                // — la fenêtre AppKit est déjà dimensionnée pour ne pas laisser
+                // d'espace vide.
+                .frame(maxHeight: 378)
 
                 // Phase 6.7 : ligne Réglages fixe sous la liste, toujours accessible.
                 // Séparateur visuel + item navigable (↑↓+↵) + raccourci ⌘, standard macOS.

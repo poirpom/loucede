@@ -267,8 +267,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Centrer + afficher (fenêtre déjà créée au démarrage)
-        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.popoverDefaultHeight)
+        // Centrer + afficher (fenêtre déjà créée au démarrage). Phase 6.9b :
+        // hauteur calculée dynamiquement selon actions.count + selection.
+        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.calculatedPopoverHeight())
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -307,7 +308,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             PopoverState.shared.reset()
         }
 
-        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.popoverDefaultHeight)
+        // Phase 6.9b : hauteur calculée dynamiquement selon actions.count + selection.
+        positionPopoverCentered(width: Self.popoverDefaultWidth, height: Self.calculatedPopoverHeight())
         popoverWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -327,6 +329,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Phase 6.7 (2026-04-24) : hauteur portée de 500 à 540 pour loger la ligne
     /// « Réglages » (fixe sous la liste) + les 10 slots d'actions + l'aperçu
     /// texte sans que le contenu ne dépasse de la fenêtre.
+    /// Phase 6.9b (2026-04-25) : la hauteur n'est plus une constante figée.
+    /// `calculatedPopoverHeight()` renvoie la hauteur idéale en fonction de
+    /// `actions.count` (cap à 10 visibles) et de la présence d'un aperçu de
+    /// texte capturé. `popoverDefaultHeight` reste comme borne haute (10
+    /// actions + selection) pour la création initiale de la fenêtre.
     static let popoverDefaultWidth: CGFloat = 400
     static let popoverDefaultHeight: CGFloat = 540
     /// Phase 1.4b : format « agrandi » (touche F sur la vue résultat).
@@ -334,15 +341,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// marge haut + 15 % bas). Recentré à chaque resize pour rester équilibré.
     static let popoverExpandedWidth: CGFloat = 500
 
-    /// Bascule la fenêtre popup entre format normal et format agrandi avec
-    /// animation fluide (NSAnimationContext). Recalcule le centrage pour
-    /// compenser le changement de dimensions. Appelé depuis PopoverView
-    /// sur appui de la touche F quand la vue résultat est affichée.
-    func resizePopover(expanded: Bool) {
+    // MARK: - Hauteur dynamique du popup (Phase 6.9b, 2026-04-25)
+
+    /// Hauteur d'une ligne d'action (icône emoji 20pt + padding vertical 8+8).
+    /// Doit rester synchro avec `actionRow` dans PopoverView.swift.
+    static let popoverActionRowHeight: CGFloat = 36
+    /// Spacing entre lignes dans le `VStack(spacing: 2)` de la liste.
+    static let popoverActionRowSpacing: CGFloat = 2
+    /// Nombre max d'actions visibles dans la liste avant scroll. Plus le
+    /// settings row fixe sous la liste = 11 lignes affichées au total.
+    static let popoverMaxVisibleActions: Int = 10
+    /// Hauteur du chrome qui entoure la liste (search bar + dividers + settings
+    /// row + footer nav). Ne dépend pas du nombre d'actions. Mesure empirique
+    /// validée à ±2pt sur Sequoia 15.x.
+    static let popoverChromeHeight: CGFloat = 108
+    /// Hauteur additionnelle quand un aperçu de texte capturé est affiché en
+    /// haut du popup (preview lineLimit(3) + paddings + divider).
+    static let popoverPreviewHeight: CGFloat = 67
+    /// Hauteur du message « Aucune action trouvée » quand la liste est vide.
+    static let popoverEmptyListHeight: CGFloat = 61
+    /// Hauteur du popup en mode résultat compact (header action + ScrollView
+    /// 300pt + footer boutons). Mesurée empiriquement.
+    static let popoverResultCompactHeight: CGFloat = 394
+
+    /// Mode d'affichage du popup principal — détermine ses dimensions.
+    /// Transitions résolues par `resizePopover(to:)` avec animation 250 ms.
+    enum PopoverMode {
+        /// Liste d'actions (entrée du popup). Hauteur dynamique via
+        /// `calculatedPopoverHeight()` selon `actions.count` + selection.
+        case list
+        /// Vue résultat en format compact. Hauteur fixe (= chrome + 300pt scroll).
+        case resultCompact
+        /// Vue résultat en format agrandi (touche F). 70 % de la hauteur écran.
+        case resultExpanded
+    }
+
+    /// Hauteur idéale du popup en fonction de l'état courant. Calculée au
+    /// moment de `showPopover()` puis figée pour toute la session — on ne
+    /// resize PAS pendant la frappe dans le champ recherche (sinon le popup
+    /// tremblerait à chaque caractère qui filtrerait la liste).
+    static func calculatedPopoverHeight() -> CGFloat {
+        let actionCount = ActionsStore.shared.actions.count
+        let visibleCount = min(actionCount, popoverMaxVisibleActions)
+
+        let listHeight: CGFloat
+        if visibleCount == 0 {
+            listHeight = popoverEmptyListHeight
+        } else {
+            listHeight = CGFloat(visibleCount) * popoverActionRowHeight
+                       + CGFloat(visibleCount - 1) * popoverActionRowSpacing
+        }
+
+        let withSelection = CapturedTextManager.shared.hasSelection
+        return popoverChromeHeight
+             + listHeight
+             + (withSelection ? popoverPreviewHeight : 0)
+    }
+
+    /// Bascule la fenêtre popup vers le mode demandé avec animation fluide
+    /// (NSAnimationContext, 250 ms). Recalcule le centrage pour compenser
+    /// le changement de dimensions.
+    ///
+    /// Phase 6.9b (2026-04-25) : remplace l'ancienne API `resizePopover(expanded:)`
+    /// qui était ambiguë (le `false` signifiait tantôt « retour liste »
+    /// tantôt « retour résultat compact »). Le mode explicite est désormais
+    /// une `PopoverMode`, ce qui empêche le call site de prendre la mauvaise
+    /// décision pour la hauteur cible.
+    func resizePopover(to mode: PopoverMode) {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
         let screenRect = screen.visibleFrame
-        let width: CGFloat = expanded ? Self.popoverExpandedWidth : Self.popoverDefaultWidth
-        let height: CGFloat = expanded ? (screenRect.height * 0.7) : Self.popoverDefaultHeight
+        let width: CGFloat
+        let height: CGFloat
+        switch mode {
+        case .list:
+            width = Self.popoverDefaultWidth
+            height = Self.calculatedPopoverHeight()
+        case .resultCompact:
+            width = Self.popoverDefaultWidth
+            height = Self.popoverResultCompactHeight
+        case .resultExpanded:
+            width = Self.popoverExpandedWidth
+            height = screenRect.height * 0.7
+        }
         let x = (screenRect.width - width) / 2 + screenRect.minX
         let y = (screenRect.height - height) / 2 + screenRect.minY
         let newFrame = NSRect(x: x, y: y, width: width, height: height)
