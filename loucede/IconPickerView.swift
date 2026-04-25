@@ -3,14 +3,16 @@
 //  loucede
 //
 //  Phase 6.4 (2026-04-23) : bascule SF Symbols → emojis.
-//  Le fichier conserve son nom pour éviter un remaniement du
-//  projet Xcode, mais son contenu est désormais :
-//  - `ActionIconView` : composant d'affichage réutilisable (emoji
-//    avec boîte fixe + fallback placeholder gris pour SF legacy)
-//  - `EmojiPickerView` : picker flottant qui remplace la grille
-//    SF historique. Offre un TextField grand format (capture
-//    emoji tapé / collé / sélectionné via ⌃⌘Espace) + bouton
-//    d'ouverture du panneau emoji système natif.
+//  Phase 6.10 (2026-04-25) : suppression du popover custom au profit
+//  de l'emoji picker système ancré directement sous l'emoji cliqué.
+//
+//  Le fichier conserve son nom pour éviter un remaniement du projet
+//  Xcode, mais son contenu est désormais :
+//  - `ActionIconView` : composant d'affichage (emoji avec boîte fixe
+//    + fallback placeholder gris pour SF legacy ou icon vide)
+//  - `EmojiPickerButton` : bouton-emoji cliquable qui ouvre directement
+//    le sélecteur emoji système (NSApp.orderFrontCharacterPalette)
+//    ancré sous lui via un TextField caché auto-focalisé.
 //
 
 import SwiftUI
@@ -41,8 +43,8 @@ struct ActionIconView: View {
                     .font(.system(size: fontSize))
             } else {
                 // Fallback : SF Symbol legacy non migré, ou icon vide.
-                // Cercle gris discret — l'utilisateur rouvre l'action
-                // pour choisir un emoji via le picker système.
+                // Cercle gris discret — l'utilisateur clique dessus pour
+                // ouvrir le picker système et choisir un emoji.
                 Circle()
                     .fill(Color.gray.opacity(0.25))
                     .frame(width: fontSize * 0.7, height: fontSize * 0.7)
@@ -52,154 +54,101 @@ struct ActionIconView: View {
     }
 }
 
-// MARK: - Emoji Picker View (édition)
+// MARK: - Emoji Picker Button (édition)
 
-/// Picker flottant affiché depuis `ActionEditorView` quand l'utilisateur
-/// clique sur l'icône d'une action. Remplace l'ancienne grille
-/// `IconPickerView` (192 SF Symbols).
+/// Bouton-emoji qui ouvre directement le sélecteur emoji système macOS
+/// (`NSApp.orderFrontCharacterPalette`) ancré juste sous lui, sans
+/// popover custom intermédiaire.
 ///
-/// UX : un grand TextField centré auto-focalisé — l'utilisateur peut
-/// soit taper un emoji, soit appuyer sur ⌃⌘Espace pour ouvrir le
-/// panneau emoji système natif (recherche + catégories fournies par
-/// macOS). Un bouton « Ouvrir le sélecteur » le propose explicitement
-/// pour découverte.
+/// Mécanique : un `TextField` invisible (opacity 0.001) est posé sur le
+/// même rectangle que l'emoji affiché. Au clic, on focus ce TextField
+/// puis on demande au système d'ouvrir la palette. macOS ancre la
+/// palette à proximité du focus de saisie texte courant — donc juste
+/// sous notre emoji. L'emoji choisi est ensuite inséré dans le
+/// TextField, intercepté par `onChange`, normalisé à un seul grapheme
+/// cluster, et propagé au modèle via le `@Binding`.
 ///
-/// API identique à l'ancien picker : `selectedIcon: String` (valeur
-/// actuelle, pré-remplit le champ) + `onSelect: (String) -> Void`
-/// (appelée dès qu'un emoji valide est saisi). Le callback
-/// déclenche la fermeture du picker côté appelant.
-struct EmojiPickerView: View {
-    @Environment(\.colorScheme) var colorScheme
-    let selectedIcon: String
-    let onSelect: (String) -> Void
+/// Phase 6.10 (2026-04-25) : remplace l'ancien `EmojiPickerView` qui
+/// affichait un popover custom (titre + grosse preview + texte d'aide
+/// + bouton « Rouvrir le sélecteur d'emoji »). Le picker système couvre
+/// déjà tous ces besoins (recherche, catégories, récents) — l'UI
+/// intermédiaire n'apportait rien.
+struct EmojiPickerButton: View {
+    @Binding var icon: String
+    var boxSize: CGFloat = 36
+    var fontSize: CGFloat = 24
 
-    @State private var input: String = ""
+    /// Champ-tampon invisible : reçoit l'emoji inséré par la palette
+    /// système. Vidé après chaque traitement pour ne pas accumuler les
+    /// graphème entre deux ouvertures successives.
+    @State private var hiddenInput: String = ""
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Choisis un emoji")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
+        ZStack {
+            // Affichage visible — identique au reste de l'app.
+            ActionIconView(icon: icon, boxSize: boxSize, fontSize: fontSize)
 
-            // Grand champ éditable — l'utilisateur tape / colle / sélectionne
-            // via le sélecteur système. Le `.onChange` ci-dessous normalise
-            // le contenu à un seul emoji et déclenche le callback.
-            //
-            // Phase 6.8e : le champ démarre toujours vide, l'emoji actuel
-            // s'affiche en placeholder grisé derrière. Avant ce changement, le
-            // champ pré-remplissait selectedIcon, et la frappe / l'insertion
-            // via le palette produisait des concaténations douteuses
-            // (« 🇫🇷🇬🇧 » selon la position du curseur) qui empêchaient la
-            // modification propre d'un emoji déjà attribué.
-            ZStack {
-                if input.isEmpty && selectedIcon.isEmojiOnly {
-                    Text(selectedIcon)
-                        .font(.system(size: 48))
-                        .opacity(0.25)
-                        .allowsHitTesting(false)
+            // TextField caché posé sur la même boîte que l'emoji.
+            // - opacity 0.001 : invisible mais reste focusable (opacity 0
+            //   désactive le focus dans certaines versions de SwiftUI).
+            // - allowsHitTesting(false) : laisse le tap atteindre le ZStack
+            //   pour qu'on puisse intercepter le click et focus
+            //   programmatiquement, plutôt que de focuser via le TextField
+            //   directement (sinon, premier clic = focus, deuxième clic =
+            //   ouvre la palette — UX confuse).
+            TextField("", text: $hiddenInput)
+                .textFieldStyle(.plain)
+                .focused($isFocused)
+                .opacity(0.001)
+                .frame(width: boxSize, height: boxSize)
+                .allowsHitTesting(false)
+                .onChange(of: hiddenInput) { _, newValue in
+                    handleInputChange(newValue)
                 }
-
-                TextField("", text: $input)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 48))
-                    .multilineTextAlignment(.center)
-                    .focused($isFocused)
-                    .onChange(of: input) { _, newValue in
-                        handleInputChange(newValue)
-                    }
-            }
-            .frame(width: 80, height: 80)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.12))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isFocused ? Color.accentColor.opacity(0.6) : Color.gray.opacity(0.2), lineWidth: 1)
-            )
-
-            VStack(spacing: 2) {
-                Text("Tape un emoji, colle-le,")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                Text("ou ⌃⌘Espace pour le sélecteur système")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-
-            Button {
-                // Focus le champ avant d'ouvrir la palette pour que l'emoji
-                // choisi y soit inséré automatiquement par le système. Ce
-                // bouton sert de repli si l'utilisateur a fermé la palette
-                // ouverte automatiquement en 6.8f.
-                isFocused = true
-                NSApp.orderFrontCharacterPalette(nil)
-            } label: {
-                Label("Rouvrir le sélecteur d'emoji", systemImage: "face.smiling")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.bordered)
         }
-        .padding(20)
-        .frame(width: 280)
-        .background(Color(NSColor.windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
-        .onAppear {
-            // Phase 6.8e : champ toujours vide à l'ouverture. L'emoji actuel
-            // s'affiche en placeholder grisé (cf. ZStack ci-dessus) pour éviter
-            // les concaténations « 🇫🇷🇬🇧 » lorsque l'utilisateur tape un nouvel
-            // emoji ou en sélectionne un via la palette système.
-            input = ""
-            // Léger délai pour que la focus prise après l'animation d'ouverture.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isFocused = true
-                // Phase 6.8f : ouvre directement la palette emoji native au
-                // survol de l'icône. L'utilisateur atterrit donc d'un seul clic
-                // dans le sélecteur système complet (recherche, catégories),
-                // plutôt que d'avoir à cliquer sur « Ouvrir le sélecteur » à
-                // chaque fois. Le bouton reste disponible comme repli si la
-                // palette a été fermée.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isFocused = true
+            // Léger délai (~50 ms) pour laisser SwiftUI propager le focus
+            // au TextField avant d'ouvrir la palette. Sans ce délai, macOS
+            // ancre parfois la palette à l'ancien focus (champ « name »
+            // au-dessus, par ex.) au lieu du nôtre.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 NSApp.orderFrontCharacterPalette(nil)
             }
         }
     }
 
-    /// Normalise une saisie quelconque à un unique emoji grapheme cluster.
-    /// - Si `newValue` est vide : rien à faire (utilisateur a effacé).
-    /// - Si le dernier caractère est un emoji : on le garde seul et on notifie.
-    /// - Si le dernier caractère n'est pas un emoji : on restaure l'état.
+    /// Filtre passif : on accepte tout grapheme cluster qui passe
+    /// `isEmojiOnly` (donc emojis, drapeaux, ZWJ, modificateurs de
+    /// teinte). Les caractères non-emoji (saisie clavier accidentelle
+    /// pendant que le TextField est focus) sont silencieusement
+    /// ignorés. Le champ est toujours vidé en sortie pour repartir à
+    /// zéro à la prochaine ouverture.
     private func handleInputChange(_ newValue: String) {
         guard !newValue.isEmpty else { return }
-
-        // On prend le dernier grapheme cluster (gère emojis composés ZWJ, flags…)
-        if let lastCluster = newValue.last {
-            let candidate = String(lastCluster)
+        if let last = newValue.last {
+            let candidate = String(last)
             if candidate.isEmojiOnly {
-                if input != candidate {
-                    input = candidate
-                }
-                onSelect(candidate)
-                return
+                icon = candidate
             }
         }
-
-        // Saisie non-emoji : rejette et revide le champ (le placeholder grisé
-        // continue d'afficher l'emoji actuel, cf. ZStack plus haut).
-        input = ""
+        // Reset systématique pour éviter que des résidus s'accumulent
+        // (frappe parasite avant que le picker ne soit ouvert, etc.).
+        if !hiddenInput.isEmpty {
+            DispatchQueue.main.async {
+                hiddenInput = ""
+            }
+        }
     }
 }
 
 // MARK: - Preview
 
-#Preview("EmojiPicker") {
-    EmojiPickerView(selectedIcon: "🍳") { emoji in
-        print("Selected: \(emoji)")
+#Preview("EmojiPickerButton") {
+    StatefulPreviewWrapper("🍳") { binding in
+        EmojiPickerButton(icon: binding)
     }
     .padding()
 }
@@ -219,4 +168,20 @@ struct EmojiPickerView: View {
         ActionIconView(icon: "")             // vide → placeholder
     }
     .padding()
+}
+
+/// Wrapper pour faire fonctionner les `#Preview` qui ont besoin d'un
+/// `@Binding` mutable (pas exposé directement par le DSL Preview).
+private struct StatefulPreviewWrapper<Value, Content: View>: View {
+    @State private var value: Value
+    let content: (Binding<Value>) -> Content
+
+    init(_ initial: Value, @ViewBuilder content: @escaping (Binding<Value>) -> Content) {
+        self._value = State(wrappedValue: initial)
+        self.content = content
+    }
+
+    var body: some View {
+        content($value)
+    }
 }

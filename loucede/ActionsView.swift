@@ -394,7 +394,6 @@ struct ActionEditorView: View {
     @ObservedObject private var store = ActionsStore.shared
 
     @State private var isImprovingPrompt = false
-    @State private var showIconPicker = false
     @State private var isNameFocused = false
     @State private var showDeleteConfirmation = false
 
@@ -444,15 +443,14 @@ struct ActionEditorView: View {
                 VStack(alignment: .leading, spacing: 20) {
                         // Header with icon and name
                         HStack(spacing: 12) {
-                            // Custom Icon Picker Button (Phase 6.4 : emoji)
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    showIconPicker.toggle()
+                            // Phase 6.10 (2026-04-25) : bouton-emoji qui ouvre
+                            // directement l'emoji picker système ancré dessous,
+                            // sans popover custom. Cf. EmojiPickerButton dans
+                            // IconPickerView.swift.
+                            EmojiPickerButton(icon: $action.icon, boxSize: 36, fontSize: 24)
+                                .onChange(of: action.icon) { _, _ in
+                                    scheduleSave()
                                 }
-                            }) {
-                                ActionIconView(icon: action.icon, boxSize: 36, fontSize: 24)
-                            }
-                            .buttonStyle(.plain)
 
                             TextField("Nouvelle action", text: $action.name, onEditingChanged: { editing in
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
@@ -626,31 +624,9 @@ struct ActionEditorView: View {
                     onSave(action)
                 }
             }
-
-            // Floating Icon Picker - above everything
-            if showIconPicker {
-                Color.black.opacity(0.001)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showIconPicker = false
-                        }
-                    }
-
-                EmojiPickerView(
-                    selectedIcon: action.icon,
-                    onSelect: { icon in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            action.icon = icon
-                            scheduleSave()
-                            showIconPicker = false
-                        }
-                    }
-                )
-                .fixedSize(horizontal: true, vertical: true)
-                .offset(x: 24, y: 68)
-                .transition(.opacity)
-            }
+            // Phase 6.10 : le popover custom EmojiPickerView a été retiré.
+            // Le bouton emoji (EmojiPickerButton ci-dessus) ouvre désormais
+            // directement le sélecteur emoji système ancré sous lui.
         }
     }
 
