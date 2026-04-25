@@ -493,13 +493,40 @@ struct PopoverView: View {
                     // en texte brut rendait les marques visibles. Le bouton
                     // Copier continue de coller le Markdown brut
                     // (cf. `state.resultText` préservé).
-                    Markdown(state.resultText)
-                        .markdownTextStyle(\.text) {
-                            FontSize(13)
-                        }
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
+                    //
+                    // Phase 6.14 (2026-04-26) : pendant le streaming, on
+                    // affiche `Text(state.resultText)` brut (markdown visible
+                    // mais sans rendu) plutôt que `Markdown(...)`. Raison :
+                    // - MarkdownUI re-parse cmark à chaque flush 60Hz et
+                    //   reconstruit la hiérarchie SwiftUI complète (un titre
+                    //   H2 partiel devient un H2 complet, une liste se forme
+                    //   token par token…). Le solver AppLayout AppKit doit
+                    //   suivre ces remaniements et peut générer des
+                    //   contraintes invalides en cours de stream → crash
+                    //   `_updateConstraintsForSubtreeIfNeeded` observé en
+                    //   prod sur du texte structuré.
+                    // - Avec `Text` brut, la string s'allonge sans changer
+                    //   la hiérarchie de vue. Geometry update simple, pas de
+                    //   reconstruction. À la fin du stream (`isProcessing`
+                    //   passe à false), on bascule sur `Markdown(...)` pour
+                    //   le rendu final propre.
+                    // - Bonus : c'est aussi nettement plus efficace côté
+                    //   CPU (cmark n'est plus parsé 60×/seconde).
+                    if state.isProcessing {
+                        Text(state.resultText)
+                            .font(.system(size: 13))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                    } else {
+                        Markdown(state.resultText)
+                            .markdownTextStyle(\.text) {
+                                FontSize(13)
+                            }
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                    }
                 }
                 // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
                 // la hauteur disponible. En format compact, plafonné à 300.
