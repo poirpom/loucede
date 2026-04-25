@@ -61,11 +61,23 @@ struct ActionsSettingsView: View {
                 }
                 .scrollIndicators(.hidden)
 
-                // Footer sidebar : import / export JSON (Phase 2.4)
+                // Footer sidebar : import / export (Phase 2.4 + 6.13)
                 Divider()
                 HStack(spacing: 8) {
-                    Button {
-                        exportActionsToFile()
+                    // Phase 6.13 (2026-04-25) : menu déroulant pour choisir
+                    // le format d'export. JSON pour la sauvegarde / ré-import,
+                    // Markdown pour la lecture humaine / archivage / partage.
+                    Menu {
+                        Button {
+                            exportActionsToFile()
+                        } label: {
+                            Label("Sauvegarde JSON", systemImage: "doc.badge.gearshape")
+                        }
+                        Button {
+                            exportActionsAsMarkdown()
+                        } label: {
+                            Label("Lecture Markdown", systemImage: "doc.richtext")
+                        }
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.up")
@@ -74,7 +86,9 @@ struct ActionsSettingsView: View {
                                 .font(.system(size: 11))
                         }
                     }
-                    .buttonStyle(.plain)
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
                     .foregroundColor(.secondary)
 
                     Spacer()
@@ -203,11 +217,35 @@ struct ActionsSettingsView: View {
             return
         }
         let panel = NSSavePanel()
-        panel.title = "Exporter les actions"
+        panel.title = "Exporter les actions (sauvegarde)"
         panel.allowedContentTypes = [.json]
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         panel.nameFieldStringValue = "loucede-actions-\(formatter.string(from: Date())).json"
+        panel.canCreateDirectories = true
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                try? data.write(to: url)
+            }
+        }
+    }
+
+    /// Phase 6.13 (2026-04-25) : export Markdown lisible humain (non
+    /// ré-importable). Utile pour archivage, partage, lecture dans un
+    /// renderer Markdown (Bear, Notion, GitHub…).
+    private func exportActionsAsMarkdown() {
+        guard let data = store.exportActionsMarkdown() else {
+            NSSound.beep()
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Exporter les actions (Markdown)"
+        // Le système s'assure que l'extension est .md (UTType.plainText
+        // accepte tous les .md, .txt). On force .md via nameFieldStringValue.
+        panel.allowedContentTypes = [.plainText]
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        panel.nameFieldStringValue = "loucede-actions-\(formatter.string(from: Date())).md"
         panel.canCreateDirectories = true
         panel.begin { response in
             if response == .OK, let url = panel.url {

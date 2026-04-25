@@ -637,6 +637,48 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
+    // MARK: - Export Markdown (Phase 6.13, 2026-04-25)
+
+    /// Sérialise toutes les actions au format Markdown lisible humain.
+    /// Contrairement à `exportActionsData()` (JSON, ré-importable), ce format
+    /// est non ré-importable mais joliment formaté pour archivage / partage /
+    /// lecture dans n'importe quel renderer Markdown (Bear, Notion, Obsidian,
+    /// GitHub, TextEdit avec preview, etc.). Les prompts multi-lignes sont
+    /// préservés avec leur structure originale (listes, indentations).
+    func exportActionsMarkdown() -> Data? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.dateStyle = .long
+        let dateString = formatter.string(from: Date())
+
+        var md = "# Actions loucedé\n\n"
+        md += "_Exporté le \(dateString) — \(actions.count) action\(actions.count > 1 ? "s" : "")._\n\n"
+        md += "---\n\n"
+
+        for (index, action) in actions.enumerated() {
+            // Titre : « 1. 🇫🇷 Traduis en français »
+            let icon = action.icon.isEmojiOnly ? "\(action.icon) " : ""
+            md += "## \(index + 1). \(icon)\(action.name)\n\n"
+
+            // Raccourci ⌘+touche dérivé de la position (Phase 6.8d-bis).
+            if let shortcut = Self.shortcut(forPosition: index) {
+                md += "**Raccourci** : ⌘\(shortcut.label)\n\n"
+            }
+
+            // Le prompt brut, ligne par ligne. Pas de bloc code (```) car
+            // les prompts contiennent souvent eux-mêmes du Markdown qu'on
+            // veut voir rendu (titres, listes…). On entoure d'un blockquote
+            // (`> `) pour visuellement distinguer le prompt du chrome.
+            md += "> "
+            md += action.prompt.replacingOccurrences(of: "\n", with: "\n> ")
+            md += "\n\n"
+
+            md += "---\n\n"
+        }
+
+        return md.data(using: .utf8)
+    }
+
     // MARK: - Prompts du seed (Phase 6.9c, 2026-04-25)
 
     // Réécriture complète des 4 prompts historiques + ajout de « Sois concis »
