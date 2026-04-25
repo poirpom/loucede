@@ -166,7 +166,7 @@ struct PopoverView: View {
                         return nil
                     }
                     // Esc sans recherche active : ferme le popup.
-                    state.streamTask?.cancel()
+                    state.endStream()
                     closeHandler()
                     return nil
                 default:
@@ -558,9 +558,7 @@ struct PopoverView: View {
                     // Retour : esc — géré par le handler Esc au niveau de la resultView,
                     // le bouton reste actionnable à la souris.
                     Button {
-                        state.streamTask?.cancel()
-                        state.activeAction = nil
-                        state.resultText = ""
+                        state.clearResult()
                     } label: {
                         HStack(spacing: 6) {
                             KeyboardKey("esc")
@@ -582,9 +580,7 @@ struct PopoverView: View {
         .onKeyPress(phases: .down) { press in
             switch press.key {
             case .escape:
-                state.streamTask?.cancel()
-                state.activeAction = nil
-                state.resultText = ""
+                state.clearResult()
                 return .handled
             default:
                 // F / f → bascule format. lowercased() pour accepter caps lock.

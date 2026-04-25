@@ -37,13 +37,21 @@ final class PopoverState: ObservableObject {
     // pour pouvoir l'annuler.
     var streamTask: Task<Void, Never>?
 
+    // Phase 6.8g (2026-04-25) : tampon de chunks accumulés pendant le
+    // streaming, vidé à 60 Hz dans `resultText` par `flushTask`. Avant
+    // ce coalescing, chaque chunk déclenchait un re-render complet du
+    // popup (Markdown ré-évalué + ScrollView relayouté), ce qui saturait
+    // SwiftUI sur les streams rapides et faisait planter l'app pendant
+    // l'exécution d'une action (crash signalé le 25 avril).
+    private var pendingChunkBuffer: String = ""
+    private var flushTask: Task<Void, Never>?
+
     private init() {}
 
     /// Réinitialise l'état avant un nouvel affichage du popup.
     /// Appelé par AppDelegate.showPopover juste avant orderFront.
     func reset() {
-        streamTask?.cancel()
-        streamTask = nil
+        endStream()
         activeAction = nil
         selectedIndex = 0
         isProcessing = false
@@ -52,16 +60,69 @@ final class PopoverState: ObservableObject {
         openCounter &+= 1
     }
 
+    /// Annule le streaming LLM en cours et libère les ressources liées
+    /// (timer de flush + buffer de chunks). Sûr à appeler même si aucun
+    /// stream n'est actif. NE TOUCHE PAS à `activeAction` ni `resultText` :
+    /// utiliser `clearResult()` pour aussi revenir à la liste.
+    func endStream() {
+        streamTask?.cancel()
+        streamTask = nil
+        flushTask?.cancel()
+        flushTask = nil
+        pendingChunkBuffer = ""
+        isProcessing = false
+    }
+
+    /// Annule le streaming en cours, vide le résultat et revient à la
+    /// liste d'actions. Appelé par les boutons Retour / Esc.
+    func clearResult() {
+        endStream()
+        activeAction = nil
+        resultText = ""
+    }
+
+    /// Ajoute le tampon de chunks accumulés à `resultText` en une seule
+    /// passe. Appelé périodiquement par `flushTask` à ~60 Hz, ainsi qu'à
+    /// la fin du stream (succès ou erreur) pour ne perdre aucun token.
+    private func flushPendingChunks() {
+        guard !pendingChunkBuffer.isEmpty else { return }
+        resultText += pendingChunkBuffer
+        pendingChunkBuffer = ""
+    }
+
+    /// Démarre la boucle de flush 60 Hz. Idempotent : si une boucle
+    /// tourne déjà, ne fait rien. Stoppée automatiquement par
+    /// `endStream()`.
+    private func startFlushLoop() {
+        guard flushTask == nil else { return }
+        flushTask = Task { @MainActor [weak self] in
+            // ~60 Hz = 16.66 ms. On vise une fréquence de rafraîchissement
+            // alignée sur l'écran pour que le streaming reste fluide
+            // visuellement, sans pour autant ré-évaluer Markdown à chaque
+            // token reçu (la cadence des LLM dépasse souvent 100 tokens/s).
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+                if Task.isCancelled { break }
+                self?.flushPendingChunks()
+            }
+        }
+    }
+
     /// Lance une action (prompt) sur le texte capturé.
     /// Déplacé ici depuis PopoverView pour que l'action puisse être
     /// déclenchée depuis l'extérieur (ex. showPopoverWithAction).
     func runAction(_ action: Action) {
+        // Si un stream tournait déjà (cas extrême : double-tap sur une
+        // action), on l'annule proprement avant d'en redémarrer un.
+        endStream()
+
         let store = ActionsStore.shared
         let textManager = CapturedTextManager.shared
 
         activeAction = action
         resultText = ""
         isProcessing = true
+        pendingChunkBuffer = ""
 
         let apiKey = store.apiKey
         let provider = store.selectedProvider
@@ -69,19 +130,33 @@ final class PopoverState: ObservableObject {
         let inputText = textManager.capturedText
         let fullPrompt = inputText.isEmpty ? action.prompt : "\(action.prompt)\n\n\(inputText)"
 
-        streamTask = Task { @MainActor in
+        startFlushLoop()
+        streamTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
                 try await AIService.shared.chatStream(
                     messages: [(role: "user", content: fullPrompt)],
                     apiKey: apiKey,
                     provider: provider,
                     model: model
-                ) { chunk in
-                    self.resultText += chunk
+                ) { [weak self] chunk in
+                    // Le chunk callback est invoqué via `await MainActor.run`
+                    // côté AIService — on est donc bien sur MainActor ici.
+                    // On accumule plutôt que de modifier `resultText`
+                    // directement : un seul re-render par frame.
+                    self?.pendingChunkBuffer += chunk
                 }
             } catch {
-                self.resultText = "Erreur : \(error.localizedDescription)"
+                // Vide d'abord le tampon (ne pas perdre le partiel) puis
+                // affiche l'erreur en complément.
+                self.flushPendingChunks()
+                self.resultText += "\n\nErreur : \(error.localizedDescription)"
             }
+            // Flush final pour garantir qu'aucun token n'est perdu entre
+            // le dernier tick du timer et la fin du stream.
+            self.flushPendingChunks()
+            self.flushTask?.cancel()
+            self.flushTask = nil
             self.isProcessing = false
         }
     }

@@ -438,8 +438,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func hidePopover() {
         // Annule tout stream LLM en cours (le résultat ne sera plus visible)
+        // et libère le timer de flush des chunks (Phase 6.8g).
         Task { @MainActor in
-            PopoverState.shared.streamTask?.cancel()
+            PopoverState.shared.endStream()
         }
         popoverWindow?.orderOut(nil)
         if let monitor = eventMonitor {
