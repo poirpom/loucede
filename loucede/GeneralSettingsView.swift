@@ -18,7 +18,6 @@ struct GeneralSettingsView: View {
     @State private var apiKeyInput: String = ""
     @State private var selectedProvider: AIProvider = .openai
     @State private var selectedModelId: String = ""
-    @State private var showModelTooltip: Bool = false
     @State private var isRecordingMainShortcut = false
     @State private var mainRecordedKeys: [String] = []
     @State private var mainShortcutConflict: String? = nil
@@ -124,14 +123,10 @@ struct GeneralSettingsView: View {
                             // re-résoudre vers un modèle toujours disponible.
                             selectedModelId = resolvedModelId(for: selectedProvider)
                         }
-                        .popover(isPresented: $showModelTooltip, arrowEdge: .bottom) {
-                            if let model = availableModels.first(where: { $0.id == selectedModelId }) {
-                                ModelSpecsTooltip(model: model)
-                            }
-                        }
-                        .onHover { hovering in
-                            showModelTooltip = hovering
-                        }
+                        // Phase 6.11b (2026-04-25) : l'ancien `.popover` au survol
+                        // a été retiré au profit d'une carte inline sous les
+                        // Pickers (cf. plus bas). Le hover popover était invasif :
+                        // l'utilisateur attendait un menu, pas une infobulle.
 
                         // Spinner discret pendant la vérif live des modèles
                         if store.verifyingProviders.contains(selectedProvider) {
@@ -141,6 +136,18 @@ struct GeneralSettingsView: View {
                         }
 
                         Spacer()
+                    }
+
+                    // Phase 6.11b : carte des specs du modèle sélectionné,
+                    // affichée en permanence sous le HStack des Pickers (au
+                    // lieu d'un popover au survol). Alignée à 160pt à gauche
+                    // pour rester dans le rythme vertical des Réglages.
+                    if let model = availableModels.first(where: { $0.id == selectedModelId }) {
+                        HStack(alignment: .top, spacing: 0) {
+                            Spacer().frame(width: 160)
+                            ModelSpecsCard(model: model)
+                            Spacer()
+                        }
                     }
 
                     HStack {
@@ -480,48 +487,52 @@ struct GeneralSettingsView: View {
     }
 }
 
-// MARK: - Model Specs Tooltip
+// MARK: - Model Specs Card
 
-struct ModelSpecsTooltip: View {
+/// Carte d'information du modèle sélectionné (nom + description + 3 barres
+/// Vitesse/Intelligence/Coût). Phase 6.11b : ex-`ModelSpecsTooltip` qui
+/// s'affichait en popover au survol du Picker. Désormais inline sous les
+/// Pickers, en permanence visible — pas de shadow, fond discret aligné
+/// sur les autres conteneurs des Réglages.
+struct ModelSpecsCard: View {
     let model: AIModel
     @Environment(\.colorScheme) var colorScheme
 
-    private var appBlue: Color {
-        Color(red: 0.0, green: 0.584, blue: 1.0)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Model name with provider icon
+            // Nom + icône provider
             HStack(spacing: 8) {
                 Image(model.provider.iconName)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 18, height: 18)
                 Text(model.name)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.primary)
             }
 
-            // Description
+            // Description courte
             Text(model.specs.description)
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Stats
-            VStack(alignment: .leading, spacing: 8) {
+            // 3 barres de specs
+            VStack(alignment: .leading, spacing: 6) {
                 SpecsBar(label: "Vitesse", value: model.specs.speed)
                 SpecsBar(label: "Intelligence", value: model.specs.intelligence)
                 SpecsBar(label: "Coût tokens", value: model.specs.tokenUsage, inverted: true)
             }
         }
         .padding(14)
-        .frame(width: 220)
+        .frame(maxWidth: 320, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
-                .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 4)
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.gray.opacity(colorScheme == .dark ? 0.10 : 0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
         )
     }
 }
