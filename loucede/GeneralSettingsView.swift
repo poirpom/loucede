@@ -23,6 +23,11 @@ struct GeneralSettingsView: View {
     @State private var mainRecordedKeys: [String] = []
     @State private var mainShortcutConflict: String? = nil
     @State private var mainShortcutMonitor: Any? = nil
+    /// Phase 6.5a : toggle « Lancer au démarrage ». Synchronisé avec
+    /// `SMAppService.mainApp.status` au .onAppear ; un .onChange relaye
+    /// la modification au système. En cas d'échec (rare : profil MDM,
+    /// status `.requiresApproval`), on revert visuellement.
+    @State private var launchAtLoginEnabled: Bool = false
     @Environment(\.colorScheme) var colorScheme
 
     /// Liste filtrée par la vérif live si disponible, sinon liste hard-codée
@@ -216,6 +221,48 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingMainShortcut)
+
+                    // Phase 6.5a (2026-04-25) : toggle « Lancer au démarrage ».
+                    // S'appuie sur SMAppService (macOS 13+) — pas de helper
+                    // tool ni de plist supplémentaire requis.
+                    HStack {
+                        HStack(spacing: 10) {
+                            Image(systemName: "power.circle.fill")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Lancer au démarrage")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                Text("Ouvre loucedé automatiquement à la connexion")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary.opacity(0.7))
+                            }
+                        }
+                        Spacer()
+                        Toggle("", isOn: $launchAtLoginEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
+                    .onAppear {
+                        // Source de vérité = SMAppService.mainApp.status. On le
+                        // relit à l'ouverture des Réglages plutôt que d'utiliser
+                        // un cache persisté côté app : l'utilisateur peut avoir
+                        // désactivé le login item depuis Réglages Système entre-
+                        // temps, et on veut refléter l'état réel.
+                        launchAtLoginEnabled = LaunchAtLoginManager.shared.isEnabled
+                    }
+                    .onChange(of: launchAtLoginEnabled) { _, newValue in
+                        let success = LaunchAtLoginManager.shared.setEnabled(newValue)
+                        if !success {
+                            // Échec (cas rare : MDM, .requiresApproval) — on
+                            // resync le toggle sur l'état réel pour ne pas
+                            // mentir à l'utilisateur.
+                            DispatchQueue.main.async {
+                                launchAtLoginEnabled = LaunchAtLoginManager.shared.isEnabled
+                            }
+                        }
+                    }
                 }
 
                 Divider()
