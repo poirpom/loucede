@@ -20,31 +20,40 @@ struct ActionsSettingsView: View {
             // Sidebar - Actions list
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
+                    // Phase 6.8d-bis (2026-04-25) : 15 slots fixes affichés.
+                    // Les positions occupées rendent un ActionListRow standard
+                    // (tap pour sélectionner). Les positions vides rendent un
+                    // EmptySlotRow grisé qui affiche déjà le raccourci ⌘+touche
+                    // qu'aura la future action — l'utilisateur sait à l'avance
+                    // ce qu'il va obtenir. Le premier slot vide (= prochain
+                    // index libre) est tappable pour créer une nouvelle action,
+                    // ce qui remplace l'ancien CTA « Nouvelle action » fixe.
                     VStack(spacing: 2) {
-                        ForEach(store.actions) { action in
-                            ActionListRow(
-                                action: action,
-                                isSelected: selectedAction?.id == action.id
-                            )
-                            .onTapGesture {
-                                selectedAction = action
+                        ForEach(0..<ActionsStore.maxActions, id: \.self) { position in
+                            if position < store.actions.count {
+                                let action = store.actions[position]
+                                ActionListRow(
+                                    action: action,
+                                    position: position,
+                                    isSelected: selectedAction?.id == action.id
+                                )
+                                .onTapGesture {
+                                    selectedAction = action
+                                }
+                            } else {
+                                EmptySlotRow(
+                                    position: position,
+                                    isNextAvailable: position == store.actions.count
+                                )
+                                .onTapGesture {
+                                    // Seul le prochain slot libre crée une action.
+                                    // Les slots ultérieurs sont juste informatifs
+                                    // (preview du raccourci à venir).
+                                    if position == store.actions.count {
+                                        addNewAction()
+                                    }
+                                }
                             }
-                        }
-
-                        // Nouvelle action - sous la dernière action
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .black))
-                            Text("Nouvelle action")
-                                .font(.system(size: 14, weight: .semibold))
-
-                            Spacer()
-                        }
-                        .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 10)
-                        .onTapGesture {
-                            addNewAction()
                         }
                     }
                     .padding(.vertical, 8)
@@ -164,7 +173,12 @@ struct ActionsSettingsView: View {
     }
 
     func addNewAction() {
-        // V1 : nombre d'actions illimité (licence personnelle).
+        // Phase 6.8d-bis : cap dur à 15 actions. La table `positionShortcuts`
+        // ne contient que 15 entrées (⌘1-⌘0 + ⌘A/Z/E/R/T) ; au-delà il n'y a
+        // plus de raccourci unique disponible. La UI empêche déjà d'arriver
+        // jusqu'ici (les slots vides au-dessus du prochain libre ne sont
+        // pas tappables), mais on garde la garde côté store par sécurité.
+        guard store.actions.count < ActionsStore.maxActions else { return }
         let newAction = Action(
             name: "",
             icon: "star",
@@ -252,6 +266,10 @@ struct ActionsSettingsView: View {
 struct ActionListRow: View {
     @Environment(\.colorScheme) var colorScheme
     let action: Action
+    /// Phase 6.8d-bis : position de l'action dans `store.actions`. Détermine
+    /// le raccourci clavier ⌘+touche affiché à droite (table de référence
+    /// dans `ActionsStore.positionShortcuts`).
+    let position: Int
     let isSelected: Bool
 
     // Selected background color: #f1f1ef for light mode, accentColor opacity for dark mode
@@ -285,12 +303,12 @@ struct ActionListRow: View {
 
             Spacer()
 
-            // Phase 6.8b : raccourci clavier attribué affiché à droite.
-            // Même mapping que la popup (slot 0→⌘1, …, slot 9→⌘0) pour
-            // aider l'utilisateur à repérer visuellement ses actions sans
-            // ouvrir chaque éditeur.
-            if let slot = action.slotIndex {
-                KeyboardKey("⌘\(slot == 9 ? 0 : slot + 1)")
+            // Phase 6.8d-bis : raccourci clavier déterminé par la position
+            // dans la liste (plus de slotIndex stocké). Même rendu que dans
+            // la popup, pour aider l'utilisateur à repérer visuellement ses
+            // actions sans ouvrir chaque éditeur.
+            if let s = ActionsStore.shortcut(forPosition: position) {
+                KeyboardKey("⌘\(s.label)")
             }
         }
         .padding(.vertical, 8)
@@ -303,6 +321,64 @@ struct ActionListRow: View {
     }
 }
 
+// MARK: - Empty Slot Row (Phase 6.8d-bis)
+
+/// Slot vide affiché dans la sidebar des Réglages. Montre déjà le raccourci
+/// ⌘+touche qui sera attribué à la future action à cette position. Le slot
+/// `isNextAvailable` (= immédiatement après la dernière action existante)
+/// affiche un libellé « Nouvelle action » en bleu accent et est tappable
+/// pour créer ; les autres slots ultérieurs sont neutres et non interactifs.
+struct EmptySlotRow: View {
+    @Environment(\.colorScheme) var colorScheme
+    let position: Int
+    let isNextAvailable: Bool
+
+    var textColor: Color {
+        if isNextAvailable {
+            return Color(red: 0.0, green: 0.584, blue: 1.0)
+        }
+        return colorScheme == .light
+            ? Color(white: 0.55)
+            : Color(white: 0.45)
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Boîte vide alignée sur l'icône d'une action remplie (24×24)
+            // pour préserver l'alignement vertical de la liste.
+            if isNextAvailable {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(textColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(textColor)
+                }
+                .frame(width: 24, height: 24)
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(textColor.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                    .frame(width: 24, height: 24)
+            }
+
+            Text(isNextAvailable ? "Nouvelle action" : "Slot disponible")
+                .font(.system(size: 14, weight: isNextAvailable ? .bold : .medium))
+                .foregroundColor(textColor)
+                .lineLimit(1)
+
+            Spacer()
+
+            if let s = ActionsStore.shortcut(forPosition: position) {
+                KeyboardKey("⌘\(s.label)")
+                    .opacity(isNextAvailable ? 1 : 0.5)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .contentShape(Rectangle())
+    }
+}
+
 // MARK: - Action Editor
 
 struct ActionEditorView: View {
@@ -310,6 +386,12 @@ struct ActionEditorView: View {
     @State var action: Action
     var onSave: (Action) -> Void
     var onDelete: () -> Void
+
+    /// Observation du store pour que le badge « Raccourci clavier ⌘X »
+    /// (Phase 6.8d-bis) refresh si la position de l'action change suite à
+    /// une suppression / un import. Singleton partagé : `@ObservedObject`
+    /// est sûr ici (pas de cycle d'init multiple).
+    @ObservedObject private var store = ActionsStore.shared
 
     @State private var isImprovingPrompt = false
     @State private var showIconPicker = false
@@ -388,20 +470,29 @@ struct ActionEditorView: View {
                             Spacer()
                         }
 
-                    // Slot clavier — position dans la rangée de chiffres du popup (1/& à 0/à).
-                    // La sélection par keycode physique garantit la compat AZERTY/QWERTY.
-                    SlotPicker(
-                        slotIndex: $action.slotIndex,
-                        conflictName: conflictName(for: action.slotIndex, excluding: action.id),
-                        usedSlots: usedSlots(excluding: action.id),
-                        onChange: { scheduleSave() }
-                    )
-                    .background(inputBackgroundColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                    )
+                    // Phase 6.8d-bis (2026-04-25) : raccourci clavier en
+                    // lecture seule, déterminé par la position de l'action
+                    // dans la liste. Plus de Picker manuel — l'utilisateur
+                    // change le raccourci en réordonnant les actions (V1 :
+                    // pas de drag-reorder, mais supprimer + recréer suffit).
+                    if let position = store.position(of: action),
+                       let shortcut = ActionsStore.shortcut(forPosition: position) {
+                        HStack {
+                            Text("Raccourci clavier")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            KeyboardKey("⌘\(shortcut.label)")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(inputBackgroundColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                        )
+                    }
 
                     // Éditeur de prompt (V1 : toutes les actions sont de type .ai)
                     Group {
@@ -563,27 +654,6 @@ struct ActionEditorView: View {
         }
     }
 
-    /// Nom de l'action qui occupe déjà ce slot (hors action en cours d'édition), ou nil.
-    /// Utilisé pour prévenir l'utilisateur qu'il va écraser une assignation existante.
-    /// En pratique, avec `usedSlots` qui désactive les slots déjà pris, ce chemin
-    /// ne devrait plus se déclencher à la sélection — gardé comme garde-fou pour
-    /// les états existants (import de config, migration, etc.).
-    private func conflictName(for slot: Int?, excluding actionId: UUID) -> String? {
-        guard let slot = slot else { return nil }
-        return ActionsStore.shared.actions.first {
-            $0.id != actionId && $0.slotIndex == slot
-        }?.name
-    }
-
-    /// Ensemble des slots occupés par d'autres actions (hors celle éditée).
-    /// Passé à SlotPicker pour désactiver l'entrée correspondante dans le menu
-    /// et éviter qu'un utilisateur attribue le même raccourci à deux actions.
-    private func usedSlots(excluding actionId: UUID) -> Set<Int> {
-        Set(ActionsStore.shared.actions
-            .filter { $0.id != actionId }
-            .compactMap { $0.slotIndex })
-    }
-
     func improvePromptWithAI() {
         let store = ActionsStore.shared
         guard !store.apiKey.isEmpty else { return }
@@ -738,62 +808,6 @@ struct TooltipArrow: Shape {
         path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
         path.closeSubpath()
         return path
-    }
-}
-
-// MARK: - Slot Picker (Phase 2)
-
-/// Sélecteur de position clavier pour une action. `nil` = aucun raccourci.
-/// Les libellés affichent d'abord la touche AZERTY FR (`&é"'(§è!çà`) puis la touche
-/// QWERTY équivalente (`1234567890`), ce qui correspond au mapping des keycodes
-/// physiques 18-29 utilisé dans PopoverView.
-struct SlotPicker: View {
-    @Binding var slotIndex: Int?
-    let conflictName: String?
-    /// Slots déjà attribués à d'autres actions — désactivés dans le menu pour
-    /// empêcher l'utilisateur d'attribuer le même raccourci à deux actions.
-    /// Le slot actuellement sélectionné par CETTE action n'y est PAS inclus
-    /// (il reste sélectionnable / affichable).
-    let usedSlots: Set<Int>
-    var onChange: () -> Void = {}
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Raccourci clavier")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { slotIndex ?? -1 },
-                    set: { newValue in
-                        slotIndex = (newValue == -1) ? nil : newValue
-                        onChange()
-                    }
-                )) {
-                    Text("Aucun").tag(-1)
-                    ForEach(0..<10, id: \.self) { i in
-                        // Phase 1.4g / Option B : raccourci déclenché par ⌘+chiffre
-                        // (i=9 → ⌘0 par convention rangée clavier). Les chiffres
-                        // sont affichés tels quels car indépendants du layout :
-                        // ⌘+1 fonctionne identiquement en AZERTY et QWERTY.
-                        Text("⌘\(i == 9 ? 0 : i + 1)")
-                            .tag(i)
-                            .disabled(usedSlots.contains(i))
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(maxWidth: 160)
-            }
-            if let name = conflictName {
-                Text("⚠︎ Déjà utilisé par « \(name) » — ce choix écrasera l'assignation précédente.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.orange)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 }
 

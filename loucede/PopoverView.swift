@@ -64,23 +64,14 @@ struct PopoverView: View {
     // de fond Phase 1.4h/1.4i (#2E2E2E, #1B1C1C) reviennent donc codées
     // en dur, comme avant les tentatives d'adaptation clair/sombre.
 
-    /// Mapping keyCode physique Carbon → index de slot (0 = touche 1/&, …, 9 = touche 0/à).
-    /// Ces keyCodes sont identiques en AZERTY FR et QWERTY US (c'est la position physique
-    /// de la touche sur le clavier). Source : Carbon HIToolbox `kVK_ANSI_1` … `kVK_ANSI_0`.
-    private static func slotIndex(forPhysicalKeyCode keyCode: UInt16) -> Int? {
-        switch keyCode {
-        case 18: return 0 // touche 1 / &
-        case 19: return 1 // touche 2 / é
-        case 20: return 2 // touche 3 / "
-        case 21: return 3 // touche 4 / '
-        case 23: return 4 // touche 5 / (
-        case 22: return 5 // touche 6 / §
-        case 26: return 6 // touche 7 / è
-        case 28: return 7 // touche 8 / !
-        case 25: return 8 // touche 9 / ç
-        case 29: return 9 // touche 0 / à
-        default: return nil
-        }
+    /// Phase 6.8d-bis (2026-04-25) : la table de mapping est désormais
+    /// centralisée dans `ActionsStore.positionShortcuts` (15 entrées :
+    /// 10 chiffres + AZERT). On résout ici keycode → position dans cette
+    /// table, et l'action déclenchée est `store.actions[position]` (la
+    /// position dans la liste détermine le raccourci, plus de `slotIndex`
+    /// stocké manuellement).
+    private static func position(forPhysicalKeyCode keyCode: UInt16) -> Int? {
+        ActionsStore.positionShortcuts.firstIndex { $0.keyCode == keyCode }
     }
 
     var body: some View {
@@ -185,14 +176,12 @@ struct PopoverView: View {
                     settingsHandler()
                     return nil
                 }
-                guard let slot = Self.slotIndex(forPhysicalKeyCode: event.keyCode) else {
+                guard let position = Self.position(forPhysicalKeyCode: event.keyCode),
+                      store.actions.indices.contains(position) else {
                     return event
                 }
-                if let action = store.actions.first(where: { $0.slotIndex == slot }) {
-                    state.runAction(action)
-                    return nil
-                }
-                return event
+                state.runAction(store.actions[position])
+                return nil
             }
 
             return event
@@ -410,13 +399,14 @@ struct PopoverView: View {
             Text(action.name)
                 .font(.system(size: 13))
             Spacer()
-            // Badge de slot : affiche ⌘1 … ⌘9 / ⌘0 correspondant au raccourci
-            // qui déclenche l'action (Option B — Phase 1.4g). Les chiffres nus
-            // alimentent le champ de recherche, d'où le préfixe ⌘. On affiche
-            // le chiffre logique plutôt que le label AZERTY car c'est ce que
-            // l'utilisateur tape réellement avec ⌘, quel que soit son layout.
-            if let slot = action.slotIndex {
-                KeyboardKey("⌘\(slot == 9 ? 0 : slot + 1)")
+            // Badge de raccourci : ⌘ + (1…0 puis A,Z,E,R,T) selon la position
+            // de l'action dans `store.actions`. Les chiffres nus alimentent
+            // le champ de recherche, d'où le préfixe ⌘ obligatoire. Phase
+            // 6.8d-bis : position = ordre dans la liste (plus de slotIndex
+            // manuel), table de référence dans `ActionsStore.positionShortcuts`.
+            if let pos = store.position(of: action),
+               let s = ActionsStore.shortcut(forPosition: pos) {
+                KeyboardKey("⌘\(s.label)")
             }
         }
         .padding(.horizontal, 10)

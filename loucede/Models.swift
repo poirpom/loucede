@@ -130,6 +130,43 @@ class ActionsStore: ObservableObject {
         "fork.knife": "🍳",
     ]
 
+    // MARK: - Raccourcis par position (Phase 6.8d-bis, 2026-04-25)
+
+    /// Nombre maximum d'actions qu'un utilisateur peut créer. Au-delà, il
+    /// n'y a plus de touche libre dans la table `positionShortcuts` ci-dessous
+    /// pour assigner un raccourci ⌘+touche unique. Cap appliqué dans
+    /// `addAction` et dans la UI Réglages.
+    static let maxActions = 15
+
+    /// Mapping position dans la liste → (keycode physique Carbon, label
+    /// affiché). Les 10 premiers slots utilisent la rangée de chiffres
+    /// (1/& à 0/à) ; les 5 suivants la rangée des lettres AZERTY (A, Z,
+    /// E, R, T).
+    ///
+    /// Les keycodes sont stables AZERTY ↔ QWERTY (position physique de la
+    /// touche). Les labels sont AZERTY-first : sur QWERTY US, les positions
+    /// 10 et 11 sont en réalité Q et W — choix volontaire, loucedé est
+    /// French-first (cohérent avec le raccourci principal ⌘^⌥W qui suit
+    /// déjà ce pattern).
+    static let positionShortcuts: [(keyCode: UInt16, label: String)] = [
+        (18, "1"), (19, "2"), (20, "3"), (21, "4"), (23, "5"),
+        (22, "6"), (26, "7"), (28, "8"), (25, "9"), (29, "0"),
+        (12, "A"), (13, "Z"), (14, "E"), (15, "R"), (17, "T"),
+    ]
+
+    /// Raccourci pour la position donnée dans la liste, ou nil si hors
+    /// limites (>= 15).
+    static func shortcut(forPosition position: Int) -> (keyCode: UInt16, label: String)? {
+        guard positionShortcuts.indices.contains(position) else { return nil }
+        return positionShortcuts[position]
+    }
+
+    /// Position d'une action dans la liste — sa position détermine son
+    /// raccourci ⌘+touche. nil si l'action n'est pas (plus) dans le store.
+    func position(of action: Action) -> Int? {
+        actions.firstIndex { $0.id == action.id }
+    }
+
     static let shared = ActionsStore()
 
     var apiKey: String {
