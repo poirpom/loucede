@@ -96,8 +96,14 @@ struct ActionsSettingsView: View {
                 ActionEditorView(
                     action: action,
                     onSave: { updatedAction in
+                        // Phase 6.8c-fix : on ne réassigne PLUS `selectedAction`
+                        // ici — le store est @Published, la sidebar (qui itère
+                        // `store.actions`) se met à jour seule, et `.id(action.id)`
+                        // ci-dessous préserve l'instance de l'éditeur. Réassigner
+                        // `selectedAction` à chaque sauvegarde provoquait des
+                        // boucles de re-render pendant la frappe et faisait planter
+                        // l'app (timer firing pendant view update).
                         store.updateAction(updatedAction)
-                        selectedAction = updatedAction
                     },
                     onDelete: {
                         deleteSelectedAction()
@@ -315,13 +321,24 @@ struct ActionEditorView: View {
     /// de cliquer. À la disparition du composant (changement d'action sélectionnée
     /// dans la sidebar), on flush un dernier `onSave` pour ne jamais perdre la
     /// frappe en cours.
-    @State private var saveDebounceTimer: Timer?
+    ///
+    /// Phase 6.8c-fix : le `Timer.scheduledTimer` initial faisait planter l'app
+    /// à chaque modification (timer firing en plein view update + boucle de
+    /// re-render via `selectedAction = updatedAction` côté parent). On a
+    /// remplacé par un `DispatchWorkItem` (cancellation propre, pas de souci
+    /// de RunLoop mode pendant les interactions menu) et on capture la valeur
+    /// d'`action` au moment du planning plutôt qu'une référence vers `self`.
+    @State private var pendingSaveWork: DispatchWorkItem?
 
     private func scheduleSave() {
-        saveDebounceTimer?.invalidate()
-        saveDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
-            onSave(action)
+        pendingSaveWork?.cancel()
+        let snapshot = action
+        let saveCallback = onSave
+        let work = DispatchWorkItem {
+            saveCallback(snapshot)
         }
+        pendingSaveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
     }
 
     // Input background color: #f1f1ef for light mode, controlBackgroundColor for dark mode
@@ -509,9 +526,14 @@ struct ActionEditorView: View {
             .onDisappear {
                 // Flush la sauvegarde en attente si l'utilisateur change d'action
                 // avant l'expiration du debounce 300 ms — on ne perd jamais la
-                // dernière frappe.
-                saveDebounceTimer?.invalidate()
-                onSave(action)
+                // dernière frappe. Si rien n'est en attente, on ne sauve PAS :
+                // un onSave inconditionnel ré-écrirait l'action après une
+                // suppression et restaurerait un fantôme dans la sidebar.
+                if let pending = pendingSaveWork {
+                    pending.cancel()
+                    pendingSaveWork = nil
+                    onSave(action)
+                }
             }
 
             // Floating Icon Picker - above everything
