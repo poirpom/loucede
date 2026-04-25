@@ -167,10 +167,28 @@ struct GeneralSettingsView: View {
                             }
                     }
 
-                    Text("Obtiens ta clé API sur \(selectedProvider.websiteURL)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.leading, 160)
+                    // Phase 6.11a (2026-04-25) : URL cliquable. Le domaine est
+                    // affiché tel quel (sans `https://`, plus lisible) ; le
+                    // `Link` y ajoute le scheme pour ouvrir le navigateur.
+                    HStack(spacing: 0) {
+                        Text("Obtiens ta clé API sur ")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        if let url = URL(string: "https://\(selectedProvider.websiteURL)") {
+                            // `Link` gère déjà le curseur pointing hand au hover
+                            // sur macOS — pas besoin de `.pointerCursor()`.
+                            Link(selectedProvider.websiteURL, destination: url)
+                                .font(.system(size: 12, weight: .semibold))
+                        } else {
+                            // Fallback défensif (URL malformée — ne devrait
+                            // jamais arriver vu le contenu hard-codé). On
+                            // rend non-cliquable plutôt que de crasher.
+                            Text(selectedProvider.websiteURL)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.leading, 160)
                 }
 
                 Divider()
