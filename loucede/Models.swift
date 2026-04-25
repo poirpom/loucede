@@ -548,6 +548,39 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
+    /// Réordonne les actions par drag-and-drop (Phase 6.11c, 2026-04-25).
+    /// `source` = index(es) à déplacer, `destination` = index cible APRÈS
+    /// retrait des sources — sémantique identique à `Array.move(fromOffsets:
+    /// toOffset:)` de SwiftUI. Implémenté manuellement ici pour ne pas avoir
+    /// à importer SwiftUI dans un fichier modèle.
+    ///
+    /// La modification de `actions` (`@Published`) propage automatiquement aux
+    /// abonnés : sidebar Réglages, popup principale, et raccourcis ⌘+touche
+    /// (qui sont dérivés de la position via
+    /// `ActionsStore.shortcut(forPosition:)`).
+    func moveActions(fromOffsets source: IndexSet, toOffset destination: Int) {
+        // 1. Capture des éléments à déplacer (IndexSet itère en ordre croissant,
+        //    donc movingElements est dans l'ordre original).
+        let movingElements = source.map { actions[$0] }
+
+        // 2. Suppression depuis les indices les plus grands pour éviter le
+        //    décalage des indices plus petits restant à supprimer.
+        for index in source.sorted(by: >) {
+            actions.remove(at: index)
+        }
+
+        // 3. Compense le décalage : combien d'éléments retirés étaient avant
+        //    `destination` ? Ces retraits ont fait remonter les éléments qui
+        //    suivaient, donc la cible d'insertion doit être décalée d'autant.
+        let removalsBeforeDest = source.filter { $0 < destination }.count
+        let insertIndex = destination - removalsBeforeDest
+
+        // 4. Insertion en bloc à la position compensée.
+        actions.insert(contentsOf: movingElements, at: insertIndex)
+
+        saveActions()
+    }
+
     // MARK: - Export / Import JSON (Phase 2.4)
 
     /// Enveloppe stable pour les fichiers d'export/import. Versionnée via `schema`

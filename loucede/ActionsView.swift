@@ -15,23 +15,32 @@ struct ActionsSettingsView: View {
     @StateObject private var store = ActionsStore.shared
     @Binding var selectedAction: Action?
 
+    /// Hauteur d'une ligne d'action dans la sidebar, paddings inclus.
+    /// Phase 6.11c : utilisée pour dimensionner exactement la `List` à la
+    /// hauteur de son contenu (sinon SwiftUI laisse de l'espace mort entre
+    /// la List et les EmptySlotRow en dessous).
+    /// Composition : icône 24pt + padding vertical (8 + 8) + `listRowInsets`
+    /// vertical (1 + 1) = 42pt par row.
+    private let rowHeight: CGFloat = 42
+
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar - Actions list
             VStack(alignment: .leading, spacing: 0) {
+                // Phase 6.11c (2026-04-25) : la liste des actions remplies
+                // passe en `List` SwiftUI pour bénéficier de `.onMove` (drag &
+                // drop natif). Les slots vides restent dans un `ForEach`
+                // séparé en-dessous, intouchables au drag — sinon `onMove`
+                // permettrait de drag depuis un slot vide, UX confuse.
+                //
+                // Styling adapté pour matcher le rendu pré-6.11c (`.plain`
+                // + séparateurs cachés + fonds transparents + paddings calés).
                 ScrollView {
-                    // Phase 6.8d-bis (2026-04-25) : 15 slots fixes affichés.
-                    // Les positions occupées rendent un ActionListRow standard
-                    // (tap pour sélectionner). Les positions vides rendent un
-                    // EmptySlotRow grisé qui affiche déjà le raccourci ⌘+touche
-                    // qu'aura la future action — l'utilisateur sait à l'avance
-                    // ce qu'il va obtenir. Le premier slot vide (= prochain
-                    // index libre) est tappable pour créer une nouvelle action,
-                    // ce qui remplace l'ancien CTA « Nouvelle action » fixe.
-                    VStack(spacing: 2) {
-                        ForEach(0..<ActionsStore.maxActions, id: \.self) { position in
-                            if position < store.actions.count {
-                                let action = store.actions[position]
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 8) // marge top
+                        // Liste draggable des actions remplies.
+                        List {
+                            ForEach(Array(store.actions.enumerated()), id: \.element.id) { position, action in
                                 ActionListRow(
                                     action: action,
                                     position: position,
@@ -40,24 +49,46 @@ struct ActionsSettingsView: View {
                                 .onTapGesture {
                                     selectedAction = action
                                 }
-                            } else {
-                                EmptySlotRow(
-                                    position: position,
-                                    isNextAvailable: position == store.actions.count
-                                )
-                                .onTapGesture {
-                                    // Seul le prochain slot libre crée une action.
-                                    // Les slots ultérieurs sont juste informatifs
-                                    // (preview du raccourci à venir).
-                                    if position == store.actions.count {
-                                        addNewAction()
-                                    }
-                                }
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+                            }
+                            .onMove { source, destination in
+                                // Le `selectedAction` reste pointé sur la même
+                                // Action (id stable) — la sélection est donc
+                                // préservée même si la position change. C'est
+                                // le comportement attendu (Q1 = A).
+                                store.moveActions(fromOffsets: source, toOffset: destination)
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .scrollDisabled(true)  // scroll géré par le ScrollView parent
+                        // Hauteur dynamique : exactement ce qu'il faut pour les
+                        // actions présentes, pas plus. Sans ça, la `List` se
+                        // donne une hauteur arbitraire qui crée un trou avant
+                        // les slots vides.
+                        .frame(height: rowHeight * CGFloat(store.actions.count))
+
+                        // Slots vides (non-draggables, non-droppables).
+                        // Le premier slot après les actions remplies est
+                        // tappable pour créer une nouvelle action.
+                        ForEach(store.actions.count..<ActionsStore.maxActions, id: \.self) { position in
+                            EmptySlotRow(
+                                position: position,
+                                isNextAvailable: position == store.actions.count
+                            )
+                            .onTapGesture {
+                                if position == store.actions.count {
+                                    addNewAction()
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 1)
+                        }
+
+                        Spacer().frame(height: 8) // marge bottom
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 8)
                 }
                 .scrollIndicators(.hidden)
 
