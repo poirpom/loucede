@@ -10,7 +10,10 @@ struct OnboardingView: View {
 
     var onComplete: () -> Void
 
-    private let totalSteps = 5
+    /// Phase 6.5b (2026-04-25) : ajout de `LaunchAtLoginStep` entre Shortcut
+    /// et Activation. L'utilisateur a déjà configuré son raccourci, on lui
+    /// propose maintenant le démarrage automatique avant l'écran final.
+    private let totalSteps = 6
 
     var body: some View {
         Group {
@@ -24,6 +27,8 @@ struct OnboardingView: View {
             case 3:
                 ShortcutStep(onNext: nextStep, onBack: previousStep)
             case 4:
+                LaunchAtLoginStep(onNext: nextStep, onBack: previousStep)
+            case 5:
                 ActivationStep(
                     onComplete: onComplete,
                     onBack: previousStep
