@@ -72,7 +72,12 @@ struct GeneralSettingsView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
 
-                    HStack {
+                    // Phase 6.11b (2026-04-25) : la carte des specs est imbriquée
+                    // dans un VStack avec les Pickers pour qu'elle hérite
+                    // automatiquement de la largeur cumulée Provider + Modèle
+                    // (suggestion utilisateur : aligner pile sur le bord droit
+                    // du Picker modèle, plutôt qu'une largeur cap arbitraire).
+                    HStack(alignment: .top) {
                         HStack(spacing: 10) {
                             Image(systemName: "cpu")
                                 .font(.system(size: 18, weight: .medium))
@@ -83,71 +88,71 @@ struct GeneralSettingsView: View {
                         }
                         .frame(width: 160, alignment: .leading)
 
-                        Picker("", selection: $selectedProvider) {
-                            ForEach(AIProvider.allCases, id: \.self) { provider in
-                                Text(provider.rawValue).tag(provider)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .onChange(of: selectedProvider) { _, newValue in
-                            store.saveProvider(newValue)
-                            // Vérif live des modèles pour le nouveau provider
-                            // (la liste filtrée est appliquée quand la réponse arrive).
-                            Task { await store.verifyAvailableModels(for: newValue) }
-                            // Load saved model for this provider (auto-fallback si l'ID persisté n'est plus valide)
-                            selectedModelId = resolvedModelId(for: newValue)
-                            // Load API key for the new provider
-                            apiKeyInput = store.apiKey(for: newValue)
-                        }
-                        .onAppear {
-                            selectedProvider = store.selectedProvider
-                            selectedModelId = resolvedModelId(for: store.selectedProvider)
-                            apiKeyInput = store.apiKey(for: store.selectedProvider)
-                            // Première vérif du provider courant à l'ouverture des Réglages.
-                            Task { await store.verifyAvailableModels(for: store.selectedProvider) }
-                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Picker("", selection: $selectedProvider) {
+                                    ForEach(AIProvider.allCases, id: \.self) { provider in
+                                        Text(provider.rawValue).tag(provider)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .onChange(of: selectedProvider) { _, newValue in
+                                    store.saveProvider(newValue)
+                                    // Vérif live des modèles pour le nouveau provider
+                                    // (la liste filtrée est appliquée quand la réponse arrive).
+                                    Task { await store.verifyAvailableModels(for: newValue) }
+                                    // Load saved model for this provider (auto-fallback si l'ID persisté n'est plus valide)
+                                    selectedModelId = resolvedModelId(for: newValue)
+                                    // Load API key for the new provider
+                                    apiKeyInput = store.apiKey(for: newValue)
+                                }
+                                .onAppear {
+                                    selectedProvider = store.selectedProvider
+                                    selectedModelId = resolvedModelId(for: store.selectedProvider)
+                                    apiKeyInput = store.apiKey(for: store.selectedProvider)
+                                    // Première vérif du provider courant à l'ouverture des Réglages.
+                                    Task { await store.verifyAvailableModels(for: store.selectedProvider) }
+                                }
 
-                        Picker("", selection: $selectedModelId) {
-                            ForEach(availableModels) { model in
-                                Text(model.name).tag(model.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .onChange(of: selectedModelId) { _, newValue in
-                            store.saveModel(newValue)
-                        }
-                        .onChange(of: store.verifiedModelIds[selectedProvider]) { _, _ in
-                            // Si la vérif vient de retirer le modèle actuellement choisi,
-                            // re-résoudre vers un modèle toujours disponible.
-                            selectedModelId = resolvedModelId(for: selectedProvider)
-                        }
-                        // Phase 6.11b (2026-04-25) : l'ancien `.popover` au survol
-                        // a été retiré au profit d'une carte inline sous les
-                        // Pickers (cf. plus bas). Le hover popover était invasif :
-                        // l'utilisateur attendait un menu, pas une infobulle.
+                                Picker("", selection: $selectedModelId) {
+                                    ForEach(availableModels) { model in
+                                        Text(model.name).tag(model.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .onChange(of: selectedModelId) { _, newValue in
+                                    store.saveModel(newValue)
+                                }
+                                .onChange(of: store.verifiedModelIds[selectedProvider]) { _, _ in
+                                    // Si la vérif vient de retirer le modèle actuellement choisi,
+                                    // re-résoudre vers un modèle toujours disponible.
+                                    selectedModelId = resolvedModelId(for: selectedProvider)
+                                }
 
-                        // Spinner discret pendant la vérif live des modèles
-                        if store.verifyingProviders.contains(selectedProvider) {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                                .frame(width: 16, height: 16)
+                                // Spinner discret pendant la vérif live des modèles
+                                if store.verifyingProviders.contains(selectedProvider) {
+                                    ProgressView()
+                                        .scaleEffect(0.5)
+                                        .frame(width: 16, height: 16)
+                                }
+                            }
+
+                            // La card s'étire à `maxWidth: .infinity` pour
+                            // matcher la largeur du VStack parent — qui est
+                            // lui-même piloté par la largeur intrinsèque du
+                            // HStack des Pickers ci-dessus. Donc card largeur
+                            // = Picker provider + Picker modèle (+ spinner si
+                            // visible). Pile sur le bord droit du Picker
+                            // modèle.
+                            if let model = availableModels.first(where: { $0.id == selectedModelId }) {
+                                ModelSpecsCard(model: model)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
 
                         Spacer()
-                    }
-
-                    // Phase 6.11b : carte des specs du modèle sélectionné,
-                    // affichée en permanence sous le HStack des Pickers (au
-                    // lieu d'un popover au survol). Alignée à 160pt à gauche
-                    // pour rester dans le rythme vertical des Réglages.
-                    if let model = availableModels.first(where: { $0.id == selectedModelId }) {
-                        HStack(alignment: .top, spacing: 0) {
-                            Spacer().frame(width: 160)
-                            ModelSpecsCard(model: model)
-                            Spacer()
-                        }
                     }
 
                     HStack {
@@ -525,7 +530,8 @@ struct ModelSpecsCard: View {
             }
         }
         .padding(14)
-        .frame(maxWidth: 320, alignment: .leading)
+        // Pas de cap de largeur ici : la largeur est pilotée par le call site
+        // (Phase 6.11b : matche la largeur cumulée des Pickers Provider + Modèle).
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.gray.opacity(colorScheme == .dark ? 0.10 : 0.06))
