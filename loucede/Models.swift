@@ -109,6 +109,7 @@ class ActionsStore: ObservableObject {
     private let mainShortcutKeyCodeKey = "loucede_main_shortcut_keycode"
     private let seed26MigrationKey = "loucede_migration_seed_26_done"
     private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
+    private let seed69cMigrationKey = "loucede_migration_seed_69c_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -218,14 +219,16 @@ class ActionsStore: ObservableObject {
             migrateLegacySeedIfNeeded()
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
+            migrateSeed69cIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
-            // Premier lancement : le seed contient déjà les actions 2.6 et les
-            // emojis 6.4 ; on pose les deux flags pour ne pas re-déclencher
-            // les migrations si l'utilisateur vide sa config plus tard.
+            // Premier lancement : le seed contient déjà la version 6.9c des
+            // prompts + les emojis 6.4 ; on pose tous les flags de migration
+            // pour ne jamais re-déclencher si l'utilisateur vide sa config.
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
             UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
+            UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
         }
     }
 
@@ -251,9 +254,15 @@ class ActionsStore: ObservableObject {
     /// - renomme « Réponds à ce post LinkedIn » → « Commente ce post LinkedIn »
     ///   si l'action existe (évite le doublon si l'utilisateur avait créé
     ///   l'ancienne version manuellement)
-    /// - ajoute « Extrais la recette » si absente, sur le premier slot libre
+    /// - ajoute « Extrais la recette de cuisine » si absente, sur le premier slot libre
     /// Les actions custom de l'utilisateur ne sont pas touchées. Après
     /// exécution, le flag `seed26MigrationKey` empêche toute ré-exécution.
+    ///
+    /// Phase 6.9c : on injecte directement le nom et le prompt 6.9c (les
+    /// utilisateurs encore en attente de cette migration sont rarissimes —
+    /// le seed26 a été shipped en avril 2026 — autant leur fournir la
+    /// version courante plutôt que celle de Phase 2.6 qui sera à nouveau
+    /// remigrée par `migrateSeed69cIfNeeded`).
     private func migrateSeed26IfNeeded() {
         guard !UserDefaults.standard.bool(forKey: seed26MigrationKey) else { return }
 
@@ -265,15 +274,17 @@ class ActionsStore: ObservableObject {
             changed = true
         }
 
-        // b) Ajout recette (si absente)
-        if !actions.contains(where: { $0.name == "Extrais la recette" }) {
-            let usedSlots = Set(actions.compactMap { $0.slotIndex })
-            let freeSlot = (0..<10).first { !usedSlots.contains($0) }
+        // b) Ajout recette (si absente). On accepte les deux noms historiques
+        // pour ne pas créer de doublon chez un utilisateur déjà migré 6.9c
+        // mais qui aurait perdu son flag seed26 (cas pathologique improbable).
+        let recipePresent = actions.contains { name in
+            name.name == "Extrais la recette" || name.name == "Extrais la recette de cuisine"
+        }
+        if !recipePresent && actions.count < ActionsStore.maxActions {
             actions.append(Action(
-                name: "Extrais la recette",
+                name: "Extrais la recette de cuisine",
                 icon: "🍳",
-                prompt: Self.recipeExtractionPrompt,
-                slotIndex: freeSlot
+                prompt: Self.recipeExtractionPrompt
             ))
             changed = true
         }
@@ -307,6 +318,58 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
+    }
+
+    /// Migration one-shot (Phase 6.9c, 2026-04-25) — « migration douce » des
+    /// prompts du seed vers leurs nouvelles versions :
+    /// - Pour chaque action dont le nom ET le prompt correspondent EXACTEMENT
+    ///   à la version pré-6.9c, on remplace le prompt (et le nom pour la
+    ///   recette qui devient « Extrais la recette de cuisine »).
+    /// - Si l'utilisateur a édité son prompt, on ne touche RIEN — le match
+    ///   exact garantit qu'on ne réécrase jamais une personnalisation.
+    /// - On AJOUTE « Sois concis » ✂️ à la fin de la liste si elle n'y est
+    ///   pas, dans la limite des 15 actions (cap Phase 6.8d-bis).
+    /// - « Traduis en emoji » et toute action custom sont préservées telles
+    ///   quelles — cette action sort du seed mais reste chez ceux qui l'ont.
+    private func migrateSeed69cIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: seed69cMigrationKey) else { return }
+
+        var changed = false
+
+        // Tuples (nom à matcher, ancien prompt à matcher, nouveau nom, nouveau prompt).
+        // L'icône n'est jamais touchée par la migration : si l'utilisateur a
+        // changé l'icône, il la garde ; sinon l'ancienne icône (déjà l'emoji
+        // post-Phase 6.4) reste cohérente avec le nouveau prompt.
+        let updates: [(matchName: String, oldPrompt: String, newName: String, newPrompt: String)] = [
+            ("Traduis en français", Self.legacyTranslateFrPrompt_pre69c, "Traduis en français", Self.translateFrPrompt),
+            ("Résume ce texte",     Self.legacySummarizePrompt_pre69c,  "Résume ce texte",     Self.summarizePrompt),
+            ("Corrige les fautes",  Self.legacyCorrectPrompt_pre69c,    "Corrige les fautes",  Self.correctPrompt),
+            ("Extrais la recette",  Self.legacyRecipePrompt_pre69c,     "Extrais la recette de cuisine", Self.recipeExtractionPrompt),
+        ]
+
+        for update in updates {
+            if let idx = actions.firstIndex(where: { $0.name == update.matchName && $0.prompt == update.oldPrompt }) {
+                actions[idx].name = update.newName
+                actions[idx].prompt = update.newPrompt
+                changed = true
+            }
+        }
+
+        // Ajout « Sois concis » si absente et qu'il reste de la place.
+        let conciseAlreadyPresent = actions.contains { $0.name == "Sois concis" }
+        if !conciseAlreadyPresent && actions.count < ActionsStore.maxActions {
+            actions.append(Action(
+                name: "Sois concis",
+                icon: "✂️",
+                prompt: Self.concisePrompt
+            ))
+            changed = true
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
     }
 
     func saveActions() {
@@ -574,73 +637,228 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
-    // Prompts par défaut français (Phase 2, 2026-04-22). Chaque prompt est associé
-    // à un slot clavier (0 = touche 1/&, 1 = touche 2/é, …) via son `slotIndex`.
-    // Les keycodes physiques 18-29 sont mappés aux slots 0-9 dans PopoverView,
-    // ce qui fonctionne identiquement en AZERTY FR et QWERTY US.
-    static let defaultActions: [Action] = [
-        Action(
-            name: "Traduis en français",
-            icon: "🇫🇷",
-            prompt: """
-            Tu es un traducteur professionnel. Traduis le texte suivant en français.
-            Règles :
-            - Détecte automatiquement la langue source
-            - Adopte un français naturel et courant (ni trop littéral, ni trop libre)
-            - Conserve le ton et le registre de l'original (formel, informel, technique, etc.)
-            - Conserve les noms propres, marques et acronymes tels quels
-            - Si un mot ou une expression n'a pas d'équivalent naturel en français, garde le terme original entre guillemets avec une courte explication entre parenthèses
-            - Conserve exactement la mise en forme du texte original : titres, sous-titres, listes, citations, sauts de ligne, etc.
-            - Si un passage semble incohérent avec le reste (publicité, référence hors-sujet, légende d'image), supprime-le
-            - Réponds uniquement avec la traduction, sans introduction, sans commentaire, sans explication
-            """,
-            slotIndex: 0
-        ),
-        Action(
-            name: "Traduis en emoji",
-            icon: "😀",
-            prompt: "Traduis le texte suivant en une séquence d'emojis. Veille à respecter la structure des phrases et du texte, en incluant la ponctuation. Réponds uniquement avec les emojis, sans texte, sans explication.",
-            slotIndex: 1
-        ),
-        Action(
-            name: "Corrige les fautes",
-            icon: "✍️",
-            prompt: """
-            Tu es un correcteur professionnel. Corrige les fautes d'orthographe, de grammaire et de typographie du texte suivant.
-            Règles :
-            - Ne modifie pas le sens, le style ni le ton
-            - Conserve exactement la mise en forme originale
-            - Réponds uniquement avec le texte corrigé, sans commentaire
-            """,
-            slotIndex: 2
-        ),
-        Action(
-            name: "Résume ce texte",
-            icon: "🤏",
-            prompt: """
-            Tu es un rédacteur professionnel. Résume le texte suivant en français.
-            Règles :
-            - Conserve toutes les idées essentielles sans en altérer le sens
-            - Vise une longueur d'environ 30% du texte original
-            - Respecte la structure du texte original : titres, sous-titres, listes, etc.
-            - Conserve le ton et le registre de l'original
-            - Réponds uniquement avec le résumé, sans introduction, sans commentaire, sans explication
-            """,
-            slotIndex: 3
-        ),
-        Action(
-            name: "Extrais la recette",
-            icon: "🍳",
-            prompt: recipeExtractionPrompt,
-            slotIndex: 4
-        ),
-    ]
+    // MARK: - Prompts du seed (Phase 6.9c, 2026-04-25)
 
-    /// Prompt partagé entre le seed `defaultActions` (nouveaux utilisateurs)
-    /// et la migration `migrateSeed26IfNeeded()` (utilisateurs existants)
-    /// pour garantir que les deux chemins produisent strictement la même
-    /// action "Extrais la recette".
+    // Réécriture complète des 4 prompts historiques + ajout de « Sois concis »
+    // basée sur des templates structurés (Rôle / Tâche / Procédure / Règles /
+    // Contraintes / Sortie). Plus longs mais nettement plus déterministes
+    // côté LLM (tests utilisateur).
+
+    /// Prompt « Traduis en français » — Phase 6.9c.
+    static let translateFrPrompt: String = """
+    Rôle : traducteur professionnel.
+
+    Tâche : traduire le texte fourni en français.
+
+    Procédure :
+    1. Détecte automatiquement la langue source.
+    2. Comprends le sens global avant de traduire.
+    3. Produis une traduction fidèle, claire et naturelle en français.
+
+    Règles de traduction :
+    - Français fluide et naturel (éviter la traduction mot à mot).
+    - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+    - Conserver les noms propres, marques, acronymes et termes techniques standard.
+    - Adapter les expressions idiomatiques vers leur équivalent naturel en français.
+    - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+    - Éviter les ajouts ou interprétations non présents dans le texte.
+
+    Mise en forme :
+    - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+    - Conserver l'ordre des phrases et des sections.
+
+    Filtrage :
+    - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
+
+    Sortie attendue :
+    - Répondre uniquement avec la traduction.
+    - Ne rien ajouter avant ou après la traduction.
+    """
+
+    /// Prompt « Résume ce texte » — Phase 6.9c.
+    static let summarizePrompt: String = """
+    Ta tâche : extraire uniquement les idées essentielles du texte.
+
+    Instructions :
+    1. Identifie les concepts principaux du texte.
+    2. Supprime les exemples, anecdotes, répétitions et détails secondaires.
+    3. Reformule les idées de façon claire et concise.
+
+    Contraintes strictes :
+    - 3 à 5 points maximum
+    - 1 idée principale par point
+    - 10 à 18 mots maximum par point
+    - Style neutre et informatif
+    - Pas d'introduction ni de conclusion
+
+    Format de sortie :
+    - Liste à puces uniquement
+
+    Vérification avant réponse :
+    - Chaque point doit représenter une idée essentielle du texte.
+    - Supprimer tout point redondant ou secondaire.
+    """
+
+    /// Prompt « Corrige les fautes » — Phase 6.9c.
+    static let correctPrompt: String = """
+    Rôle : correcteur professionnel.
+
+    Tâche : corriger le texte fourni.
+
+    Procédure :
+    1. Lire le texte pour en comprendre le sens global.
+    2. Corriger toutes les erreurs linguistiques.
+    3. Vérifier la cohérence et la lisibilité finale.
+
+    Types de corrections à effectuer :
+    - Orthographe
+    - Grammaire et accords
+    - Conjugaison
+    - Ponctuation
+    - Typographie française (espaces, guillemets, majuscules, etc.)
+
+    Règles :
+    - Ne pas modifier le sens du texte.
+    - Conserver le style et le ton de l'auteur.
+    - Ne pas reformuler sauf si une phrase est grammaticalement incorrecte.
+    - Ne pas ajouter ni supprimer d'informations.
+    - Conserver les noms propres, marques, acronymes et termes techniques.
+
+    Mise en forme :
+    - Conserver strictement la mise en forme originale :
+      titres, sous-titres, paragraphes, listes, citations, sauts de ligne, etc.
+    - Conserver l'ordre des phrases.
+
+    Sortie attendue :
+    - Fournir uniquement le texte corrigé.
+    - Aucun commentaire, explication ou annotation.
+    """
+
+    /// Prompt « Extrais la recette de cuisine » — Phase 6.9c (renomme l'ancienne
+    /// « Extrais la recette »). Partagé entre le seed et la migration douce.
     static let recipeExtractionPrompt: String = """
+    Rôle : expert en extraction et normalisation de recettes de cuisine.
+
+    Tâche : extraire et reformater une recette de cuisine à partir du texte fourni, puis la présenter en français clair et standardisé.
+
+    Procédure :
+    1. Identifier automatiquement la langue source.
+    2. Isoler uniquement le contenu utile à la recette (ingrédients, étapes, astuces culinaires).
+    3. Traduire en français naturel si nécessaire.
+    4. Reformater la recette de manière structurée et cohérente.
+
+    Normalisation obligatoire :
+    - Convertir toutes les unités au système métrique :
+      - Poids → grammes (g) ou kilogrammes (kg)
+      - Volume → millilitres (ml) ou litres (l)
+      - Températures → degrés Celsius (°C)
+      - Tasses (cups), cuillères, onces → équivalents métriques précis ou estimés cohérents
+    - Uniformiser les quantités (éviter les approximations multiples)
+
+    Filtrage du contenu :
+    - Supprimer tout contenu non essentiel à la recette :
+      anecdotes, histoire personnelle, publicité, commentaires, digressions.
+    - Ne conserver que ce qui est utile à la réalisation du plat.
+
+    Structure de sortie (Markdown obligatoire) :
+
+    # [Nom de la recette]
+
+    ## Ingrédients
+    - Liste à puces
+    - Format : quantité + unité + ingrédient
+
+    ## Préparation
+    1. Étape claire et actionnable
+    2. Une seule action principale par étape
+    3. Ordre chronologique respecté
+
+    ## Notes (optionnel)
+    - Astuces
+    - Variantes
+    - Conseils de cuisson ou de conservation
+
+    Règles finales :
+    - Traduction fluide et naturelle en français
+    - Aucune information ajoutée inventée
+    - Aucune explication ou commentaire hors recette
+    - Répondre uniquement avec la recette structurée
+    """
+
+    /// Prompt « Sois concis » — nouvelle action Phase 6.9c.
+    static let concisePrompt: String = """
+    Rôle : éditeur professionnel spécialisé dans la reformulation et la synthèse.
+
+    Tâche : reformuler le texte fourni pour le rendre plus clair et plus concis.
+
+    Procédure :
+    1. Comprendre le sens global du texte.
+    2. Identifier les idées essentielles.
+    3. Supprimer les répétitions, lourdeurs et formulations inutiles.
+    4. Reformuler avec des phrases plus courtes et plus directes.
+
+    Règles :
+    - Conserver strictement le sens original.
+    - Ne pas ajouter d'informations nouvelles.
+    - Réduire la longueur du texte tout en gardant toutes les idées importantes.
+    - Privilégier un style clair, fluide et direct.
+    - Remplacer les tournures longues par des formulations simples.
+
+    Contraintes :
+    - Réduire la longueur du texte d'environ 20 à 40 % si possible.
+    - Éviter les répétitions et mots inutiles.
+    - Conserver le ton et le registre du texte original.
+
+    Mise en forme :
+    - Conserver la structure originale : paragraphes, listes, titres, etc.
+    - Respecter l'ordre des idées.
+
+    Sortie :
+    - Fournir uniquement le texte reformulé.
+    - Ne pas ajouter d'explications ni de commentaires.
+    """
+
+    // MARK: - Anciens prompts (référentiels pour la migration douce 6.9c)
+    //
+    // Copies BIT-EXACT des prompts livrés entre Phase 2 et Phase 6.9b.
+    // Servent à détecter si l'utilisateur a édité son action depuis le seed
+    // initial : si `action.prompt == legacyXxx_pre69c`, on sait que c'est
+    // l'original et on peut remplacer par la nouvelle version sans risquer
+    // d'écraser une personnalisation. NE PAS modifier ces strings, sinon
+    // la migration ne matchera plus chez les utilisateurs existants.
+
+    fileprivate static let legacyTranslateFrPrompt_pre69c: String = """
+    Tu es un traducteur professionnel. Traduis le texte suivant en français.
+    Règles :
+    - Détecte automatiquement la langue source
+    - Adopte un français naturel et courant (ni trop littéral, ni trop libre)
+    - Conserve le ton et le registre de l'original (formel, informel, technique, etc.)
+    - Conserve les noms propres, marques et acronymes tels quels
+    - Si un mot ou une expression n'a pas d'équivalent naturel en français, garde le terme original entre guillemets avec une courte explication entre parenthèses
+    - Conserve exactement la mise en forme du texte original : titres, sous-titres, listes, citations, sauts de ligne, etc.
+    - Si un passage semble incohérent avec le reste (publicité, référence hors-sujet, légende d'image), supprime-le
+    - Réponds uniquement avec la traduction, sans introduction, sans commentaire, sans explication
+    """
+
+    fileprivate static let legacySummarizePrompt_pre69c: String = """
+    Tu es un rédacteur professionnel. Résume le texte suivant en français.
+    Règles :
+    - Conserve toutes les idées essentielles sans en altérer le sens
+    - Vise une longueur d'environ 30% du texte original
+    - Respecte la structure du texte original : titres, sous-titres, listes, etc.
+    - Conserve le ton et le registre de l'original
+    - Réponds uniquement avec le résumé, sans introduction, sans commentaire, sans explication
+    """
+
+    fileprivate static let legacyCorrectPrompt_pre69c: String = """
+    Tu es un correcteur professionnel. Corrige les fautes d'orthographe, de grammaire et de typographie du texte suivant.
+    Règles :
+    - Ne modifie pas le sens, le style ni le ton
+    - Conserve exactement la mise en forme originale
+    - Réponds uniquement avec le texte corrigé, sans commentaire
+    """
+
+    fileprivate static let legacyRecipePrompt_pre69c: String = """
     Tu extrais une recette de cuisine depuis le texte fourni et la restitues en français, au système métrique.
     Règles :
     - Détecte automatiquement la langue source
@@ -658,4 +876,43 @@ class ActionsStore: ObservableObject {
     - Ignore le contenu hors-recette (publicité, anecdotes, commentaires, histoire personnelle du blogueur)
     - Réponds uniquement avec la recette structurée, sans introduction
     """
+
+    // MARK: - Seed des nouveaux utilisateurs (Phase 6.9c)
+
+    /// 5 actions installées au premier lancement, dans l'ordre. La position
+    /// dans le tableau détermine le raccourci ⌘+touche (Phase 6.8d-bis :
+    /// position 0 → ⌘1, position 4 → ⌘5). Le champ `slotIndex` est conservé
+    /// pour la compat Codable mais n'est plus consulté par le dispatcher.
+    static let defaultActions: [Action] = [
+        Action(
+            name: "Traduis en français",
+            icon: "🇫🇷",
+            prompt: translateFrPrompt,
+            slotIndex: 0
+        ),
+        Action(
+            name: "Résume ce texte",
+            icon: "🤏",
+            prompt: summarizePrompt,
+            slotIndex: 1
+        ),
+        Action(
+            name: "Corrige les fautes",
+            icon: "✍️",
+            prompt: correctPrompt,
+            slotIndex: 2
+        ),
+        Action(
+            name: "Extrais la recette de cuisine",
+            icon: "🍳",
+            prompt: recipeExtractionPrompt,
+            slotIndex: 3
+        ),
+        Action(
+            name: "Sois concis",
+            icon: "✂️",
+            prompt: concisePrompt,
+            slotIndex: 4
+        ),
+    ]
 }
