@@ -114,15 +114,29 @@ struct PopoverView: View {
             // le résultat (~394pt) déborderait d'une fenêtre liste compacte
             // (ex. 296pt avec 5 actions). Inversement, le retour à la liste
             // doit recalculer la hauteur (les actions ont pu changer depuis).
+            //
+            // Phase 6.14-fix (2026-04-26) : suspend/resume flush autour du
+            // resize, même raison que `toggleResultExpanded` ci-dessous.
+            // Particulièrement critique au passage liste→résultat : le
+            // streaming démarre, et le premier flush peut atterrir pile
+            // pendant l'animation NSWindow.
             if newValue == nil {
+                state.suspendFlush()
                 globalAppDelegate?.resizePopover(to: .list)
                 if resultExpanded {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         resultExpanded = false
                     }
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    state.resumeFlush()
+                }
             } else if !resultExpanded {
+                state.suspendFlush()
                 globalAppDelegate?.resizePopover(to: .resultCompact)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    state.resumeFlush()
+                }
             }
             // Si newValue != nil ET resultExpanded == true, on ne resize pas :
             // l'utilisateur reste en mode résultat agrandi (cas extrême : il
@@ -208,10 +222,20 @@ struct PopoverView: View {
     /// fenêtre elle-même n'ait fini de rétrécir.
     private func toggleResultExpanded() {
         let newExpanded = !resultExpanded
-        // Phase 6.9b : nouveau mode-based API.
+        // Phase 6.14-fix (2026-04-26) : suspend le flush du buffer LLM
+        // pendant l'animation NSWindow + SwiftUI. Sans ça, la mutation de
+        // `state.resultText` à 60Hz pendant que AppKit anime la fenêtre
+        // déclenche un crash NSInternalInconsistencyException
+        // « The window has been marked as needing another Update Constraints ».
+        // L'animation dure 250ms ; on reprend après 300ms (marge sécu) pour
+        // appliquer en un seul flush les chunks accumulés pendant la pause.
+        state.suspendFlush()
         globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact)
         withAnimation(.easeInOut(duration: 0.25)) {
             resultExpanded = newExpanded
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
+            state.resumeFlush()
         }
     }
 
@@ -494,39 +518,22 @@ struct PopoverView: View {
                     // Copier continue de coller le Markdown brut
                     // (cf. `state.resultText` préservé).
                     //
-                    // Phase 6.14 (2026-04-26) : pendant le streaming, on
-                    // affiche `Text(state.resultText)` brut (markdown visible
-                    // mais sans rendu) plutôt que `Markdown(...)`. Raison :
-                    // - MarkdownUI re-parse cmark à chaque flush 60Hz et
-                    //   reconstruit la hiérarchie SwiftUI complète (un titre
-                    //   H2 partiel devient un H2 complet, une liste se forme
-                    //   token par token…). Le solver AppLayout AppKit doit
-                    //   suivre ces remaniements et peut générer des
-                    //   contraintes invalides en cours de stream → crash
-                    //   `_updateConstraintsForSubtreeIfNeeded` observé en
-                    //   prod sur du texte structuré.
-                    // - Avec `Text` brut, la string s'allonge sans changer
-                    //   la hiérarchie de vue. Geometry update simple, pas de
-                    //   reconstruction. À la fin du stream (`isProcessing`
-                    //   passe à false), on bascule sur `Markdown(...)` pour
-                    //   le rendu final propre.
-                    // - Bonus : c'est aussi nettement plus efficace côté
-                    //   CPU (cmark n'est plus parsé 60×/seconde).
-                    if state.isProcessing {
-                        Text(state.resultText)
-                            .font(.system(size: 13))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                    } else {
-                        Markdown(state.resultText)
-                            .markdownTextStyle(\.text) {
-                                FontSize(13)
-                            }
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                    }
+                    // Phase 6.14-fix (2026-04-26) : on revient au rendu
+                    // Markdown live pendant le streaming (préférence UX).
+                    // Le crash AppKit qui motivait la Phase 6.14 était en
+                    // fait causé par les transitions de fenêtre (touche F)
+                    // qui mutaient `resultText` pendant un layout en cours,
+                    // pas par le re-parse Markdown lui-même. Le vrai fix
+                    // est dans `PopoverState.suspendFlush()` appelé pendant
+                    // les animations de resize (cf. `toggleResultExpanded`
+                    // et `onChange(of: state.activeAction)` plus haut).
+                    Markdown(state.resultText)
+                        .markdownTextStyle(\.text) {
+                            FontSize(13)
+                        }
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
                 }
                 // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
                 // la hauteur disponible. En format compact, plafonné à 300.

@@ -46,6 +46,16 @@ final class PopoverState: ObservableObject {
     private var pendingChunkBuffer: String = ""
     private var flushTask: Task<Void, Never>?
 
+    /// Phase 6.14-fix (2026-04-26) : suspendre les flushes pendant les
+    /// transitions de fenêtre AppKit (resize compact ↔ agrandi, retour à
+    /// la liste). Sans ça, la mutation de `resultText` pendant l'animation
+    /// NSWindow déclenche un re-layout SwiftUI alors qu'AppKit a déjà
+    /// programmé une passe de constraints, et le solver lève
+    /// `NSInternalInconsistencyException`: « The window has been marked as
+    /// needing another Update Constraints in […] ». Voir le commit pour
+    /// l'analyse détaillée.
+    private var flushPaused: Bool = false
+
     private init() {}
 
     /// Réinitialise l'état avant un nouvel affichage du popup.
@@ -84,10 +94,30 @@ final class PopoverState: ObservableObject {
     /// Ajoute le tampon de chunks accumulés à `resultText` en une seule
     /// passe. Appelé périodiquement par `flushTask` à ~60 Hz, ainsi qu'à
     /// la fin du stream (succès ou erreur) pour ne perdre aucun token.
+    /// Phase 6.14-fix : si `flushPaused == true`, on laisse les chunks
+    /// dans le buffer (le LLM continue de streamer côté `streamTask`,
+    /// rien n'est perdu — juste retardé jusqu'au `resumeFlush()`).
     private func flushPendingChunks() {
-        guard !pendingChunkBuffer.isEmpty else { return }
+        guard !flushPaused, !pendingChunkBuffer.isEmpty else { return }
         resultText += pendingChunkBuffer
         pendingChunkBuffer = ""
+    }
+
+    /// Phase 6.14-fix : suspend l'application des chunks streamés à
+    /// `resultText`. À appeler avant une transition de fenêtre AppKit
+    /// (resize compact↔agrandi, retour liste). Le buffer continue à
+    /// recevoir les tokens du LLM, ils seront appliqués au `resumeFlush()`.
+    func suspendFlush() {
+        flushPaused = true
+    }
+
+    /// Phase 6.14-fix : reprend l'application des chunks et flush
+    /// immédiatement le buffer accumulé pendant la pause (rattrapage en
+    /// une seule passe — l'utilisateur voit les ~5-10 tokens manqués
+    /// apparaître d'un bloc, ce qui est imperceptible visuellement).
+    func resumeFlush() {
+        flushPaused = false
+        flushPendingChunks()
     }
 
     /// Démarre la boucle de flush 60 Hz. Idempotent : si une boucle
