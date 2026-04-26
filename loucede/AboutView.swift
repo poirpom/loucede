@@ -7,6 +7,8 @@ import SwiftUI
 
 struct AboutView: View {
     @StateObject private var updateChecker = UpdateChecker.shared
+    /// Phase 6.16 (2026-04-26) : sheet d'envoi de suggestion.
+    @State private var showSuggestionSheet: Bool = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -61,10 +63,36 @@ struct AboutView: View {
                     .font(.system(size: 12))
             }
 
+            // Phase 6.16 : bouton d'envoi de suggestion. License-gated
+            // (cf. `LicenseManager.hasLicense`) — grisé tant que
+            // l'utilisateur n'a pas de licence active. La gate effective
+            // sera connectée en Phase 6.2 ; le stub actuel retourne
+            // toujours `true` pour permettre les tests pendant le dev.
+            Button {
+                showSuggestionSheet = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 12))
+                    Text("Envoyer une suggestion")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!LicenseManager.shared.hasLicense)
+            .help(LicenseManager.shared.hasLicense
+                  ? "Partage une idée ou une remarque"
+                  : "Disponible après activation de la licence")
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+        .sheet(isPresented: $showSuggestionSheet) {
+            SuggestionFormView()
+        }
     }
 }
 
