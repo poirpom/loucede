@@ -123,10 +123,10 @@ struct PopoverView: View {
             if newValue == nil {
                 state.suspendFlush()
                 globalAppDelegate?.resizePopover(to: .list)
+                // Phase 6.14-fix-2 : set instantané, pas de withAnimation
+                // (cf. `toggleResultExpanded` pour l'analyse complète).
                 if resultExpanded {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        resultExpanded = false
-                    }
+                    resultExpanded = false
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
@@ -237,17 +237,25 @@ struct PopoverView: View {
     private func toggleResultExpanded() {
         let newExpanded = !resultExpanded
         // Phase 6.14-fix (2026-04-26) : suspend le flush du buffer LLM
-        // pendant l'animation NSWindow + SwiftUI. Sans ça, la mutation de
+        // pendant l'animation NSWindow. Sans ça, la mutation de
         // `state.resultText` à 60Hz pendant que AppKit anime la fenêtre
         // déclenche un crash NSInternalInconsistencyException
         // « The window has been marked as needing another Update Constraints ».
-        // L'animation dure 250ms ; on reprend après 300ms (marge sécu) pour
-        // appliquer en un seul flush les chunks accumulés pendant la pause.
+        //
+        // Phase 6.14-fix-2 (2026-04-26) : RETRAIT du `withAnimation` sur
+        // `resultExpanded`. La cause résiduelle du crash était l'animation
+        // SwiftUI qui interpolait la frame du ScrollView (300 ↔ 2000pt) en
+        // parallèle de l'animation NSWindow — ~15 re-renders SwiftUI pendant
+        // les 250ms, chacun forçant le solver de constraints à reculer en
+        // même temps qu'AppKit animait la window. Race condition fatale.
+        // Avec le set instantané, `resultExpanded` passe à la nouvelle
+        // valeur en 1 frame, et seule la NSWindow s'anime côté AppKit —
+        // pas de chevauchement. Trade-off : à la réduction, pendant 250ms,
+        // une fine bande noire peut apparaître en bas (window rétrécit
+        // progressivement, ScrollView déjà à 300pt). Largement acceptable.
         state.suspendFlush()
         globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact)
-        withAnimation(.easeInOut(duration: 0.25)) {
-            resultExpanded = newExpanded
-        }
+        resultExpanded = newExpanded
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
             state.resumeFlush()
         }
