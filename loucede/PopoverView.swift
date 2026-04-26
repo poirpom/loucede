@@ -159,14 +159,37 @@ struct PopoverView: View {
         let closeHandler = onClose
         let settingsHandler = onOpenSettings
         slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // Vue résultat : on ne touche à rien, le handler SwiftUI gère.
-            guard state.activeAction == nil else { return event }
-
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-            // --- Sans modifier : Backspace / Esc gérés ici, le reste passe à SwiftUI.
-            // Raison : .onKeyPress(.delete) et .onKeyPress(.escape) sont peu fiables
-            // sur macOS (le système intercepte souvent avant SwiftUI), alors que le
+            // Phase 6.15 (2026-04-26) : Esc ferme le popup dans TOUS les
+            // contextes (vue liste comme vue résultat). Avant, Esc en vue
+            // résultat était délégué à SwiftUI via .onKeyPress(.escape) qui
+            // est peu fiable sur macOS — le système l'interceptait souvent
+            // et le comportement était imprévisible. On centralise ici dans
+            // le NSEvent monitor (= capture fiable des touches physiques).
+            // Convention macOS standard : Esc ferme le popup d'action,
+            // comme Spotlight, Raycast, Alfred. Pour relancer une autre
+            // action, on rouvre via le raccourci global.
+            if mods.isEmpty && event.keyCode == 53 {
+                // Sauf : si une recherche est active en vue liste, le 1er
+                // Esc clear la recherche (geste familier macOS), un 2e
+                // Esc fermera le popup.
+                if state.activeAction == nil && !state.searchQuery.isEmpty {
+                    state.searchQuery = ""
+                    return nil
+                }
+                state.endStream()
+                closeHandler()
+                return nil
+            }
+
+            // Le reste de la logique du monitor (slots ⌘+touche, Backspace
+            // de recherche, ⌘, Réglages…) ne s'applique qu'en vue liste.
+            guard state.activeAction == nil else { return event }
+
+            // --- Sans modifier : Backspace géré ici, le reste passe à SwiftUI.
+            // Raison : .onKeyPress(.delete) est peu fiable sur macOS (le
+            // système intercepte souvent avant SwiftUI), alors que le
             // NSEvent monitor voit toutes les touches physiques sans ambigüité.
             if mods.isEmpty {
                 switch event.keyCode {
@@ -176,15 +199,6 @@ struct PopoverView: View {
                         return nil
                     }
                     return event
-                case 53: // ⎋ Escape
-                    if !state.searchQuery.isEmpty {
-                        state.searchQuery = ""
-                        return nil
-                    }
-                    // Esc sans recherche active : ferme le popup.
-                    state.endStream()
-                    closeHandler()
-                    return nil
                 default:
                     return event // chiffres, lettres, ponctuation → SwiftUI onKeyPress
                 }
@@ -550,39 +564,30 @@ struct PopoverView: View {
                     // allègement de l'interface.
                     // Phase 1.4d : pas de picto SF Symbol, KeyboardKey avant le Text
                     // (même ordre que le footer nav de la liste : touche → libellé).
-                    // Copier : ⌘↵ — copie le résultat dans le presse-papier (popup reste ouvert)
+                    //
+                    // Phase 6.15 (2026-04-26) : réarrangement et inversion.
+                    // - Esc Fermer (anciennement « Retour ») et F Agrandir
+                    //   à GAUCHE = actions contextuelles secondaires.
+                    // - ⌘⏎ Coller et ⏎ Copier à DROITE = actions principales,
+                    //   convention macOS (action par défaut à droite, comme
+                    //   Save dialog).
+                    // - Inversion ⌘⏎ ↔ ⏎ : ⏎ est désormais Copier (action par
+                    //   défaut, non-destructive, fréquence d'usage la plus
+                    //   élevée). ⌘⏎ devient Coller (action engagée qui
+                    //   remplace le texte source — destructive).
+
+                    // Esc Fermer — géré par le NSEvent monitor pour le clavier ;
+                    // ce bouton reste actionnable à la souris pour découvrabilité.
                     Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(state.resultText, forType: .string)
-                        showConfirmation("Copié")
+                        state.endStream()
+                        onClose()
                     } label: {
                         HStack(spacing: 6) {
-                            KeyboardKey("⌘↵")
-                            Text("Copier")
+                            KeyboardKey("esc")
+                            Text("Fermer")
                         }
                     }
                     .buttonStyle(.plain)
-                    .keyboardShortcut(.return, modifiers: .command)
-
-                    // Coller : ↵ — colle dans l'app précédente (ferme le popup).
-                    // On attend que le toast "Collé" soit visible ~300 ms avant
-                    // d'appeler performPasteInPreviousApp (qui orderOut le popup).
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(state.resultText, forType: .string)
-                        showConfirmation("Collé", duration: 0.3) {
-                            globalAppDelegate?.performPasteInPreviousApp()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            KeyboardKey("↵")
-                            Text("Coller")
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.return, modifiers: [])
-
-                    Spacer()
 
                     // Phase 1.4b : indicateur F Agrandir / F Réduire. Clic souris
                     // bascule aussi pour cohérence (sinon seule la touche F marcherait).
@@ -596,17 +601,38 @@ struct PopoverView: View {
 
                     Spacer()
 
-                    // Retour : esc — géré par le handler Esc au niveau de la resultView,
-                    // le bouton reste actionnable à la souris.
+                    // Coller : ⌘↵ — colle dans l'app précédente (ferme le popup).
+                    // On attend que le toast "Collé" soit visible ~300 ms avant
+                    // d'appeler performPasteInPreviousApp (qui orderOut le popup).
                     Button {
-                        state.clearResult()
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(state.resultText, forType: .string)
+                        showConfirmation("Collé", duration: 0.3) {
+                            globalAppDelegate?.performPasteInPreviousApp()
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            KeyboardKey("esc")
-                            Text("Retour")
+                            KeyboardKey("⌘↵")
+                            Text("Coller")
                         }
                     }
                     .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: .command)
+
+                    // Copier : ↵ — copie le résultat dans le presse-papier
+                    // (popup reste ouvert pour relire ou recopier).
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(state.resultText, forType: .string)
+                        showConfirmation("Copié")
+                    } label: {
+                        HStack(spacing: 6) {
+                            KeyboardKey("↵")
+                            Text("Copier")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: [])
                 }
                 .padding(12)
             }
@@ -615,22 +641,17 @@ struct PopoverView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .result)
-        // Handler clavier vue résultat : Esc (retour liste) + F (bascule taille).
-        // Unifié en un seul .onKeyPress(phases:) plutôt que plusieurs handlers
-        // empilés, pour avoir un dispatch explicite et prévisible.
+        // Handler clavier vue résultat : F (bascule taille).
+        // Phase 6.15 (2026-04-26) : Esc retiré d'ici, désormais géré
+        // globalement par le NSEvent monitor (cf. installSlotMonitorIfNeeded).
+        // Centralisation = comportement uniforme et fiable sur tout le popup.
         .onKeyPress(phases: .down) { press in
-            switch press.key {
-            case .escape:
-                state.clearResult()
+            // F / f → bascule format. lowercased() pour accepter caps lock.
+            if press.characters.lowercased() == "f" {
+                toggleResultExpanded()
                 return .handled
-            default:
-                // F / f → bascule format. lowercased() pour accepter caps lock.
-                if press.characters.lowercased() == "f" {
-                    toggleResultExpanded()
-                    return .handled
-                }
-                return .ignored
             }
+            return .ignored
         }
         // Overlay du toast de confirmation (copie / collage). S'affiche brièvement
         // au centre de la vue résultat et se dissipe automatiquement.
