@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct AboutView: View {
     @StateObject private var updateChecker = UpdateChecker.shared
@@ -22,9 +23,15 @@ struct AboutView: View {
         VStack(spacing: 24) {
             Spacer().frame(height: 20)
 
-            Image(systemName: "sparkles")
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(Color.accentColor)
+            // Correctif 2026-04-27 : remplace l'ancienne icône
+            // `Image(systemName: "sparkles")` par l'AppIcon réelle de
+            // l'application. `NSApp.applicationIconImage` retourne le
+            // composite système (incluant le squircle macOS Big Sur+).
+            // Taille 64×64pt = même empreinte visuelle que l'étincelle.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 64, height: 64)
 
             Text("loucedé")
                 .font(.system(size: 28, weight: .bold))
