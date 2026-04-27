@@ -33,23 +33,28 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 24) {
-                TabTextButton(title: "Général", isSelected: selectedTab == 0) {
+            // Correctif 2026-04-27 : barre d'onglets passe en format
+            // « pictogramme + titre » (style macOS natif Settings). Chaque
+            // onglet est un `TabIconButton` avec un SF Symbol au-dessus du
+            // label. Onglet sélectionné mis en évidence par un fond pillé
+            // (corner radius 8) en couleur accent translucide.
+            HStack(spacing: 4) {
+                TabIconButton(title: "Général", systemImage: "gearshape", isSelected: selectedTab == 0) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 0 }
                 }
                 // Phase 1.5b : "Prompts" renommé "Actions" pour cohérence avec
                 // le reste du vocabulaire (ActionsStore, Action, actionRow…).
-                TabTextButton(title: "Actions", isSelected: selectedTab == 1) {
+                TabIconButton(title: "Actions", systemImage: "square.and.pencil", isSelected: selectedTab == 1) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
                 }
-                TabTextButton(title: "Modèles", isSelected: selectedTab == 2) {
+                TabIconButton(title: "Modèles", systemImage: "wand.and.stars", isSelected: selectedTab == 2) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 2 }
                 }
-                TabTextButton(title: "À propos", isSelected: selectedTab == 3) {
+                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 3) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
                 }
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .onAppear { updateChecker.checkForUpdates() }
 
             Divider()
@@ -83,16 +88,31 @@ struct SettingsView: View {
 
 // MARK: - Tab button
 
-struct TabTextButton: View {
+/// Bouton d'onglet style macOS natif Settings : pictogramme SF Symbol
+/// au-dessus du libellé, fond pillé quand sélectionné.
+/// Correctif 2026-04-27 : remplace l'ancien `TabTextButton` (texte seul).
+struct TabIconButton: View {
     let title: String
+    let systemImage: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(isSelected ? Color.accentColor : .secondary)
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .regular))
+                    .frame(width: 22, height: 22)
+                    .foregroundColor(isSelected ? Color.accentColor : .secondary)
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+            }
+            .frame(width: 72, height: 56)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
         }
         .buttonStyle(.plain)
     }
