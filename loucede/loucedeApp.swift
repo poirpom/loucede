@@ -367,10 +367,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Nombre max d'actions visibles dans la liste avant scroll. Plus le
     /// settings row fixe sous la liste = 11 lignes affichées au total.
     static let popoverMaxVisibleActions: Int = 10
-    /// Hauteur du chrome qui entoure la liste (search bar + dividers + settings
-    /// row + footer nav). Ne dépend pas du nombre d'actions. Mesure empirique
-    /// validée à ±2pt sur Sequoia 15.x.
-    static let popoverChromeHeight: CGFloat = 108
+    /// Hauteur du chrome qui entoure la liste (logo + search bar + dividers
+    /// + settings row + footer nav). Ne dépend pas du nombre d'actions.
+    /// Mesure empirique validée à ±2pt sur Sequoia 15.x.
+    /// Phase 6.18 (2026-04-28) : 108 → 152 (+44pt) pour absorber le logo
+    /// loucedé ajouté en haut de la mainView (28pt + paddings 10/6).
+    static let popoverChromeHeight: CGFloat = 152
     /// Hauteur additionnelle quand un aperçu de texte capturé est affiché en
     /// haut du popup (preview lineLimit(3) + paddings + divider).
     static let popoverPreviewHeight: CGFloat = 67

@@ -325,6 +325,29 @@ struct PopoverView: View {
             // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
             // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
             VStack(spacing: 0) {
+                // Phase 6.18 (2026-04-28) : logo loucedé en haut à droite,
+                // cliquable pour ouvrir les Réglages. Ferrage horizontal à
+                // 12pt comme les badges ⌘+touche des actionRows en-dessous.
+                // Border radius 7pt (~22 % de 28pt = squircle macOS standard).
+                HStack {
+                    Spacer()
+                    Button {
+                        onOpenSettings()
+                    } label: {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 28, height: 28)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .pointerCursor()
+                    .help("Ouvrir les Réglages")
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
                 // Phase 1.4g : bandeau de recherche toujours visible, avec
                 // placeholder « Rechercher » pour signaler la fonction à
                 // l'utilisateur. Alimenté par la frappe directe (onKeyPress
