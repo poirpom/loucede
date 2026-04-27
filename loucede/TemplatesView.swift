@@ -188,21 +188,6 @@ let promptSuggestions: [PromptSuggestion] = [
         category: .analyze
     ),
     PromptSuggestion(
-        name: "Extrais les actions concrètes",
-        prompt: """
-        Analyse le texte suivant et identifie toutes les actions, recommandations ou étapes pratiques mentionnées, dans la même langue que le texte original.
-        Règles :
-        - Regroupe les actions par thème ou par priorité logique, même si le texte est désorganisé
-        - Présente chaque groupe avec un intitulé en **gras** suivi des actions en liste numérotée
-        - Formule chaque action à l'infinitif, de manière courte et actionnable
-        - Utilise le format Markdown pour la mise en forme
-        - Si aucune action n'est identifiable, réponds uniquement : "Aucune action concrète identifiée."
-        - Réponds uniquement avec la liste structurée, sans introduction ni commentaire
-        """,
-        icon: "✅",
-        category: .analyze
-    ),
-    PromptSuggestion(
         name: "Analyse les biais",
         prompt: """
         Tu es un expert en pensée critique et rhétorique. Analyse le texte suivant et identifie les biais cognitifs, présupposés, positions idéologiques ou angles implicites présents, dans la même langue que le texte original.
