@@ -367,18 +367,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Nombre max d'actions visibles dans la liste avant scroll. Plus le
     /// settings row fixe sous la liste = 11 lignes affichées au total.
     static let popoverMaxVisibleActions: Int = 10
-    /// Hauteur du chrome qui entoure la liste (search bar + dividers +
-    /// settings row + footer nav). Ne dépend pas du nombre d'actions.
-    /// Mesure empirique validée à ±2pt sur Sequoia 15.x.
-    /// Phase 6.18-fix (2026-04-28) : retour à 108. Le logo loucedé est
-    /// désormais intégré dans la zone preview (à droite du preview du
-    /// texte capturé), aligné top — il tient dans la hauteur du preview
-    /// (3 lignes max) sans ajouter de chrome. Quand pas de selection,
-    /// pas de preview, donc pas de logo non plus.
-    static let popoverChromeHeight: CGFloat = 108
-    /// Hauteur additionnelle quand un aperçu de texte capturé est affiché en
-    /// haut du popup (preview lineLimit(3) + paddings + divider).
-    static let popoverPreviewHeight: CGFloat = 67
+    /// Hauteur du chrome qui entoure la liste (top bar logo + search bar
+    /// + dividers + settings row + footer nav). Ne dépend pas du nombre
+    /// d'actions. Mesure empirique validée à ±2pt sur Sequoia 15.x.
+    /// Phase 6.18-fix-2 (2026-04-28) : 108 → 161 (+53). Le logo loucedé
+    /// est désormais TOUJOURS visible dans la top bar (28pt + paddings
+    /// 12+12 = 52pt + divider 1pt = 53pt), même sans selection. Quand
+    /// selection, le preview cohabite avec le logo dans la même top bar
+    /// — voir `popoverPreviewHeight` pour le delta.
+    static let popoverChromeHeight: CGFloat = 161
+    /// Delta de hauteur ADDITIONNEL quand un aperçu de texte est affiché
+    /// (= différence entre top bar avec preview vs top bar logo seul).
+    /// Phase 6.18-fix-2 : 67 → 12. Avant, popoverPreviewHeight était la
+    /// hauteur ABSOLUE de la zone preview. Maintenant, c'est juste le
+    /// delta entre 64pt (preview 3 lignes + paddings) et 52pt (logo
+    /// seul), soit 12pt — la top bar pousse de 12pt en présence d'une
+    /// selection.
+    static let popoverPreviewHeight: CGFloat = 12
     /// Hauteur du message « Aucune action trouvée » quand la liste est vide.
     static let popoverEmptyListHeight: CGFloat = 61
     /// Hauteur du popup en mode résultat compact (header action + ScrollView

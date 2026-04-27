@@ -310,41 +310,41 @@ struct PopoverView: View {
         // spacing: 0 (comme resultView) pour que la zone #1B1C1C colle directement
         // au Divider sous la preview, sans gap visuel dû au spacing du VStack.
         VStack(alignment: .leading, spacing: 0) {
-            if textManager.hasSelection {
-                // Phase 6.18-fix (2026-04-28) : preview du texte capturé +
-                // logo loucedé sur la même ligne (alignment .top pour que
-                // le logo soit aligné avec la première ligne du preview).
-                // Le preview prend tout l'espace dispo via maxWidth: .infinity ;
-                // le logo se cale à droite. Logo cliquable → Réglages.
-                // Décision : pas de logo quand pas de selection (le preview
-                // est lui-même conditionnel, et les Réglages restent
-                // accessibles via le settings row fixe sous la liste).
-                HStack(alignment: .top, spacing: 8) {
+            // Phase 6.18-fix-2 (2026-04-28) : top bar TOUJOURS visible.
+            // Si selection : preview à gauche + logo à droite (alignment
+            // .top pour que le logo soit aligné avec la première ligne du
+            // preview). Si pas de selection : Spacer à gauche + logo à
+            // droite (le logo reste accessible pour ouvrir les Réglages
+            // peu importe le contexte d'ouverture du popup).
+            HStack(alignment: .top, spacing: 8) {
+                if textManager.hasSelection {
                     Text(textManager.capturedText)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                         .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Button {
-                        onOpenSettings()
-                    } label: {
-                        Image(nsImage: NSApp.applicationIconImage)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: 28, height: 28)
-                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .pointerCursor()
-                    .help("Ouvrir les Réglages")
+                } else {
+                    Spacer()
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 12)
-            }
 
-            Divider().opacity(textManager.hasSelection ? 1 : 0)
+                Button {
+                    onOpenSettings()
+                } label: {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+                .help("Ouvrir les Réglages")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+
+            Divider()
 
             // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
             // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
