@@ -110,6 +110,7 @@ class ActionsStore: ObservableObject {
     private let seed26MigrationKey = "loucede_migration_seed_26_done"
     private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
     private let seed69cMigrationKey = "loucede_migration_seed_69c_done"
+    private let planActionsEmojiMigrationKey = "loucede_migration_plan_actions_emoji_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -220,6 +221,7 @@ class ActionsStore: ObservableObject {
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
             migrateSeed69cIfNeeded()
+            migratePlanActionsEmojiIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -229,6 +231,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
             UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
             UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
+            UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
         }
     }
 
@@ -370,6 +373,34 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
+    }
+
+    /// Migration one-shot (correctif 2026-04-27) : remplace l'emoji
+    /// 🗺️ par ✅ pour les actions « Génère un plan d'actions » qui ont
+    /// gardé l'icône d'origine. Le modèle correspondant dans l'onglet
+    /// Modèles a aussi été mis à jour (cf. `TemplatesView.swift`).
+    ///
+    /// Match minimal sur (name + ancienne icône) : si l'utilisateur a
+    /// changé le nom OU l'icône, on ne touche pas — on suppose que
+    /// c'est une personnalisation volontaire. Le prompt n'est pas pris
+    /// en compte (l'icône est un visuel, pas du contenu — un user qui
+    /// a customisé son prompt mais gardé l'icône d'origine bénéficie
+    /// quand même de la mise à jour visuelle).
+    private func migratePlanActionsEmojiIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: planActionsEmojiMigrationKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Génère un plan d'actions" && actions[idx].icon == "🗺️" {
+                actions[idx].icon = "✅"
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
     }
 
     func saveActions() {

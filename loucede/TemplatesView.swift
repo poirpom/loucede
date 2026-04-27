@@ -317,7 +317,7 @@ let promptSuggestions: [PromptSuggestion] = [
         • Si une information est ambiguë, formule la tâche correspondante avec un ? en fin de ligne pour signaler qu'une clarification est nécessaire
         • Réponds uniquement avec le plan en Markdown, sans introduction ni commentaire
         """,
-        icon: "🗺️",
+        icon: "✅",
         category: .structure
     ),
     PromptSuggestion(
