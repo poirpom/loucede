@@ -311,26 +311,21 @@ struct PopoverView: View {
         // au Divider sous la preview, sans gap visuel dû au spacing du VStack.
         VStack(alignment: .leading, spacing: 0) {
             if textManager.hasSelection {
-                Text(textManager.capturedText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-            }
+                // Phase 6.18-fix (2026-04-28) : preview du texte capturé +
+                // logo loucedé sur la même ligne (alignment .top pour que
+                // le logo soit aligné avec la première ligne du preview).
+                // Le preview prend tout l'espace dispo via maxWidth: .infinity ;
+                // le logo se cale à droite. Logo cliquable → Réglages.
+                // Décision : pas de logo quand pas de selection (le preview
+                // est lui-même conditionnel, et les Réglages restent
+                // accessibles via le settings row fixe sous la liste).
+                HStack(alignment: .top, spacing: 8) {
+                    Text(textManager.capturedText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-            Divider().opacity(textManager.hasSelection ? 1 : 0)
-
-            // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
-            // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
-            VStack(spacing: 0) {
-                // Phase 6.18 (2026-04-28) : logo loucedé en haut à droite,
-                // cliquable pour ouvrir les Réglages. Ferrage horizontal à
-                // 12pt comme les badges ⌘+touche des actionRows en-dessous.
-                // Border radius 7pt (~22 % de 28pt = squircle macOS standard).
-                HStack {
-                    Spacer()
                     Button {
                         onOpenSettings()
                     } label: {
@@ -345,9 +340,15 @@ struct PopoverView: View {
                     .help("Ouvrir les Réglages")
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+            }
 
+            Divider().opacity(textManager.hasSelection ? 1 : 0)
+
+            // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
+            // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
+            VStack(spacing: 0) {
                 // Phase 1.4g : bandeau de recherche toujours visible, avec
                 // placeholder « Rechercher » pour signaler la fonction à
                 // l'utilisateur. Alimenté par la frappe directe (onKeyPress
