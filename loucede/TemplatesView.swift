@@ -305,7 +305,7 @@ let promptSuggestions: [PromptSuggestion] = [
         category: .structure
     ),
     PromptSuggestion(
-        name: "Génère un plan d'actions",
+        name: "Génère une Todo list",
         prompt: """
         Tu es un expert en gestion de projet et en organisation. À partir du texte suivant — qui peut être des notes brutes, désorganisées ou incomplètes — génère un plan d'actions structuré et progressif, dans la même langue que le texte original.
         Règles :

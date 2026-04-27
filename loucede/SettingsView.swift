@@ -50,8 +50,16 @@ struct SettingsView: View {
                 TabIconButton(title: "Modèles", systemImage: "wand.and.stars", isSelected: selectedTab == 2) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 2 }
                 }
-                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 3) {
+                // Phase 6.2 (2026-04-27) : onglet Licence inséré entre
+                // Modèles et À propos. SF Symbol `key.fill`. Au-dessus
+                // d'un divider visuel naturel : les onglets de gauche
+                // (config & contenus) vs les onglets de droite (compte
+                // & infos).
+                TabIconButton(title: "Licence", systemImage: "key.fill", isSelected: selectedTab == 3) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
+                }
+                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 4) {
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 4 }
                 }
             }
             .padding(.vertical, 8)
@@ -73,7 +81,8 @@ struct SettingsView: View {
                     selectedAction = action
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
                 })
-                case 3: AboutView()
+                case 3: LicenseSettingsView()
+                case 4: AboutView()
                 default: EmptyView()
                 }
             }

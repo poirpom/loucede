@@ -90,6 +90,24 @@ struct PopoverView: View {
         // translucide). Dark-only depuis Phase 6.7b (app forcée en darkAqua).
         .background(Color(hex: "2E2E2E"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        // Phase 6.2 Étape 9 (2026-04-27) : modal « trial épuisé »
+        // présenté en overlay (reste dans la fenêtre popup, pas une
+        // sheet macOS séparée). Apparaît quand `state.showTrialExpiredModal`
+        // devient true (set par `runAction` quand `canRunAction` fail).
+        .overlay {
+            if state.showTrialExpiredModal {
+                TrialExpiredOverlay(
+                    onDismiss: { state.showTrialExpiredModal = false },
+                    onPurchase: {
+                        state.showTrialExpiredModal = false
+                        NSWorkspace.shared.open(LicenseConfig.productCheckoutURL)
+                        onClose()
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: state.showTrialExpiredModal)
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
@@ -721,6 +739,66 @@ struct ConfirmationToast: View {
             Capsule().stroke(Color.gray.opacity(0.2), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.15), radius: 24, y: 6)
+    }
+}
+
+// MARK: - Trial Expired Modal (Phase 6.2 Étape 9)
+
+/// Modal présenté en overlay sur le popup quand l'utilisateur tente de
+/// lancer une action LLM mais qu'il a épuisé ses 12 essais gratuits
+/// sans avoir activé de licence (`LicenseManager.canRunAction == false`).
+/// Reste dans la fenêtre du popup (pas une sheet macOS séparée) — un
+/// fond semi-transparent assombrit le contenu derrière, le contenu
+/// du modal est centré.
+private struct TrialExpiredOverlay: View {
+    let onDismiss: () -> Void
+    let onPurchase: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Fond semi-transparent — tap pour fermer (équivalent
+            // « Plus tard »).
+            Color.black.opacity(0.55)
+                .contentShape(Rectangle())
+                .onTapGesture { onDismiss() }
+
+            // Carte centrée
+            VStack(spacing: 14) {
+                Text("😱 12 - 12 = 0")
+                    .font(.system(size: 24, weight: .bold))
+                    .multilineTextAlignment(.center)
+
+                Text("Pour continuer à utiliser loucedé en douce, c'est 8€ 💸")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Button("Plus tard") {
+                        onDismiss()
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+
+                    Button("Acheter") {
+                        onPurchase()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                }
+                .padding(.top, 6)
+            }
+            .padding(20)
+            .frame(maxWidth: 320)
+            .background(Color(hex: "1B1C1C"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
+        }
     }
 }
 

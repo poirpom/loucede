@@ -119,6 +119,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.setupGlobalHotkey()
             }
             .store(in: &cancellables)
+
+        // Phase 6.2 Étape 8 (2026-04-27) : validation passive de la
+        // licence au démarrage de l'app. Async non-bloquant — le
+        // démarrage ne dépend pas du résultat. Le `silent: true` évite
+        // le flicker `.active (depuis cache Keychain) → .validating →
+        // .active` ; le pré-status restauré par `loadFromKeychain`
+        // reste affiché tant que la vraie réponse Polar n'est pas
+        // tombée.
+        //
+        // Le cache offline est géré dans `validate()` lui-même : si
+        // l'erreur est réseau et qu'on a un cache < 7 jours avec
+        // dernier status `granted`, on bascule en `.offline` (qui
+        // counts as `hasLicense`).
+        Task { @MainActor in
+            await LicenseManager.shared.validate(silent: true)
+        }
     }
 
     func showOnboarding() {

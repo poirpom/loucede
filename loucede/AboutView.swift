@@ -8,6 +8,13 @@ import AppKit
 
 struct AboutView: View {
     @StateObject private var updateChecker = UpdateChecker.shared
+    /// Phase 6.2 (2026-04-27) : observation explicite du LicenseManager
+    /// pour que le bouton « Envoyer une suggestion » se mette à jour
+    /// automatiquement quand `hasLicense` change (activation,
+    /// désactivation, basculement online ↔ offline). Avant on lisait
+    /// `LicenseManager.shared.hasLicense` directement, ce qui marchait
+    /// au premier rendu mais ne réagissait pas aux changements.
+    @StateObject private var licenseManager = LicenseManager.shared
     /// Phase 6.16 (2026-04-26) : sheet d'envoi de suggestion.
     @State private var showSuggestionSheet: Bool = false
 
@@ -72,9 +79,10 @@ struct AboutView: View {
 
             // Phase 6.16 : bouton d'envoi de suggestion. License-gated
             // (cf. `LicenseManager.hasLicense`) — grisé tant que
-            // l'utilisateur n'a pas de licence active. La gate effective
-            // sera connectée en Phase 6.2 ; le stub actuel retourne
-            // toujours `true` pour permettre les tests pendant le dev.
+            // l'utilisateur n'a pas de licence active. En Debug,
+            // `hasLicense` est forcé à `true` par le `#if DEBUG` pour
+            // ne pas bloquer le dev. Réactivité assurée par le
+            // `@StateObject licenseManager` ci-dessus.
             Button {
                 showSuggestionSheet = true
             } label: {
@@ -88,8 +96,8 @@ struct AboutView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.bordered)
-            .disabled(!LicenseManager.shared.hasLicense)
-            .help(LicenseManager.shared.hasLicense
+            .disabled(!licenseManager.hasLicense)
+            .help(licenseManager.hasLicense
                   ? "Partage une idée ou une remarque"
                   : "Disponible après activation de la licence")
 

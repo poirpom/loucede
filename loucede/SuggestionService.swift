@@ -44,7 +44,15 @@ final class SuggestionService {
     /// version + build + platform + locale pour faciliter le tri côté
     /// admin (ex. filtrer les suggestions par version de loucedé).
     /// Throws `SuggestionError` en cas d'échec.
-    func sendSuggestion(email: String, suggestion: String) async throws {
+    ///
+    /// Phase 6.2 polish (2026-04-27) : `email` et `heroName` sont
+    /// désormais deux champs distincts du payload.
+    /// - `email` = adresse mail réelle du customer Polar (permet de
+    ///   répondre à l'utilisateur). Vide si pas de licence active.
+    /// - `heroName` = sobriquet généré (cf. `LicenseManager`). Vide si
+    ///   l'utilisateur ne l'a pas encore généré.
+    /// Le Zap côté admin doit être ajusté pour mapper ces deux champs.
+    func sendSuggestion(email: String, heroName: String, suggestion: String) async throws {
         // Métadonnées pour contextualiser la suggestion côté Notion.
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
@@ -57,6 +65,7 @@ final class SuggestionService {
 
         let payload: [String: Any] = [
             "email": email,
+            "heroName": heroName,
             "suggestion": suggestion,
             "version": version,
             "build": build,

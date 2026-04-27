@@ -21,6 +21,13 @@ final class PopoverState: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var resultText: String = ""
 
+    /// Phase 6.2 Étape 9 (2026-04-27) : flag de présentation du modal
+    /// « trial épuisé ». Set à `true` par `runAction` quand
+    /// `LicenseManager.canRunAction == false` (= pas de licence et
+    /// 12 essais déjà consommés). PopoverView présente alors le modal
+    /// en overlay. Reset à `false` au click « Plus tard » ou « Acheter ».
+    @Published var showTrialExpiredModal: Bool = false
+
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,
     // la liste est filtrée par substring case-insensitive sur le nom.
@@ -67,6 +74,7 @@ final class PopoverState: ObservableObject {
         isProcessing = false
         resultText = ""
         searchQuery = ""
+        showTrialExpiredModal = false
         openCounter &+= 1
     }
 
@@ -141,7 +149,26 @@ final class PopoverState: ObservableObject {
     /// Lance une action (prompt) sur le texte capturé.
     /// Déplacé ici depuis PopoverView pour que l'action puisse être
     /// déclenchée depuis l'extérieur (ex. showPopoverWithAction).
+    ///
+    /// Phase 6.2 Étape 9 (2026-04-27) : licence gate.
+    /// - Si `LicenseManager.canRunAction == false` (= trial épuisé +
+    ///   pas de licence active) → on ne lance pas le stream et on
+    ///   présente le modal trial épuisé via `showTrialExpiredModal`.
+    /// - Si action lancée et stream réussi : on incrémente le compteur
+    ///   trial UNIQUEMENT si l'utilisateur n'a pas de vraie licence
+    ///   (`!hasLicense`). Comportement Debug : le `#if DEBUG` force
+    ///   `hasLicense = true` → pas d'incrément en dev, c'est OK pour
+    ///   tester sans burner d'essais.
+    /// - Incrément APRÈS le stream réussi (pas avant), pour ne pas
+    ///   brûler des essais sur des erreurs réseau ou clé API absente.
     func runAction(_ action: Action) {
+        // Phase 6.2 Étape 9 : gate licence/trial.
+        let license = LicenseManager.shared
+        guard license.canRunAction else {
+            showTrialExpiredModal = true
+            return
+        }
+
         // Si un stream tournait déjà (cas extrême : double-tap sur une
         // action), on l'annule proprement avant d'en redémarrer un.
         endStream()
@@ -160,9 +187,17 @@ final class PopoverState: ObservableObject {
         let inputText = textManager.capturedText
         let fullPrompt = inputText.isEmpty ? action.prompt : "\(action.prompt)\n\n\(inputText)"
 
+        // Snapshot du `hasLicense` au lancement : si l'utilisateur
+        // active une licence en plein milieu d'un stream, on ne veut
+        // pas changer la décision « ce stream consomme-t-il un essai
+        // gratuit ou non » à mi-parcours. La décision est prise à
+        // l'envoi de la requête, pas à sa terminaison.
+        let consumesTrial = !license.hasLicense
+
         startFlushLoop()
         streamTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            var streamSucceeded = false
             do {
                 try await AIService.shared.chatStream(
                     messages: [(role: "user", content: fullPrompt)],
@@ -176,6 +211,7 @@ final class PopoverState: ObservableObject {
                     // directement : un seul re-render par frame.
                     self?.pendingChunkBuffer += chunk
                 }
+                streamSucceeded = true
             } catch {
                 // Vide d'abord le tampon (ne pas perdre le partiel) puis
                 // affiche l'erreur en complément.
@@ -188,6 +224,15 @@ final class PopoverState: ObservableObject {
             self.flushTask?.cancel()
             self.flushTask = nil
             self.isProcessing = false
+
+            // Incrémente le compteur trial UNIQUEMENT après un stream
+            // réussi (pas brûler d'essai sur une erreur réseau / clé
+            // API absente / token expiré côté provider). Le snapshot
+            // `consumesTrial` capture l'état au lancement — pas
+            // affecté par un changement de licence en cours de stream.
+            if streamSucceeded && consumesTrial {
+                license.incrementTrialUsage()
+            }
         }
     }
 }

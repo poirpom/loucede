@@ -1,0 +1,69 @@
+//
+//  LicenseConfig.swift
+//  loucede
+//
+//  Phase 6.2 (2026-04-27) : configuration statique du système de licence
+//  Polar.sh.
+//
+//  Architecture :
+//  loucedé ──[X-Loucede-App-Key]──▶ proxy Scaleway ──[Bearer POLAR_TOKEN]──▶ api.polar.sh
+//
+//  Toutes les clés sensibles (POLAR_TOKEN, POLAR_ORGANIZATION_ID) vivent
+//  côté Scaleway en variables d'env chiffrées. L'app n'a que :
+//    - l'URL publique du proxy
+//    - le secret partagé pour authentifier les requêtes (header
+//      `X-Loucede-App-Key` rejeté en 401 par le proxy si absent/invalide)
+//    - l'URL de checkout Polar publique
+//
+
+import Foundation
+
+enum LicenseConfig {
+    /// URL du proxy Scaleway Functions qui relaie les calls vers Polar.sh
+    /// et garde POLAR_TOKEN + POLAR_ORGANIZATION_ID côté serveur.
+    static let proxyBaseURL = URL(string: "https://loucedelicenseproxyejpzefpl-polar-bridge.functions.fnc.fr-par.scw.cloud")!
+
+    /// Secret partagé loucedé ↔ proxy Scaleway, envoyé dans le header
+    /// `X-Loucede-App-Key` à chaque requête. Le proxy rejette en 401 si
+    /// absent ou différent.
+    ///
+    /// IMPORTANT : valeur shipped dans le binaire (décompilable). Si
+    /// compromis, rotate côté Scaleway env var puis pousser une release.
+    /// Le risque est borné : pas de fuite du token Polar (qui reste côté
+    /// serveur), juste possibilité de spammer le proxy — mitigeable via
+    /// rate limit Scaleway si ça arrivait jamais.
+    ///
+    /// À remplir par l'utilisateur via `openssl rand -hex 32` (même valeur
+    /// que `LOUCEDE_APP_SECRET` côté Scaleway env vars).
+    static let appSecret = "a3db99a06ea8d9b5a2f9733be6c38935caf03d4cb8c8800353c9f8894fe38d63"
+
+    /// URL de checkout Polar.sh publique pour le produit loucedé.
+    /// Ouverte dans une WKWebView embarquée (`LicenseCheckoutView`,
+    /// à venir). L'utilisateur paye, Polar génère une clé licence,
+    /// puis l'utilisateur l'active depuis Réglages → Licence (soit via
+    /// auto-extraction depuis la page de confirmation, soit en collant
+    /// la clé manuellement).
+    static let productCheckoutURL = URL(string: "https://buy.polar.sh/polar_cl_NyddnsIaqM7gVRKFinwyIhM8iHqzoRrJaZfDi2HN0SO")!
+
+    /// Filet de sécurité côté dev : si quelqu'un oublie de remplacer
+    /// `appSecret` avant de build pour la prod, on lève dès le premier
+    /// appel réseau. À appeler en début de chaque méthode de
+    /// `LicenseService`.
+    ///
+    /// Check robuste à la longueur du secret + détection d'un éventuel
+    /// placeholder textuel (mots-clés du genre « REMPLACER », « TODO »,
+    /// espaces…). On ne compare pas à une string magique — sinon dès
+    /// qu'on remplace l'une, l'autre se désynchronise.
+    static func assertConfigured() {
+        let s = appSecret
+        let lower = s.lowercased()
+        precondition(
+            s.count >= 32
+                && !s.contains(" ")
+                && !lower.contains("remplacer")
+                && !lower.contains("todo")
+                && !lower.contains("xxx"),
+            "LicenseConfig.appSecret semble invalide ou non renseigné. Mets ta valeur de `openssl rand -hex 32` (la même que côté Scaleway LOUCEDE_APP_SECRET)."
+        )
+    }
+}

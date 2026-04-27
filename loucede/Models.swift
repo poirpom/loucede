@@ -111,6 +111,7 @@ class ActionsStore: ObservableObject {
     private let iconsEmojiMigrationKey = "loucede_migration_icons_emoji_done"
     private let seed69cMigrationKey = "loucede_migration_seed_69c_done"
     private let planActionsEmojiMigrationKey = "loucede_migration_plan_actions_emoji_done"
+    private let planToTodoMigrationKey = "loucede_migration_plan_to_todo_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -222,16 +223,19 @@ class ActionsStore: ObservableObject {
             migrateIconsToEmojiIfNeeded()
             migrateSeed69cIfNeeded()
             migratePlanActionsEmojiIfNeeded()
+            migratePlanToTodoIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
-            // Premier lancement : le seed contient déjà la version 6.9c des
-            // prompts + les emojis 6.4 ; on pose tous les flags de migration
-            // pour ne jamais re-déclencher si l'utilisateur vide sa config.
+            // Premier lancement : le seed contient déjà la version courante
+            // des prompts + les emojis 6.4 ; on pose tous les flags de
+            // migration pour ne jamais re-déclencher si l'utilisateur vide
+            // sa config.
             UserDefaults.standard.set(true, forKey: seed26MigrationKey)
             UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
             UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
             UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
+            UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
         }
     }
 
@@ -401,6 +405,35 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
+    }
+
+    /// Migration one-shot (correctif 2026-04-28) : renomme le modèle
+    /// « Génère un plan d'actions » en « Génère une Todo list ». Le
+    /// modèle correspondant dans `TemplatesView.swift` (seed des
+    /// Modèles) a aussi été renommé.
+    ///
+    /// Match minimal sur le nom exact « Génère un plan d'actions ».
+    /// Si l'utilisateur a customisé le nom, on ne touche pas. Le prompt
+    /// et l'icône ne sont pas modifiés (l'utilisateur garde son
+    /// éventuel custom). Doit tourner APRÈS `migratePlanActionsEmojiIfNeeded`
+    /// pour que le match du nom fonctionne correctement (sinon les
+    /// deux migrations courraient sur le même nom dans des ordres
+    /// différents selon les flags déjà posés).
+    private func migratePlanToTodoIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: planToTodoMigrationKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Génère un plan d'actions" {
+                actions[idx].name = "Génère une Todo list"
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
     }
 
     func saveActions() {

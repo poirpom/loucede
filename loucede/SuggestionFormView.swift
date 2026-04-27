@@ -11,20 +11,24 @@ import SwiftUI
 struct SuggestionFormView: View {
     @Environment(\.dismiss) private var dismiss
 
-    @State private var email: String = ""
     @State private var suggestion: String = ""
     @State private var isSending: Bool = false
     @State private var errorMessage: String? = nil
     @State private var showSuccessToast: Bool = false
 
-    /// Validation : email facultatif, mais s'il est rempli il doit avoir
-    /// la forme grossière `x@y.z`. La regex est volontairement lâche —
-    /// la validation stricte côté serveur (Zapier ne valide pas vraiment
-    /// non plus, c'est juste pour éviter les fautes de frappe évidentes).
-    private var emailLooksValid: Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return true }  // facultatif
-        return trimmed.range(of: #"^[^@\s]+@[^@\s]+\.[^@\s]+$"#, options: .regularExpression) != nil
+    /// Identifiant de l'expéditeur, calculé en lecture seule au moment de
+    /// l'affichage (correctif 2026-04-27). Priorité :
+    /// (1) heroName si déjà généré, (2) email customer Polar, (3) rien.
+    /// Cette valeur est aussi celle envoyée au webhook Zapier dans le
+    /// payload — pas besoin pour l'utilisateur de retaper son email.
+    private var senderDisplay: String? {
+        if let hero = KeychainService.License.heroName, !hero.isEmpty {
+            return hero
+        }
+        if let email = KeychainService.License.customerEmail, !email.isEmpty {
+            return email
+        }
+        return nil
     }
 
     /// La suggestion doit faire au moins 3 caractères (filtre les envois
@@ -36,7 +40,7 @@ struct SuggestionFormView: View {
     }
 
     private var canSend: Bool {
-        emailLooksValid && suggestionLooksValid && !isSending
+        suggestionLooksValid && !isSending
     }
 
     var body: some View {
@@ -58,21 +62,22 @@ struct SuggestionFormView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 18)
 
-            // Champ Email
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Email (optionnel)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                TextField("idee@degenie.com", text: $email)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(isSending)
-                if !emailLooksValid {
-                    Text("Format d'email invalide")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.red)
+            // Ligne « Envoyé par » en lecture seule (correctif 2026-04-27).
+            // Affichée uniquement si on a une valeur disponible côté
+            // licence (heroName ou customerEmail). Sinon, on cache la
+            // ligne — pas de saisie manuelle requise.
+            if let sender = senderDisplay {
+                HStack {
+                    Text("Envoyé par :")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Text(sender)
+                        .font(.system(size: 12, weight: .medium))
+                        .textSelection(.enabled)
+                    Spacer()
                 }
+                .padding(.bottom, 16)
             }
-            .padding(.bottom, 16)
 
             // Champ Suggestion
             VStack(alignment: .leading, spacing: 6) {
@@ -158,10 +163,18 @@ struct SuggestionFormView: View {
     }
 
     private func send() {
-        // Re-trim au moment de l'envoi pour être sûr qu'on n'envoie pas
-        // d'espaces parasites.
-        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanSuggestion = suggestion.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Phase 6.2 polish (2026-04-27) : payload Zapier avec deux
+        // champs séparés (email + heroName) plutôt qu'un seul `sender`.
+        // L'admin a besoin de l'email RÉEL pour pouvoir répondre, ET
+        // du heroName pour l'identification ludique. Les deux peuvent
+        // être vides indépendamment :
+        //   - email vide : utilisateur sans licence (cas DEBUG)
+        //   - heroName vide : licence active mais user n'a pas encore
+        //     cliqué « Obtenir mon nom »
+        let realEmail = KeychainService.License.customerEmail ?? ""
+        let realHeroName = KeychainService.License.heroName ?? ""
 
         isSending = true
         errorMessage = nil
@@ -169,7 +182,8 @@ struct SuggestionFormView: View {
         Task {
             do {
                 try await SuggestionService.shared.sendSuggestion(
-                    email: cleanEmail,
+                    email: realEmail,
+                    heroName: realHeroName,
                     suggestion: cleanSuggestion
                 )
                 // Succès : toast 1.2s puis fermeture de la sheet.
