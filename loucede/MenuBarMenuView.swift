@@ -1,6 +1,6 @@
 //
 //  MenuBarMenuView.swift
-//  typo
+//  loucede
 //
 //  Created by content manager on 27/01/26.
 //

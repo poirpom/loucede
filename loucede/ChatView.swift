@@ -1,8 +1,8 @@
 //
 //  ChatView.swift
-//  typo
+//  loucede
 //
-//  AI Chat interface for TexTab
+//  AI Chat interface for loucede
 //
 
 import SwiftUI

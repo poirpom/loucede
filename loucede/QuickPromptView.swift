@@ -1,6 +1,6 @@
 //
 //  QuickPromptView.swift
-//  typo
+//  loucede
 //
 //  Quick Prompt - run a one-off AI prompt on selected text
 //

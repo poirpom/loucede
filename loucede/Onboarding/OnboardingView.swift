@@ -1,6 +1,6 @@
 //
 //  OnboardingView.swift
-//  typo
+//  loucede
 //
 
 import SwiftUI

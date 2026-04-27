@@ -1,6 +1,6 @@
 //
 //  TemplatesView.swift
-//  typo
+//  loucede
 //
 //  Templates view with prompt suggestions grid
 //
