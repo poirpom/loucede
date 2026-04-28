@@ -12,6 +12,10 @@ import SwiftUI
 struct PromptSuggestion: Identifiable {
     let id = UUID()
     let name: String
+    /// Description courte (≤80 signes) affichée sur la carte du modèle dans
+    /// le catalogue. Remplace la preview tronquée du prompt qui était peu
+    /// lisible. Correctif 2026-04-28.
+    let description: String
     let prompt: String
     let icon: String
     let category: PromptCategory
@@ -68,12 +72,14 @@ let promptSuggestions: [PromptSuggestion] = [
     // MARK: Traduire — "Traduis en français" en tête (seed default action)
     PromptSuggestion(
         name: "Traduis en français",
+        description: "Traduit fidèlement n'importe quelle langue source en français naturel.",
         prompt: ActionsStore.translateFrPrompt,
         icon: "🇫🇷",
         category: .translate
     ),
     PromptSuggestion(
         name: "Traduis en espagnol",
+        description: "Traduit en espagnol neutre international, compréhensible partout.",
         prompt: """
         Rol: traductor profesional.
         
@@ -108,6 +114,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Traduis en portugais",
+        description: "Traduit en portugais naturel et idiomatique.",
         prompt: """
         Papel: tradutor profissional.
         
@@ -141,6 +148,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Traduis en anglais",
+        description: "Traduit dans un anglais naturel et idiomatique.",
         prompt: """
         Role: professional translator.
         
@@ -173,6 +181,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Détecte les incohérences",
+        description: "Liste les contradictions, ambiguïtés et infos manquantes du texte.",
         prompt: """
         Analyse le texte suivant et identifie les incohérences, contradictions, ambiguïtés ou informations manquantes, dans la même langue que le texte original.
         Règles :
@@ -186,6 +195,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Extrais les arguments",
+        description: "Identifie thèse, arguments, preuves et contre-arguments du texte.",
         prompt: """
         Tu es un expert en analyse argumentative. Analyse le texte suivant et identifie ses composantes argumentatives, dans la même langue que le texte original.
         Règles :
@@ -202,6 +212,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Analyse les biais",
+        description: "Repère les biais cognitifs, présupposés et angles implicites.",
         prompt: """
         Tu es un expert en pensée critique et rhétorique. Analyse le texte suivant et identifie les biais cognitifs, présupposés, positions idéologiques ou angles implicites présents, dans la même langue que le texte original.
         Règles :
@@ -210,11 +221,12 @@ let promptSuggestions: [PromptSuggestion] = [
         - Si aucun biais n'est détecté, réponds uniquement : "Aucun biais identifiable dans ce texte."
         - Réponds uniquement avec l'analyse, sans introduction ni commentaire
         """,
-        icon: "🙅",
+        icon: "🧭",
         category: .analyze
     ),
     PromptSuggestion(
         name: "Génère des questions",
+        description: "Crée 3 à 10 questions : compréhension, approfondissement, débat.",
         prompt: """
         Lis le texte suivant et génère une liste de questions pertinentes, dans la même langue que le texte original.
         Règles :
@@ -231,24 +243,28 @@ let promptSuggestions: [PromptSuggestion] = [
     // MARK: Transformer — "Résume", "Corrige les fautes", "Sois concis" en tête (seed default actions)
     PromptSuggestion(
         name: "Résume ce texte",
+        description: "Extrait les idées essentielles en 3 à 7 points clés.",
         prompt: ActionsStore.summarizePrompt,
         icon: "🤏",
         category: .transform
     ),
     PromptSuggestion(
         name: "Corrige les fautes",
+        description: "Corrige orthographe, grammaire, conjugaison et typographie française.",
         prompt: ActionsStore.correctPrompt,
         icon: "✍️",
         category: .transform
     ),
     PromptSuggestion(
         name: "Sois concis",
+        description: "Réduit la longueur du texte de 20 à 40 % sans perdre d'idée.",
         prompt: ActionsStore.concisePrompt,
         icon: "✂️",
         category: .transform
     ),
     PromptSuggestion(
         name: "Simplifie",
+        description: "Vulgarise le texte pour un lecteur non-spécialiste.",
         prompt: """
         Tu es un expert en vulgarisation. Simplifie le texte suivant pour le rendre accessible à un lecteur non spécialiste, dans la même langue que le texte original.
         Règles :
@@ -264,6 +280,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Améliore le style",
+        description: "Lisse lourdeurs, répétitions et transitions sans toucher au sens.",
         prompt: """
         Tu es un éditeur expérimenté. Améliore la qualité stylistique et la fluidité du texte suivant, dans la même langue que le texte original.
         Règles :
@@ -279,6 +296,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Optimise pour le SEO",
+        description: "Restructure pour le web : titres, paragraphes courts, mots-clés.",
         prompt: """
         Tu es un expert en rédaction web et SEO. Réécris le texte suivant pour améliorer sa lisibilité web et son référencement naturel, dans la même langue que le texte original.
         Règles :
@@ -295,6 +313,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Adopte un ton professionnel",
+        description: "Réécrit dans un registre formel, soigné et bienveillant.",
         prompt: """
         Role: Tu es un éditeur professionnel.
         Task: Réécris le texte suivant avec un ton professionnel, dans la même langue que le texte original.
@@ -311,12 +330,14 @@ let promptSuggestions: [PromptSuggestion] = [
     // MARK: Structurer — "Extrais la recette de cuisine" en tête (seed default action)
     PromptSuggestion(
         name: "Extrais la recette de cuisine",
+        description: "Extrait, traduit et reformate une recette en système métrique.",
         prompt: ActionsStore.recipeExtractionPrompt,
         icon: "🍳",
         category: .structure
     ),
     PromptSuggestion(
         name: "Réorganise la logique",
+        description: "Regroupe et ordonne les idées sans rien supprimer ni reformuler.",
         prompt: """
         Tu es un éditeur expérimenté. Réorganise le texte suivant pour améliorer sa structure logique et la progression des idées, dans la même langue que le texte original.
         Règles :
@@ -331,6 +352,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Convertis en tableau",
+        description: "Transforme les informations en tableau Markdown structuré.",
         prompt: """
         Analyse le texte suivant et transforme ses informations en tableau structuré en Markdown, dans la même langue que le texte original.
         Règles :
@@ -345,6 +367,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Génère une Todo list",
+        description: "Structure des notes brutes en plan d'actions avec cases à cocher.",
         prompt: """
         Tu es un expert en gestion de projet et en organisation. À partir du texte suivant — qui peut être des notes brutes, désorganisées ou incomplètes — génère un plan d'actions structuré et progressif, dans la même langue que le texte original.
         Règles :
@@ -361,6 +384,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Propose des titres",
+        description: "Propose 5 titres accrocheurs avec angles variés.",
         prompt: """
         Analyse le texte suivant et propose 5 titres pertinents et accrocheurs, dans la même langue que le texte original.
         Règles :
@@ -374,6 +398,7 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Propose un plan structuré",
+        description: "Transforme le texte en plan hiérarchique numéroté I/A/1/a.",
         prompt: """
         Analyse le texte suivant et transforme-le en plan hiérarchique, dans la même langue que le texte original.
         Règles :
@@ -631,8 +656,11 @@ struct TemplateCard: View {
                     .fill(Color.gray.opacity(0.1))
                     .frame(height: 1)
 
-                // Prompt preview
-                Text(template.prompt)
+                // Description courte (correctif 2026-04-28) — remplace la
+                // preview tronquée du prompt qui était peu lisible. Calibré
+                // ≤80 signes côté contenu, mais on garde lineLimit(2) en
+                // sécurité pour le wrap sur cards étroites (3 colonnes).
+                Text(template.description)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
