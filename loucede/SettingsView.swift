@@ -14,12 +14,25 @@ func openAccessibilitySettings() {
     }
 }
 
+// MARK: - Notification deeplink
+
+extension Notification.Name {
+    /// Poste un Int (index de l'onglet cible) pour forcer la navigation
+    /// dans une fenêtre Réglages déjà ouverte. Voir `AppDelegate.openSettings(tab:)`.
+    static let loucedeSwitchSettingsTab = Notification.Name("loucedeSwitchSettingsTab")
+}
+
 struct SettingsView: View {
     @StateObject private var store = ActionsStore.shared
     @StateObject private var updateChecker = UpdateChecker.shared
     // Phase 1.5a : onglet "Général" (index 0) par défaut au lieu de "Actions" (1).
-    @State private var selectedTab = 0
+    // Phase 6.3 : accepte un `initialTab` pour le deeplink depuis la popup.
+    @State private var selectedTab: Int
     @State private var selectedAction: Action?
+
+    init(initialTab: Int = 0) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     @AppStorage("appTheme") private var appTheme: String = "System"
 
@@ -51,19 +64,31 @@ struct SettingsView: View {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 2 }
                 }
                 // Phase 6.2 (2026-04-27) : onglet Licence inséré entre
-                // Modèles et À propos. SF Symbol `key.fill`. Au-dessus
-                // d'un divider visuel naturel : les onglets de gauche
-                // (config & contenus) vs les onglets de droite (compte
-                // & infos).
+                // Modèles et À propos.
                 TabIconButton(title: "Licence", systemImage: "key.fill", isSelected: selectedTab == 3) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
                 }
-                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 4) {
+                // Phase 6.3 (2026-04-28) : onglet Mises à jour inséré entre
+                // Licence et À propos. Badge orange si mise à jour disponible.
+                TabIconButton(
+                    title: "Mises à jour",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    isSelected: selectedTab == 4,
+                    showBadge: updateChecker.updateAvailable
+                ) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 4 }
+                }
+                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 5) {
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 5 }
                 }
             }
             .padding(.vertical, 8)
             .onAppear { updateChecker.checkForUpdates() }
+            .onReceive(NotificationCenter.default.publisher(for: .loucedeSwitchSettingsTab)) { note in
+                if let tab = note.object as? Int {
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = tab }
+                }
+            }
 
             Divider()
 
@@ -82,7 +107,8 @@ struct SettingsView: View {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
                 })
                 case 3: LicenseSettingsView()
-                case 4: AboutView()
+                case 4: UpdatesView()
+                case 5: AboutView()
                 default: EmptyView()
                 }
             }
@@ -104,20 +130,29 @@ struct TabIconButton: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+    var showBadge: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 18, weight: .regular))
-                    .frame(width: 22, height: 22)
-                    .foregroundColor(isSelected ? Color.accentColor : .secondary)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 18, weight: .regular))
+                        .frame(width: 22, height: 22)
+                        .foregroundColor(isSelected ? Color.accentColor : .secondary)
+                    if showBadge {
+                        Circle()
+                            .fill(Color(red: 0.976, green: 0.620, blue: 0.043)) // #F59E0B
+                            .frame(width: 8, height: 8)
+                            .offset(x: 4, y: -4)
+                    }
+                }
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(isSelected ? .primary : .secondary)
             }
-            .frame(width: 72, height: 56)
+            .frame(width: 80, height: 56)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)

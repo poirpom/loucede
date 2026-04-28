@@ -645,10 +645,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openSettings() {
-        // Reuse existing window if it's still open
+        openSettings(tab: 0)
+    }
+
+    /// Ouvre les Réglages sur l'onglet `tab` (0 = Général par défaut).
+    /// Phase 6.3 : si la fenêtre est déjà ouverte, envoie une notification
+    /// pour naviguer vers l'onglet demandé sans recréer la fenêtre.
+    func openSettings(tab: Int) {
         if let existing = settingsWindow, existing.isVisible {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            // Deeplink vers l'onglet cible si ce n'est pas le défaut neutre
+            if tab > 0 {
+                NotificationCenter.default.post(
+                    name: .loucedeSwitchSettingsTab,
+                    object: tab
+                )
+            }
             return
         }
 
@@ -661,7 +674,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = ""
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.contentView = NSHostingView(rootView: SettingsView())
+        window.contentView = NSHostingView(rootView: SettingsView(initialTab: tab))
         window.center()
         window.isReleasedWhenClosed = false
 
