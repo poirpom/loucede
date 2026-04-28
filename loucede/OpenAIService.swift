@@ -50,9 +50,10 @@ struct AIModel: Identifiable, Hashable, Codable {
         AIModel(id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: .anthropic,
                 specs: ModelSpecs(speed: 4, intelligence: 5, tokenUsage: 2,
                                   description: "Excellent rapport qualité/prix")),
+        AIModel(id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: .anthropic,
+                specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 5,
+                                  description: "Ultra-léger pour tâches simples")),
         // Claude 3.5 Sonnet + Haiku (20241022) ont été retirés par Anthropic en 2025.
-        // Les remplacements (Claude Haiku 4.5+) devront être ajoutés ici quand
-        // les IDs exacts seront confirmés — cf. backlog projet.
 
         // Mistral
         AIModel(id: "mistral-large-latest", name: "Mistral Large", provider: .mistral,
