@@ -530,6 +530,80 @@ struct ActionEditorView: View {
                         )
                     }
 
+                    // Bloc « Ajouter aux Modèles » (correctif 2026-04-28)
+                    // Toggle pour publier l'action dans le catalogue Modèles
+                    // (catégorie « Mes modèles ») + description courte
+                    // optionnelle (≤80 signes) affichée sur la card.
+                    // Si la description est vide, le catalogue retombe sur
+                    // les 80 premiers caractères du prompt.
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle(isOn: $action.isInTemplates) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Ajouter aux Modèles")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(textGrayColor)
+                                Text("Publie cette action dans l'onglet Modèles, catégorie « Mes modèles ».")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: action.isInTemplates) { _, _ in
+                            scheduleSave()
+                        }
+
+                        if action.isInTemplates {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Description courte")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("\(action.shortDescription?.count ?? 0) / 80")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor((action.shortDescription?.count ?? 0) > 80 ? .red : .secondary)
+                                }
+
+                                TextField(
+                                    "Optionnelle",
+                                    text: Binding(
+                                        get: { action.shortDescription ?? "" },
+                                        set: { newValue in
+                                            // Cap dur à 80 signes — le compteur
+                                            // ci-dessus passe en rouge à l'approche
+                                            // de la limite, mais on tronque ici
+                                            // pour empêcher de dépasser.
+                                            action.shortDescription = String(newValue.prefix(80))
+                                        }
+                                    )
+                                )
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 13))
+                                .foregroundColor(textGrayColor)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(inputBackgroundColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                                )
+                                .onChange(of: action.shortDescription) { _, _ in
+                                    scheduleSave()
+                                }
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: action.isInTemplates)
+                    .padding(16)
+                    .background(inputBackgroundColor.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+
                     // Éditeur de prompt (V1 : toutes les actions sont de type .ai)
                     Group {
                         VStack(spacing: 0) {

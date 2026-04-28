@@ -32,6 +32,9 @@ enum PromptCategory: String, CaseIterable {
     case transform = "Transformer"
     case structure = "Structurer"
     case propose = "Proposer"
+    /// Catégorie ajoutée pour les modèles publiés par l'utilisateur via
+    /// l'éditeur d'action (toggle « Ajouter aux Modèles »). Correctif 2026-04-28.
+    case custom = "Mes modèles"
 
     /// Icône SF Symbol associée — pas affichée dans `TemplateCard` (qui
     /// montre désormais l'emoji du modèle Phase 6.12), mais conservée pour
@@ -43,6 +46,7 @@ enum PromptCategory: String, CaseIterable {
         case .transform: return "arrow.triangle.2.circlepath"
         case .structure: return "list.bullet.rectangle"
         case .propose:   return "lightbulb"
+        case .custom:    return "person.crop.circle"
         }
     }
 
@@ -55,6 +59,7 @@ enum PromptCategory: String, CaseIterable {
         case .transform: return Color(red: 0.50, green: 0.60, blue: 0.55) // Sage green
         case .structure: return Color(red: 0.55, green: 0.50, blue: 0.65) // Muted lavender
         case .propose:   return Color(red: 0.65, green: 0.55, blue: 0.50) // Warm taupe
+        case .custom:    return Color(red: 0.40, green: 0.45, blue: 0.55) // Cool charcoal — neutre, distinct des 5 catégories
         }
     }
 }
@@ -423,11 +428,40 @@ struct TemplatesView: View {
     @State private var addedTemplateId: UUID? = nil
     var onNavigateToActions: (Action) -> Void
 
+    /// Modèles publiés par l'utilisateur (correctif 2026-04-28). Rendus
+    /// dynamiquement à partir des actions du store dont `isInTemplates == true`.
+    /// Si la `shortDescription` est vide ou absente, on fallback sur les 80
+    /// premiers caractères du prompt.
+    var userTemplates: [PromptSuggestion] {
+        store.actions
+            .filter { $0.isInTemplates }
+            .map { action in
+                let desc: String = {
+                    if let s = action.shortDescription, !s.isEmpty {
+                        return s
+                    }
+                    return String(action.prompt.prefix(80))
+                }()
+                return PromptSuggestion(
+                    name: action.name.isEmpty ? "Sans titre" : action.name,
+                    description: desc,
+                    prompt: action.prompt,
+                    icon: action.icon,
+                    category: .custom
+                )
+            }
+    }
+
+    /// Catalogue complet : built-ins + modèles utilisateur (en queue).
+    var allTemplates: [PromptSuggestion] {
+        promptSuggestions + userTemplates
+    }
+
     var filteredTemplates: [PromptSuggestion] {
         if let category = selectedCategory {
-            return promptSuggestions.filter { $0.category == category }
+            return allTemplates.filter { $0.category == category }
         }
-        return promptSuggestions
+        return allTemplates
     }
 
     var inputBackgroundColor: Color {

@@ -47,18 +47,30 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     /// La sélection se fait par keycode physique (18-29) — fonctionne en AZERTY et QWERTY.
     var slotIndex: Int?
     var actionType: ActionType
+    /// Description courte (≤80 signes) éditée par l'utilisateur pour l'affichage
+    /// dans le catalogue Modèles si l'action est publiée (`isInTemplates == true`).
+    /// Si nil ou vide, le catalogue affiche les 80 premiers caractères du prompt.
+    /// Visible UNIQUEMENT dans l'éditeur d'action (pas dans la popup, pas dans
+    /// la sidebar liste). Correctif 2026-04-28.
+    var shortDescription: String?
+    /// `true` si l'utilisateur a coché « Ajouter aux Modèles » dans l'éditeur.
+    /// L'action apparaît alors dans l'onglet Modèles, catégorie « Mes modèles ».
+    /// Correctif 2026-04-28.
+    var isInTemplates: Bool
 
-    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai) {
+    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false) {
         self.id = id
         self.name = name
         self.icon = icon
         self.prompt = prompt
         self.slotIndex = slotIndex
         self.actionType = actionType
+        self.shortDescription = shortDescription
+        self.isInTemplates = isInTemplates
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, icon, prompt, slotIndex, actionType
+        case id, name, icon, prompt, slotIndex, actionType, shortDescription, isInTemplates
     }
 
     init(from decoder: Decoder) throws {
@@ -69,6 +81,8 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         prompt = try container.decode(String.self, forKey: .prompt)
         slotIndex = try container.decodeIfPresent(Int.self, forKey: .slotIndex)
         actionType = try container.decodeIfPresent(ActionType.self, forKey: .actionType) ?? .ai
+        shortDescription = try container.decodeIfPresent(String.self, forKey: .shortDescription)
+        isInTemplates = try container.decodeIfPresent(Bool.self, forKey: .isInTemplates) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -79,6 +93,8 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encode(prompt, forKey: .prompt)
         try container.encodeIfPresent(slotIndex, forKey: .slotIndex)
         try container.encode(actionType, forKey: .actionType)
+        try container.encodeIfPresent(shortDescription, forKey: .shortDescription)
+        try container.encode(isInTemplates, forKey: .isInTemplates)
     }
 }
 
