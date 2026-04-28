@@ -79,9 +79,10 @@ struct GeneralSettingsView: View {
                     // du Picker modèle, plutôt qu'une largeur cap arbitraire).
                     HStack(alignment: .top) {
                         HStack(spacing: 10) {
-                            Image(systemName: "cpu")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.purple)
+                            Image(selectedProvider.iconName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 16, height: 16)
                             Text("Fournisseur IA")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.secondary)
