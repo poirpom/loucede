@@ -16,6 +16,7 @@ class UpdateChecker: ObservableObject {
     @Published var updateAvailable = false
     @Published var latestVersion: String?
     @Published var downloadURL: String?
+    @Published var releaseNotes: String?
     @Published var errorMessage: String?
 
     // GitHub API URL for latest release
@@ -29,6 +30,7 @@ class UpdateChecker: ObservableObject {
     func checkForUpdates() {
         isChecking = true
         updateAvailable = false
+        releaseNotes = nil
         errorMessage = nil
 
         guard let url = URL(string: githubReleasesURL) else {
@@ -61,6 +63,9 @@ class UpdateChecker: ObservableObject {
                             // Remove 'v' prefix if present
                             let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
                             self?.latestVersion = version
+
+                            // Changelog (corps Markdown de la release GitHub)
+                            self?.releaseNotes = json["body"] as? String
 
                             // Compare versions
                             if self?.isNewerVersion(version, than: self?.currentVersion ?? "0") == true {

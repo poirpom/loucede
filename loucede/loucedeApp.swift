@@ -135,6 +135,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             await LicenseManager.shared.validate(silent: true)
         }
+
+        // Phase 6.3 (2026-04-28) : vérification des mises à jour au
+        // démarrage, en arrière-plan, non-bloquante. Le résultat met à
+        // jour UpdateChecker.shared (ObservableObject) ; la popup et
+        // l'onglet Mises à jour réagissent automatiquement via @Published.
+        Task {
+            UpdateChecker.shared.checkForUpdates()
+        }
     }
 
     func showOnboarding() {
