@@ -2,8 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleName</key>
+	<string>loucedé</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>loucedé utilise l'API Accessibilité pour lire le texte que tu as sélectionné dans n'importe quelle application, et pour coller le résultat à ta place. Aucune donnée n'est conservée sur ton Mac.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
