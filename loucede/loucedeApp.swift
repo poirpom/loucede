@@ -394,6 +394,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static let popoverPreviewHeight: CGFloat = 12
     /// Hauteur du message « Aucune action trouvée » quand la liste est vide.
     static let popoverEmptyListHeight: CGFloat = 61
+    /// Phase 6.3 : hauteur de la ligne « Mise à jour disponible » dans le popup.
+    /// Même structure et padding que `settingsRow` → identique à `popoverActionRowHeight`.
+    static let popoverUpdateRowHeight: CGFloat = 36
     /// Hauteur du popup en mode résultat compact (header action + ScrollView
     /// 300pt + footer boutons). Mesurée empiriquement.
     static let popoverResultCompactHeight: CGFloat = 394
@@ -427,9 +430,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let withSelection = CapturedTextManager.shared.hasSelection
+        // Phase 6.3 : ajout conditionnel de la ligne « Mise à jour disponible »
+        // (+ 1 Divider = ~1pt, absorbé dans la marge empirique de la constante).
+        let withUpdate = UpdateChecker.shared.updateAvailable
         return popoverChromeHeight
              + listHeight
              + (withSelection ? popoverPreviewHeight : 0)
+             + (withUpdate ? popoverUpdateRowHeight : 0)
     }
 
     /// Bascule la fenêtre popup vers le mode demandé avec animation fluide
@@ -612,12 +619,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func createPopoverWindow() {
         // Créé une seule fois au démarrage. L'action initiale passe
         // désormais par PopoverState.shared (voir showPopoverWithAction).
-        let contentView = PopoverView(onClose: { [weak self] in
-            self?.hidePopover()
-        }, onOpenSettings: { [weak self] in
-            self?.hidePopover()
-            self?.openSettings()
-        })
+        let contentView = PopoverView(
+            onClose: { [weak self] in
+                self?.hidePopover()
+            },
+            onOpenSettings: { [weak self] in
+                self?.hidePopover()
+                self?.openSettings()
+            },
+            onOpenUpdates: { [weak self] in
+                // Phase 6.3 : ferme le popup et ouvre les Réglages directement
+                // sur l'onglet Mises à jour (index 4).
+                self?.hidePopover()
+                self?.openSettings(tab: 4)
+            }
+        )
 
         let width: CGFloat = Self.popoverDefaultWidth
         let height: CGFloat = Self.popoverDefaultHeight

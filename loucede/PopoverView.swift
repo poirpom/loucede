@@ -33,9 +33,13 @@ private enum PopoverFocus: Hashable {
 struct PopoverView: View {
     var onClose: () -> Void
     var onOpenSettings: () -> Void
+    /// Phase 6.3 : callback pour ouvrir les Réglages directement sur
+    /// l'onglet Mises à jour. Injecté depuis `createPopoverWindow()`.
+    var onOpenUpdates: () -> Void
 
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
+    @StateObject private var updateChecker = UpdateChecker.shared
     @ObservedObject private var state = PopoverState.shared
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
@@ -54,9 +58,14 @@ struct PopoverView: View {
     // du popup), pour que chaque nouvelle action reparte en format compact.
     @State private var resultExpanded: Bool = false
 
-    init(onClose: @escaping () -> Void = {}, onOpenSettings: @escaping () -> Void = {}) {
+    init(
+        onClose: @escaping () -> Void = {},
+        onOpenSettings: @escaping () -> Void = {},
+        onOpenUpdates: @escaping () -> Void = {}
+    ) {
         self.onClose = onClose
         self.onOpenSettings = onOpenSettings
+        self.onOpenUpdates = onOpenUpdates
     }
 
     // Phase 6.7b (2026-04-24) : loucedé est dark-only. `NSApp.appearance`
@@ -427,7 +436,15 @@ struct PopoverView: View {
 
                 // Phase 6.7 : ligne Réglages fixe sous la liste, toujours accessible.
                 // Séparateur visuel + item navigable (↑↓+↵) + raccourci ⌘, standard macOS.
+                // Phase 6.3 : ligne « Mise à jour disponible » insérée au-dessus de
+                // Réglages quand UpdateChecker détecte une version plus récente.
                 Divider()
+                if updateChecker.updateAvailable {
+                    updateRow()
+                        .padding(.horizontal, 8)
+                        .padding(.top, 2)
+                    Divider()
+                }
                 settingsRow()
                     .padding(.horizontal, 8)
                     .padding(.top, 2)
@@ -524,6 +541,36 @@ struct PopoverView: View {
         .contentShape(Rectangle())
         .onTapGesture { state.runAction(action) }
         .onHover { hovering in if hovering { state.selectedIndex = index } }
+    }
+
+    /// Ligne « Mise à jour disponible » (Phase 6.3). Visible uniquement quand
+    /// `UpdateChecker.shared.updateAvailable == true`. Orange #F59E0B pour se
+    /// distinguer du bouton Réglages (bleu). Clic → ouvre l'onglet Mises à jour.
+    private func updateRow() -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 14))
+                .frame(width: 20, height: 20)
+                .foregroundStyle(updateOrange)
+            Text("Mise à jour disponible")
+                .font(.system(size: 13))
+                .foregroundStyle(updateOrange)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10))
+                .foregroundStyle(updateOrange.opacity(0.5))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(updateOrange.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onTapGesture { onOpenUpdates() }
+        .pointerCursor()
+    }
+
+    private var updateOrange: Color {
+        Color(red: 0.976, green: 0.620, blue: 0.043) // #F59E0B
     }
 
     /// Ligne « Réglages » fixe sous la liste d'actions (Phase 6.7).
