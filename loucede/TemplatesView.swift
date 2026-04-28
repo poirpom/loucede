@@ -58,7 +58,20 @@ enum PromptCategory: String, CaseIterable {
 // Modèles fournis par l'utilisateur (Phase 6.12, 2026-04-25).
 // Remplace les ~25 templates anglo-coding-centriques d'avant.
 // Source : `documents-persos/Privé et partagé/modèles de prompts ...csv`.
+//
+// Correctif 2026-04-28 : les 5 actions du seed `defaultActions` (Models.swift)
+// sont également présentes ici afin que l'utilisateur puisse les retrouver et
+// les réajouter s'il les supprime. Les prompts sont référencés via les
+// constantes statiques `ActionsStore.xxxPrompt` (single source of truth) pour
+// rester synchronisés avec le seed des actions par défaut.
 let promptSuggestions: [PromptSuggestion] = [
+    // MARK: Traduire — "Traduis en français" en tête (seed default action)
+    PromptSuggestion(
+        name: "Traduis en français",
+        prompt: ActionsStore.translateFrPrompt,
+        icon: "🇫🇷",
+        category: .translate
+    ),
     PromptSuggestion(
         name: "Traduis en espagnol",
         prompt: """
@@ -215,6 +228,25 @@ let promptSuggestions: [PromptSuggestion] = [
         icon: "❓",
         category: .analyze
     ),
+    // MARK: Transformer — "Résume", "Corrige les fautes", "Sois concis" en tête (seed default actions)
+    PromptSuggestion(
+        name: "Résume ce texte",
+        prompt: ActionsStore.summarizePrompt,
+        icon: "🤏",
+        category: .transform
+    ),
+    PromptSuggestion(
+        name: "Corrige les fautes",
+        prompt: ActionsStore.correctPrompt,
+        icon: "✍️",
+        category: .transform
+    ),
+    PromptSuggestion(
+        name: "Sois concis",
+        prompt: ActionsStore.concisePrompt,
+        icon: "✂️",
+        category: .transform
+    ),
     PromptSuggestion(
         name: "Simplifie",
         prompt: """
@@ -275,6 +307,13 @@ let promptSuggestions: [PromptSuggestion] = [
         """,
         icon: "🕴️",
         category: .transform
+    ),
+    // MARK: Structurer — "Extrais la recette de cuisine" en tête (seed default action)
+    PromptSuggestion(
+        name: "Extrais la recette de cuisine",
+        prompt: ActionsStore.recipeExtractionPrompt,
+        icon: "🍳",
+        category: .structure
     ),
     PromptSuggestion(
         name: "Réorganise la logique",
