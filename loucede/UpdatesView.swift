@@ -94,7 +94,7 @@ struct UpdatesView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("Vous êtes à jour ✅")
+                        Text("À jour")
                             .font(.system(size: 13, weight: .medium))
                     }
                     refreshButton
@@ -108,8 +108,12 @@ struct UpdatesView: View {
             checker.checkForUpdates()
         } label: {
             Text("Vérifier à nouveau")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .pointerCursor()
