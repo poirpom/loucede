@@ -127,7 +127,6 @@ let promptSuggestions: [PromptSuggestion] = [
         
         Regras de tradução:
         - Usar português natural e corrente (evitar tradução literal ou excessivamente livre).
-        - Usar sempre o tratamento por “tu” (2ª pessoa informal), de forma consistente.
         - Manter o tom, o registo e o nível de formalidade do texto original (formal, informal, técnico, etc.).
         - Preservar nomes próprios, marcas e acrónimos sem alteração.
         - Adaptar expressões idiomáticas para equivalentes naturais em português.
