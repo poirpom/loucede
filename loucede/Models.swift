@@ -112,6 +112,7 @@ class ActionsStore: ObservableObject {
     private let seed69cMigrationKey = "loucede_migration_seed_69c_done"
     private let planActionsEmojiMigrationKey = "loucede_migration_plan_actions_emoji_done"
     private let planToTodoMigrationKey = "loucede_migration_plan_to_todo_done"
+    private let summarizeV2MigrationKey = "loucede_migration_summarize_v2_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -224,6 +225,7 @@ class ActionsStore: ObservableObject {
             migrateSeed69cIfNeeded()
             migratePlanActionsEmojiIfNeeded()
             migratePlanToTodoIfNeeded()
+            migrateSummarizePromptV2IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -236,6 +238,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
             UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
             UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
+            UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
         }
     }
 
@@ -434,6 +437,31 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
+    }
+
+    /// Migration one-shot (correctif 2026-04-28) : remplace le prompt
+    /// « Résume ce texte » version 6.9c (cap 5 pts, max 18 mots, pas
+    /// d'intro/conclusion) par sa version mise à jour (cap 7 pts, max 20
+    /// mots, intro/conclusion optionnelles si nécessaires).
+    ///
+    /// Match BIT-EXACT sur (name + ancien prompt) : si l'utilisateur a
+    /// édité son prompt depuis le seed, on ne touche RIEN — l'égalité
+    /// stricte garantit qu'on ne réécrase jamais une personnalisation.
+    private func migrateSummarizePromptV2IfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: summarizeV2MigrationKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Résume ce texte" && actions[idx].prompt == Self.legacySummarizePrompt_v2 {
+                actions[idx].prompt = Self.summarizePrompt
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
     }
 
     func saveActions() {
@@ -781,7 +809,10 @@ class ActionsStore: ObservableObject {
     - Ne rien ajouter avant ou après la traduction.
     """
 
-    /// Prompt « Résume ce texte » — Phase 6.9c.
+    /// Prompt « Résume ce texte » — Phase 6.9c, mis à jour le 2026-04-28
+    /// (cap de points 5 → 7, max mots 18 → 20, intro/conclusion optionnelles
+    /// si nécessaires à la compréhension). Migration douce vers les
+    /// utilisateurs existants via `migrateSummarizePromptV2IfNeeded`.
     static let summarizePrompt: String = """
     Ta tâche : extraire uniquement les idées essentielles du texte.
 
@@ -791,11 +822,11 @@ class ActionsStore: ObservableObject {
     3. Reformule les idées de façon claire et concise.
 
     Contraintes strictes :
-    - 3 à 5 points maximum
+    - 3 à 7 points maximum
     - 1 idée principale par point
-    - 10 à 18 mots maximum par point
+    - 10 à 20 mots maximum par point
     - Style neutre et informatif
-    - Pas d'introduction ni de conclusion
+    - Si nécessaire à la compréhension, une courte introduction et une conclusion de 10 à 18 mots chacune
 
     Format de sortie :
     - Liste à puces uniquement
@@ -954,6 +985,35 @@ class ActionsStore: ObservableObject {
     - Respecte la structure du texte original : titres, sous-titres, listes, etc.
     - Conserve le ton et le registre de l'original
     - Réponds uniquement avec le résumé, sans introduction, sans commentaire, sans explication
+    """
+
+    /// Version 6.9c du prompt « Résume ce texte », snapshot BIT-EXACT pris
+    /// avant la mise à jour 2026-04-28 (cap 5 points + max 18 mots + pas
+    /// d'intro/conclusion). Référencée par `migrateSummarizePromptV2IfNeeded`
+    /// pour propager la nouvelle version aux utilisateurs existants qui
+    /// ont gardé le prompt seed non-modifié. NE PAS modifier — sinon la
+    /// migration ne matchera plus.
+    fileprivate static let legacySummarizePrompt_v2: String = """
+    Ta tâche : extraire uniquement les idées essentielles du texte.
+
+    Instructions :
+    1. Identifie les concepts principaux du texte.
+    2. Supprime les exemples, anecdotes, répétitions et détails secondaires.
+    3. Reformule les idées de façon claire et concise.
+
+    Contraintes strictes :
+    - 3 à 5 points maximum
+    - 1 idée principale par point
+    - 10 à 18 mots maximum par point
+    - Style neutre et informatif
+    - Pas d'introduction ni de conclusion
+
+    Format de sortie :
+    - Liste à puces uniquement
+
+    Vérification avant réponse :
+    - Chaque point doit représenter une idée essentielle du texte.
+    - Supprimer tout point redondant ou secondaire.
     """
 
     fileprivate static let legacyCorrectPrompt_pre69c: String = """
