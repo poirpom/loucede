@@ -35,6 +35,7 @@ struct FeaturesStep: View {
             }
             .frame(maxWidth: 420)
             .frame(maxWidth: .infinity)
+            .padding(.top, 4)
 
             Spacer()
 

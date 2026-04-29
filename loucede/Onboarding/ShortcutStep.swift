@@ -28,7 +28,7 @@ struct ShortcutStep: View {
     var body: some View {
         HStack(spacing: 0) {
             // Left side - Adaptive form
-            ZStack(alignment: .trailing) {
+            ZStack {
                 Color(NSColor.windowBackgroundColor)
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -139,12 +139,6 @@ struct ShortcutStep: View {
                         .frame(height: 20)
                 }
                 .padding(.horizontal, 32)
-                .padding(.trailing, 24)
-
-                // Wavy edge
-                WavyEdgeOrange()
-                    .frame(width: 22)
-                    .offset(x: 10)
             }
             .frame(width: 340)
 
@@ -398,9 +392,6 @@ struct OnboardingShortcutKey: View {
 struct KeyboardHintTooltip: View {
     @State private var activeKeyIndex = 0
     @State private var floatOffset: CGFloat = 0
-    @State private var glowOpacity: Double = 0.3
-
-    private let keys = ["\u{2318}", "\u{2325}"] // Command, Option
 
     var body: some View {
         VStack(spacing: 0) {
@@ -411,25 +402,39 @@ struct KeyboardHintTooltip: View {
                 .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: -2)
 
             // Tooltip content
-            HStack(spacing: 12) {
-                Text("Utilisez")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "666666"))
-
-                ForEach(0..<keys.count, id: \.self) { index in
-                    KeyboardHintKey(
-                        text: keys[index],
-                        isActive: activeKeyIndex == index
-                    )
+            VStack(spacing: 8) {
+                // Main row: [⌘] ou [⌥] + [W]
+                HStack(spacing: 8) {
+                    KeyboardHintKey(text: "\u{2318}", isActive: activeKeyIndex == 0)
+                    Text("ou")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "999999"))
+                    KeyboardHintKey(text: "\u{2325}", isActive: activeKeyIndex == 1)
+                    Text("+")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(hex: "999999"))
+                    KeyboardHintKey(text: "W", isActive: false)
                 }
 
-                Text("ou")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(hex: "999999"))
-
-                Text("+ touche")
-                    .font(.system(size: 13, weight: .medium))
+                // Subtitle
+                Text("Choisis ⌘ ou ⌥, combine avec une lettre")
+                    .font(.system(size: 11))
                     .foregroundColor(Color(hex: "666666"))
+
+                // Bonus line
+                HStack(spacing: 4) {
+                    Text("Tu peux aussi ajouter")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "999999"))
+                    ShortcutBonusKey(text: "^")
+                    Text("ou")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "999999"))
+                    ShortcutBonusKey(text: "\u{21E7}")
+                    Text("pour enrichir ton raccourci.")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "999999"))
+                }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
@@ -453,7 +458,7 @@ struct KeyboardHintTooltip: View {
         // Key highlight cycling animation
         Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.3)) {
-                activeKeyIndex = (activeKeyIndex + 1) % keys.count
+                activeKeyIndex = (activeKeyIndex + 1) % 2
             }
         }
 
@@ -500,6 +505,37 @@ struct KeyboardHintKey: View {
     }
 }
 
+// MARK: - Shortcut Bonus Key
+
+struct ShortcutBonusKey: View {
+    let text: String
+
+    var body: some View {
+        ZStack {
+            // Bottom layer (3D effect)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(hex: "d0d0d0"))
+                .frame(width: 20, height: 20)
+                .offset(y: 2)
+
+            // Top layer
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white)
+                .frame(width: 20, height: 20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color(hex: "e0e0e0"), lineWidth: 1)
+                )
+
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color(hex: "333333").opacity(0.7))
+        }
+        .frame(width: 20, height: 22)
+        .opacity(0.7)
+    }
+}
+
 // MARK: - Keyboard Hint Arrow (pointing up)
 
 struct KeyboardHintArrow: Shape {
@@ -510,44 +546,6 @@ struct KeyboardHintArrow: Shape {
         path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
         path.closeSubpath()
         return path
-    }
-}
-
-// MARK: - Wavy Edge Orange
-
-struct WavyEdgeOrange: View {
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                let width = geo.size.width
-                let height = geo.size.height
-                let notchRadius: CGFloat = 4
-                let notchSpacing: CGFloat = 20
-
-                path.move(to: CGPoint(x: width, y: 0))
-                path.addLine(to: CGPoint(x: width, y: height))
-                path.addLine(to: CGPoint(x: 0, y: height))
-
-                var y: CGFloat = height - notchSpacing / 2
-
-                while y > 0 {
-                    path.addLine(to: CGPoint(x: 0, y: y + notchRadius))
-                    path.addArc(
-                        center: CGPoint(x: 0, y: y),
-                        radius: notchRadius,
-                        startAngle: .degrees(90),
-                        endAngle: .degrees(-90),
-                        clockwise: true
-                    )
-                    y -= notchSpacing
-                }
-
-                path.addLine(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: width, y: 0))
-                path.closeSubpath()
-            }
-            .fill(Color(hex: "ff7300"))
-        }
     }
 }
 

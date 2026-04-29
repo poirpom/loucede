@@ -27,7 +27,7 @@ struct PermissionsStep: View {
     var body: some View {
         HStack(spacing: 0) {
             // Left side - Adaptive with instructions
-            ZStack(alignment: .trailing) {
+            ZStack {
                 Color(NSColor.windowBackgroundColor)
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -111,12 +111,6 @@ struct PermissionsStep: View {
                         .frame(height: 30)
                 }
                 .padding(.horizontal, 32)
-                .padding(.trailing, 24)
-
-                // Wavy edge
-                WavyEdge(isGreen: hasAccessibilityPermission)
-                    .frame(width: 22)
-                    .offset(x: 10)
             }
             .frame(width: 340)
 
@@ -358,47 +352,6 @@ struct PermissionCheckItem: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.primary)
         }
-    }
-}
-
-// MARK: - Wavy Edge
-
-struct WavyEdge: View {
-    let isGreen: Bool
-
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                let width = geo.size.width
-                let height = geo.size.height
-                let notchRadius: CGFloat = 4
-                let notchSpacing: CGFloat = 20
-
-                path.move(to: CGPoint(x: width, y: 0))
-                path.addLine(to: CGPoint(x: width, y: height))
-                path.addLine(to: CGPoint(x: 0, y: height))
-
-                var y: CGFloat = height - notchSpacing / 2
-
-                while y > 0 {
-                    path.addLine(to: CGPoint(x: 0, y: y + notchRadius))
-                    path.addArc(
-                        center: CGPoint(x: 0, y: y),
-                        radius: notchRadius,
-                        startAngle: .degrees(90),
-                        endAngle: .degrees(-90),
-                        clockwise: true
-                    )
-                    y -= notchSpacing
-                }
-
-                path.addLine(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: width, y: 0))
-                path.closeSubpath()
-            }
-            .fill(isGreen ? Color(hex: "00ce44") : Color(hex: "F9A825"))
-        }
-        .animation(.easeInOut(duration: 0.5), value: isGreen)
     }
 }
 

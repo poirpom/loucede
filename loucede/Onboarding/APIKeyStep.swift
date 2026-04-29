@@ -54,7 +54,7 @@ struct APIKeyStep: View {
     // MARK: - Left panel
 
     private var leftPanel: some View {
-        ZStack(alignment: .trailing) {
+        ZStack {
             Color(NSColor.windowBackgroundColor)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -119,13 +119,8 @@ struct APIKeyStep: View {
                 Spacer().frame(height: 24)
             }
             .padding(.horizontal, 32)
-            .padding(.trailing, 24)
             .animation(.easeInOut(duration: 0.2), value: validationError)
             .animation(.easeInOut(duration: 0.2), value: showContinueAnyway)
-
-            APIKeyWavyEdge()
-                .frame(width: 22)
-                .offset(x: 10)
         }
         .frame(width: 340)
     }
@@ -586,43 +581,6 @@ private struct APIKeyHintTooltip: View {
             withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                 floatOffset = -6
             }
-        }
-    }
-}
-
-// MARK: - Wavy edge (violet)
-
-private struct APIKeyWavyEdge: View {
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                let width       = geo.size.width
-                let height      = geo.size.height
-                let notchRadius: CGFloat = 4
-                let notchSpacing: CGFloat = 20
-
-                path.move(to: CGPoint(x: width, y: 0))
-                path.addLine(to: CGPoint(x: width, y: height))
-                path.addLine(to: CGPoint(x: 0, y: height))
-
-                var y: CGFloat = height - notchSpacing / 2
-                while y > 0 {
-                    path.addLine(to: CGPoint(x: 0, y: y + notchRadius))
-                    path.addArc(
-                        center: CGPoint(x: 0, y: y),
-                        radius: notchRadius,
-                        startAngle: .degrees(90),
-                        endAngle: .degrees(-90),
-                        clockwise: true
-                    )
-                    y -= notchSpacing
-                }
-
-                path.addLine(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: width, y: 0))
-                path.closeSubpath()
-            }
-            .fill(Color(hex: "6C5CE7"))
         }
     }
 }
