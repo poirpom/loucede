@@ -17,6 +17,7 @@ import AppKit
 
 struct LicenseSettingsView: View {
     @StateObject private var manager = LicenseManager.shared
+    @StateObject private var usageTracker = UsageTracker.shared
 
     /// Champ de saisie de clé (binding local — pas dans le manager pour
     /// que l'utilisateur puisse taper sans déclencher un re-render
@@ -240,6 +241,12 @@ struct LicenseSettingsView: View {
             .disabled(isDeactivating)
             .padding(.top, 8)
 
+            // Compteur d'utilisations total (visible uniquement si au
+            // moins un usage enregistré).
+            if usageTracker.count > 0 {
+                usageCounter
+            }
+
             // Erreur de génération du heroName (réseau down, etc.)
             if let error = heroNameError {
                 Text(error)
@@ -424,6 +431,28 @@ struct LicenseSettingsView: View {
                 .tint(manager.hasTrialRemaining ? .blue : .red)
         }
         .padding(.top, 12)
+    }
+
+    // MARK: - Usage counter (licences actives uniquement)
+
+    @ViewBuilder
+    private var usageCounter: some View {
+        let dateStr = usageTracker.formattedFirstUseDate() ?? ""
+        VStack(spacing: 0) {
+            Divider()
+                .frame(maxWidth: 320)
+                .padding(.vertical, 10)
+
+            (
+                Text("Depuis le ").foregroundStyle(.secondary)
+                + Text(dateStr).foregroundStyle(.primary)
+                + Text(", tu as utilisé loucedé ").foregroundStyle(.secondary)
+                + Text(usageTracker.count == 1 ? "1 fois." : "\(usageTracker.count) fois.").foregroundStyle(.primary)
+            )
+            .font(.system(size: 12))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 320)
+        }
     }
 
     // MARK: - Helper rows

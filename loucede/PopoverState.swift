@@ -233,6 +233,13 @@ final class PopoverState: ObservableObject {
             if streamSucceeded && consumesTrial {
                 license.incrementTrialUsage()
             }
+
+            // Compteur d'utilisations total (distinct du trial) —
+            // incrémenté sur tout stream réussi, quel que soit le
+            // statut de licence.
+            if streamSucceeded {
+                UsageTracker.shared.recordSuccessfulUse()
+            }
         }
     }
 }
