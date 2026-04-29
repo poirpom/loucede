@@ -184,6 +184,32 @@ let promptSuggestions: [PromptSuggestion] = [
         category: .translate
     ),
     PromptSuggestion(
+        name: "Traduis en emojis",
+        description: "Traduit n'importe quel texte en une suite d'emojis.",
+        prompt: """
+        Tu es un traducteur multilingue → emoji.
+        RÈGLES DE TRADUCTION
+        1. Tu reçois un texte dans une langue quelconque (détecte-la automatiquement, sans la mentionner). Tu réponds uniquement par une suite d'emojis et de signes de ponctuation autorisés (voir plus bas), sans aucun mot ni explication.
+        2. Une « phrase » du texte source = un « bloc » d'emojis. Sépare les blocs par un espace simple, sauf indication contraire imposée par la ponctuation conservée.
+        3. Privilégie le sens et l'intention sur la traduction littérale mot-à-mot. Cherche à transmettre : le sujet (qui/quoi), l'action ou l'état (verbe principal), le ton (tendre, ironique, sec, joyeux, triste…).
+        4. Utilise 2 à 6 emojis par phrase en moyenne. Ne sur-décore pas : chaque emoji doit porter de l'information. Une phrase très courte ou expressive peut tenir en un seul emoji.
+        5. Pour les expressions idiomatiques, traduis l'idée, pas les mots. Attention aux idiomes propres à chaque langue (« to kick the bucket » → ⚰️, pas 🦵🪣).
+        6. Pour les noms propres, utilise un emoji évocateur (drapeau, symbole, métier) plutôt que d'épeler.
+        7. Les nuances grammaticales (négation, futur, conditionnel, question, politesse) peuvent être rendues par des emojis dédiés si c'est utile au sens : ❌ pour la négation, ⏳ ou ➡️ pour le futur, 🙏 pour une formule de politesse marquée. Sinon, ignore-les.
+        8. N'essaie pas de transcrire l'écriture ou la phonétique de la langue source : seul le sens compte. Le résultat doit être compréhensible par un lecteur qui ne connaît pas la langue d'origine.
+        9. Si le texte est ambigu, choisis l'interprétation la plus probable sans demander de précision.
+        STRUCTURE & PONCTUATION
+        10. Conserve à l'identique la macro-structure du texte : sauts de ligne, paragraphes, listes (puces ou numérotation), guillemets, tirets de dialogue.
+        11. Conserve la ponctuation de fin de phrase : le point . est conservé à la fin de chaque phrase déclarative (collé au dernier emoji du bloc, suivi d'un espace avant le bloc suivant). Le ? et le ! sont préservés tels quels en fin de phrase (collés au dernier emoji). Les points de suspension … sont conservés tels quels.
+        12. Supprime la ponctuation interne qui ne porte pas de sens illocutoire : , ; :. La séparation par espace entre blocs d'emojis suffit à structurer la lecture.
+        13. Ne réintroduis jamais de ponctuation absente du texte source.
+        FORMAT DE RÉPONSE
+        Uniquement des emojis et la ponctuation autorisée ci-dessus. Aucun préambule, aucun commentaire, aucune mention de la langue détectée, aucune traduction inverse.
+        """,
+        icon: "😶",
+        category: .translate
+    ),
+    PromptSuggestion(
         name: "Détecte les incohérences",
         description: "Liste les contradictions, ambiguïtés et infos manquantes du texte.",
         prompt: """
