@@ -12,17 +12,9 @@ struct QuickPromptView: View {
     @State private var promptText: String = ""
     @FocusState private var isPromptFocused: Bool
     @Environment(\.colorScheme) var colorScheme
-    @AppStorage("appTheme") private var appTheme: String = "System"
-
+    // Phase 6.7b revertée (2026-04-29) : @AppStorage("appTheme") et
+    // savedColorScheme retirés — mode système suivi automatiquement.
     var onClose: () -> Void
-
-    private var savedColorScheme: ColorScheme? {
-        switch appTheme {
-        case "Light": return .light
-        case "Dark": return .dark
-        default: return nil
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -128,7 +120,6 @@ struct QuickPromptView: View {
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .preferredColorScheme(savedColorScheme)
         .onAppear {
             isPromptFocused = true
         }

@@ -112,8 +112,8 @@ struct UpdatesView: View {
                 .foregroundColor(.primary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.08)))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.07)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .pointerCursor()

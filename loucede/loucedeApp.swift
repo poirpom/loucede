@@ -66,14 +66,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             andEventID: AEEventID(kAEGetURL)
         )
 
-        // Phase 6.7b (2026-04-24) : loucedé est dark-only. On force
-        // NSApp.appearance à darkAqua dès le démarrage. Tout SwiftUI
-        // (popup, menu bar, Réglages…) hérite automatiquement de cette
-        // apparence via `@Environment(\.colorScheme)`. Le picker de
-        // thème des Réglages et l'`AppStorage("appTheme")` ont été
-        // retirés dans le même lot — la clé UserDefaults reste orpheline
-        // chez les users existants, inoffensive.
-        NSApp.appearance = NSAppearance(named: .darkAqua)
+        // Phase 6.7b revertée (2026-04-29) : loucedé respecte le mode
+        // système macOS (light et dark). NSApp.appearance n'est plus
+        // forcée à darkAqua — SwiftUI hérite automatiquement du
+        // colorScheme système via @Environment(\.colorScheme).
 
         if !OnboardingManager.shared.hasCompletedOnboarding {
             showOnboarding()

@@ -17,11 +17,9 @@ struct MenuBarMenuView: View {
     var onQuit: () -> Void
     var onDismiss: () -> Void
 
-    // Phase 6.7b (2026-04-24) : loucedé est dark-only. `isDarkMode`
-    // reste exposé comme constante `true` pour limiter le refactor des
-    // sous-vues (`MenuBarMenuItemWithAsset`, etc.) qui attendent ce flag.
-    // À nettoyer plus tard si on veut retirer la prop côté sous-vues.
-    let isDarkMode: Bool = true
+    // Phase 6.7b revertée (2026-04-29) : isDarkMode retiré, les sous-vues
+    // lisent colorScheme via @Environment directement.
+    @Environment(\.colorScheme) var colorScheme
 
     var backgroundColor: Color {
         Color(NSColor.windowBackgroundColor)
@@ -35,7 +33,6 @@ struct MenuBarMenuView: View {
                     assetName: "MenuBarIcon",
                     title: "Ouvrir loucedé",
                     isHovered: hoveredItem == "open",
-                    isDarkMode: isDarkMode,
                     delay: 0.05
                 ) {
                     onOpenLoucede()
@@ -48,7 +45,6 @@ struct MenuBarMenuView: View {
                     icon: "gearshape",
                     title: "Réglages",
                     isHovered: hoveredItem == "settings",
-                    isDarkMode: isDarkMode,
                     delay: 0.1
                 ) {
                     onSettings()
@@ -70,7 +66,6 @@ struct MenuBarMenuView: View {
                     icon: "power",
                     title: "Quitter",
                     isHovered: hoveredItem == "quit",
-                    isDarkMode: isDarkMode,
                     isDestructive: true,
                     delay: 0.15
                 ) {
@@ -116,34 +111,26 @@ struct MenuBarMenuItem: View {
     let icon: String
     let title: String
     let isHovered: Bool
-    let isDarkMode: Bool
     var isDestructive: Bool = false
     let delay: Double
     let action: () -> Void
 
+    @Environment(\.colorScheme) var colorScheme
     @State private var isVisible = false
 
     var textColor: Color {
-        if isDestructive && isHovered {
-            return .white
-        }
-        return isDarkMode ? .white : Color(white: 0.15)
+        if isDestructive && isHovered { return .white }
+        return colorScheme == .dark ? .white : Color(white: 0.15)
     }
 
     var iconColor: Color {
-        if isDestructive && isHovered {
-            return .white
-        }
-        return isDarkMode ? Color(white: 0.7) : Color(white: 0.4)
+        if isDestructive && isHovered { return .white }
+        return colorScheme == .dark ? Color(white: 0.7) : Color(white: 0.4)
     }
 
     var hoverBackground: Color {
-        if isDestructive {
-            return Color.red.opacity(0.85)
-        }
-        return isDarkMode
-            ? Color.white.opacity(0.1)
-            : Color.black.opacity(0.06)
+        if isDestructive { return Color.red.opacity(0.85) }
+        return colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06)
     }
 
     var body: some View {
@@ -184,34 +171,26 @@ struct MenuBarMenuItemWithAsset: View {
     let assetName: String
     let title: String
     let isHovered: Bool
-    let isDarkMode: Bool
     var isDestructive: Bool = false
     let delay: Double
     let action: () -> Void
 
+    @Environment(\.colorScheme) var colorScheme
     @State private var isVisible = false
 
     var textColor: Color {
-        if isDestructive && isHovered {
-            return .white
-        }
-        return isDarkMode ? .white : Color(white: 0.15)
+        if isDestructive && isHovered { return .white }
+        return colorScheme == .dark ? .white : Color(white: 0.15)
     }
 
     var iconColor: Color {
-        if isDestructive && isHovered {
-            return .white
-        }
-        return isDarkMode ? Color(white: 0.7) : Color(white: 0.4)
+        if isDestructive && isHovered { return .white }
+        return colorScheme == .dark ? Color(white: 0.7) : Color(white: 0.4)
     }
 
     var hoverBackground: Color {
-        if isDestructive {
-            return Color.red.opacity(0.85)
-        }
-        return isDarkMode
-            ? Color.white.opacity(0.1)
-            : Color.black.opacity(0.06)
+        if isDestructive { return Color.red.opacity(0.85) }
+        return colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06)
     }
 
     var body: some View {

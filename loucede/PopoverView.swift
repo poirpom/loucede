@@ -68,10 +68,10 @@ struct PopoverView: View {
         self.onOpenUpdates = onOpenUpdates
     }
 
-    // Phase 6.7b (2026-04-24) : loucedé est dark-only. `NSApp.appearance`
-    // est forcée à `.darkAqua` au démarrage (AppDelegate). Les couleurs
-    // de fond Phase 1.4h/1.4i (#2E2E2E, #1B1C1C) reviennent donc codées
-    // en dur, comme avant les tentatives d'adaptation clair/sombre.
+    // Phase 6.7b revertée (2026-04-29) : loucedé suit le mode système.
+    // Les fonds #2E2E2E / #1B1C1C sont remplacés par des couleurs
+    // sémantiques NSColor (windowBackgroundColor / controlBackgroundColor)
+    // qui s'adaptent automatiquement à light et dark.
 
     /// Phase 6.8d-bis (2026-04-25) : la table de mapping est désormais
     /// centralisée dans `ActionsStore.positionShortcuts` (15 entrées :
@@ -95,9 +95,9 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Phase 1.4h : fond popup solide #2E2E2E (remplace le VisualEffectBlur
-        // translucide). Dark-only depuis Phase 6.7b (app forcée en darkAqua).
-        .background(Color(hex: "2E2E2E"))
+        // Phase 1.4h : fond popup solide (remplace le VisualEffectBlur
+        // translucide). Adaptatif light/dark depuis Phase 6.7b revertée.
+        .background(Color(NSColor.windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Phase 6.2 Étape 9 (2026-04-27) : modal « trial épuisé »
         // présenté en overlay (reste dans la fenêtre popup, pas une
@@ -316,7 +316,7 @@ struct PopoverView: View {
     }
 
     private var mainView: some View {
-        // spacing: 0 (comme resultView) pour que la zone #1B1C1C colle directement
+        // spacing: 0 (comme resultView) pour que la zone basse colle directement
         // au Divider sous la preview, sans gap visuel dû au spacing du VStack.
         VStack(alignment: .leading, spacing: 0) {
             // Phase 6.18-fix-2 (2026-04-28) : top bar TOUJOURS visible.
@@ -355,8 +355,8 @@ struct PopoverView: View {
 
             Divider()
 
-            // Phase 1.4i : zone basse de la popup (liste + footer nav) en #1B1C1C,
-            // pour la distinguer du chrome supérieur (aperçu texte) en #2E2E2E.
+            // Phase 1.4i : zone basse de la popup (liste + footer nav) en
+            // controlBackgroundColor, légèrement distincte du chrome supérieur.
             VStack(spacing: 0) {
                 // Phase 1.4g : bandeau de recherche toujours visible, avec
                 // placeholder « Rechercher » pour signaler la fonction à
@@ -466,7 +466,7 @@ struct PopoverView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .background(Color(hex: "1B1C1C"))
+            .background(Color(NSColor.controlBackgroundColor))
         }
         .focusable()
         .focusEffectDisabled()
@@ -618,7 +618,7 @@ struct PopoverView: View {
 
             Divider()
 
-            // Phase 1.4i : zone basse du résultat (texte + footer boutons) en #1B1C1C.
+            // Phase 1.4i : zone basse du résultat (texte + footer boutons).
             VStack(spacing: 0) {
                 ScrollView {
                     // Phase 6.5 (2026-04-23) : rendu Markdown via MarkdownUI
@@ -733,7 +733,7 @@ struct PopoverView: View {
                 }
                 .padding(12)
             }
-            .background(Color(hex: "1B1C1C"))
+            .background(Color(NSColor.controlBackgroundColor))
         }
         .focusable()
         .focusEffectDisabled()
@@ -862,11 +862,11 @@ private struct TrialExpiredOverlay: View {
             }
             .padding(20)
             .frame(maxWidth: 320)
-            .background(Color(hex: "1B1C1C"))
+            .background(Color(NSColor.controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
         }

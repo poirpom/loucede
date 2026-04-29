@@ -34,15 +34,10 @@ struct SettingsView: View {
         _selectedTab = State(initialValue: initialTab)
     }
 
-    @AppStorage("appTheme") private var appTheme: String = "System"
-
-    private var savedColorScheme: ColorScheme? {
-        switch appTheme {
-        case "Light": return .light
-        case "Dark": return .dark
-        default: return nil
-        }
-    }
+    // Phase 6.7b revertée (2026-04-29) : @AppStorage("appTheme") et
+    // savedColorScheme retirés — loucedé suit le mode système macOS.
+    // La clé UserDefaults "appTheme" reste orpheline chez les users
+    // existants (inoffensive).
 
     var body: some View {
         VStack(spacing: 0) {
@@ -117,7 +112,6 @@ struct SettingsView: View {
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
         .frame(width: 800, height: 540)
-        .preferredColorScheme(savedColorScheme)
     }
 }
 

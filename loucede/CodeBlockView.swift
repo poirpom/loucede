@@ -10,7 +10,11 @@ struct CodeBlockView: View {
     // VSCode Dark+ inspired colors
     private let bgColor = Color(red: 0.12, green: 0.12, blue: 0.14) // #1e1e23
     private let headerBg = Color(red: 0.15, green: 0.15, blue: 0.17) // #262628
-    private let borderColor = Color.white.opacity(0.06)
+    // Bordure extérieure adaptative : visible sur fond clair (light mode)
+    // et subtile sur fond sombre (dark mode). Les autres Color.white.opacity(…)
+    // du fichier sont intentionnellement sur fond sombre (#1e1e23) — VSCode
+    // Dark+ theme conservé quel que soit le mode système.
+    private let borderColor = Color.primary.opacity(0.12)
     private let gutterColor = Color.white.opacity(0.2)
 
     // Syntax colors (VSCode Dark+)

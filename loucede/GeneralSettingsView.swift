@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-// Phase 6.7b (2026-04-24) : loucedé est dark-only. L'enum AppTheme,
-// l'AppStorage "appTheme" et le picker associé ont été retirés.
-// `NSApp.appearance` est forcée à `.darkAqua` dans AppDelegate.
-// La clé UserDefaults "appTheme" reste orpheline chez les users
-// existants (inoffensive).
+// Phase 6.7b revertée (2026-04-29) : loucedé suit le mode système macOS.
+// L'enum AppTheme, l'AppStorage "appTheme" et le picker associé restent
+// absents — pas d'option utilisateur, adaptation automatique via
+// @Environment(\.colorScheme). La clé UserDefaults "appTheme" reste
+// orpheline chez les users existants (inoffensive).
 
 struct GeneralSettingsView: View {
     @StateObject private var store = ActionsStore.shared
