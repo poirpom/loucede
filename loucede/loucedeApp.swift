@@ -379,7 +379,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 12+12 = 52pt + divider 1pt = 53pt), même sans selection. Quand
     /// selection, le preview cohabite avec le logo dans la même top bar
     /// — voir `popoverPreviewHeight` pour le delta.
-    static let popoverChromeHeight: CGFloat = 161
+    static let popoverChromeHeight: CGFloat = 165 // +4pt : champ recherche avec marge/fond (2026-04-29)
     /// Delta de hauteur ADDITIONNEL quand un aperçu de texte est affiché
     /// (= différence entre top bar avec preview vs top bar logo seul).
     /// Phase 6.18-fix-2 : 67 → 12. Avant, popoverPreviewHeight était la

@@ -400,8 +400,14 @@ struct PopoverView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.06))
+                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
                 .contentShape(Rectangle())
                 .onTapGesture { focus = .main }
                 // Timer de clignotement ~530 ms (rythme caret macOS). Auto-démarré
