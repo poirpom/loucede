@@ -17,14 +17,14 @@ struct LaunchAtLoginStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
-    private let brandBlue = Color(hex: "0095ff")
+    private let brandBlue     = Color(hex: "0095ff")
     private let brandBlueDark = Color(hex: "0070cc")
 
     var body: some View {
         HStack(spacing: 0) {
             // MARK: - Côté gauche : formulaire blanc
             ZStack(alignment: .trailing) {
-                Color.white
+                Color(NSColor.windowBackgroundColor)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Spacer()
@@ -32,14 +32,14 @@ struct LaunchAtLoginStep: View {
 
                     Text("Démarrage")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(hex: "1a1a1a"))
+                        .foregroundColor(.primary)
 
                     Spacer()
                         .frame(height: 10)
 
                     Text("Souhaites-tu que loucedé\ndémarre automatiquement\nà l'ouverture de session ?")
                         .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "666666"))
+                        .foregroundStyle(.secondary)
                         .lineSpacing(3)
 
                     Spacer()
@@ -95,7 +95,7 @@ struct LaunchAtLoginStep: View {
                     }) {
                         Text("Pas maintenant")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color(hex: "666666"))
+                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
                     }
@@ -163,7 +163,7 @@ private struct BenefitRow: View {
             }
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color(hex: "333333"))
+                .foregroundStyle(.primary)
         }
     }
 }

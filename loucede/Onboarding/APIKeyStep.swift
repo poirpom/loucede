@@ -33,6 +33,7 @@ struct APIKeyStep: View {
 
     private let brandViolet     = Color(hex: "6C5CE7")
     private let brandVioletDark = Color(hex: "5649C0")
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var keyInput           = ""
     @State private var badgeState         = BadgeState.none
@@ -54,20 +55,20 @@ struct APIKeyStep: View {
 
     private var leftPanel: some View {
         ZStack(alignment: .trailing) {
-            Color.white
+            Color(NSColor.windowBackgroundColor)
 
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 40)
 
                 Text("Clé API")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(hex: "1a1a1a"))
+                    .foregroundColor(.primary)
 
                 Spacer().frame(height: 10)
 
                 Text("Configure ton fournisseur d'IA\npour utiliser loucedé. Tu peux\nutiliser Anthropic, OpenAI ou Mistral.")
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hex: "666666"))
+                    .foregroundStyle(.secondary)
                     .lineSpacing(3)
 
                 Spacer().frame(height: 32)
@@ -112,7 +113,7 @@ struct APIKeyStep: View {
 
                 Text("Modifiable à tout moment dans les réglages.")
                     .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "c0c0c0"))
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
 
                 Spacer().frame(height: 24)
@@ -142,16 +143,16 @@ struct APIKeyStep: View {
             SecureField("Colle ta clé ici…", text: $keyInput)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(Color(hex: "1a1a1a"))
+                .foregroundColor(.primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "f8f8f8"))
+                        .fill(Color(NSColor.controlBackgroundColor))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: "e0e0e0"), lineWidth: 1.5)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 1.5)
                 )
                 .disabled(isValidating)
                 .onChange(of: keyInput) { _, newValue in
@@ -186,7 +187,7 @@ struct APIKeyStep: View {
                     .frame(width: 15, height: 15)
                 Text("\(provider.rawValue) détecté")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hex: "666666"))
+                    .foregroundStyle(.secondary)
             }
         case .tentative:
             HStack(spacing: 5) {
@@ -197,12 +198,16 @@ struct APIKeyStep: View {
                     .opacity(0.6)
                 Text("Mistral ?")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hex: "aaaaaa"))
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     // MARK: - Buttons
+
+    private var isValidateEnabled: Bool {
+        !keyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isValidating
+    }
 
     private var validateButton: some View {
         Button(action: { Task { await performValidate() } }) {
@@ -218,20 +223,25 @@ struct APIKeyStep: View {
             .frame(height: 48)
             .background(
                 ZStack {
+                    // Shadow 3D — uniquement quand le bouton est actif pour éviter
+                    // la transparence mutuelle "pâteuse" en disabled + dark mode
+                    if isValidateEnabled {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(brandVioletDark)
+                            .offset(y: 5)
+                    }
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(brandVioletDark)
-                        .offset(y: 5)
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            keyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? Color(hex: "c0b8f0")
-                                : brandViolet
-                        )
+                        .fill(isValidateEnabled ? brandViolet : brandViolet.opacity(0.4))
                 }
+            )
+            .shadow(
+                color: colorScheme == .dark && isValidateEnabled
+                    ? brandViolet.opacity(0.25) : .clear,
+                radius: 4, x: 0, y: 2
             )
         }
         .buttonStyle(APIKeyNoFadeButtonStyle())
-        .disabled(keyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isValidating)
+        .disabled(!isValidateEnabled)
     }
 
     private var continueAnywayButton: some View {
@@ -249,7 +259,7 @@ struct APIKeyStep: View {
         Button(action: { onNext() }) {
             Text("Configurer plus tard")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "999999"))
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
         }

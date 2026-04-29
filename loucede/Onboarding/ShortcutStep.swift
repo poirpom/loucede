@@ -27,9 +27,9 @@ struct ShortcutStep: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left side - White form
+            // Left side - Adaptive form
             ZStack(alignment: .trailing) {
-                Color.white
+                Color(NSColor.windowBackgroundColor)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Spacer()
@@ -37,14 +37,14 @@ struct ShortcutStep: View {
 
                     Text("Raccourci")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(hex: "1a1a1a"))
+                        .foregroundColor(.primary)
 
                     Spacer()
                         .frame(height: 10)
 
                     Text("Définis ton raccourci clavier\npour invoquer loucedé partout.")
                         .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "666666"))
+                        .foregroundStyle(.secondary)
                         .lineSpacing(3)
 
                     Spacer()
@@ -70,7 +70,7 @@ struct ShortcutStep: View {
                                 if savedShortcutKeys.isEmpty {
                                     Text("Clique pour enregistrer un raccourci…")
                                         .font(.system(size: 14))
-                                        .foregroundColor(Color(hex: "999999"))
+                                        .foregroundStyle(.secondary)
                                 } else {
                                     ForEach(savedShortcutKeys, id: \.self) { key in
                                         OnboardingShortcutKey(text: key)
@@ -80,12 +80,12 @@ struct ShortcutStep: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "f8f8f8"))
+                            .background(Color(NSColor.controlBackgroundColor))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                                    .foregroundColor(Color(hex: "c0c0c0"))
+                                    .foregroundColor(Color(NSColor.separatorColor))
                             )
                         }
                         .buttonStyle(.plain)
@@ -98,7 +98,7 @@ struct ShortcutStep: View {
 
                     Text("Clique sur la case ci-dessus\npour enregistrer un nouveau raccourci.")
                         .font(.system(size: 12))
-                        .foregroundColor(Color(hex: "999999"))
+                        .foregroundStyle(.secondary)
                         .lineSpacing(2)
 
                     Spacer()
@@ -271,7 +271,7 @@ struct OnboardingShortcutTooltip: View {
                 HStack(spacing: 8) {
                     Text("ex.")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "999999"))
+                        .foregroundStyle(.secondary)
 
                     // Always show 3 key slots
                     ForEach(0..<3, id: \.self) { index in
@@ -292,23 +292,23 @@ struct OnboardingShortcutTooltip: View {
                 VStack(spacing: 4) {
                     Text("Enregistrement…")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(hex: "666666"))
+                        .foregroundStyle(.secondary)
 
                     Text("Appuie sur \u{2318} ou \u{2325} + touche")
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "999999"))
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
+                    .fill(Color(NSColor.controlBackgroundColor))
                     .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(hex: "e0e0e0"), lineWidth: 1)
+                    .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
             )
 
             // Arrow pointing down
@@ -327,24 +327,24 @@ struct OnboardingTooltipKey: View {
 
     var body: some View {
         ZStack {
-            // Bottom layer (3D effect) - lighter color like container keys
+            // Bottom layer (3D effect)
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color(hex: "d0d0d0"))
+                .fill(Color(NSColor.separatorColor))
                 .frame(width: 28, height: 28)
                 .offset(y: 2)
 
-            // Top layer - white like container keys
+            // Top layer
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white)
+                .fill(Color(NSColor.controlBackgroundColor))
                 .frame(width: 28, height: 28)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(hex: "e0e0e0"), lineWidth: 1)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
                 )
 
             Text(text)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color(hex: "333333"))
+                .foregroundStyle(.primary)
         }
         .frame(width: 28, height: 30)
     }
@@ -371,22 +371,22 @@ struct OnboardingShortcutKey: View {
     var body: some View {
         Text(text)
             .font(.system(size: 15, weight: .medium, design: .rounded))
-            .foregroundColor(Color(hex: "333333"))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 ZStack {
                     // 3D effect bottom
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: "d0d0d0"))
+                        .fill(Color(NSColor.separatorColor))
                         .offset(y: 2)
 
                     // Top
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.white)
+                        .fill(Color(NSColor.controlBackgroundColor))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color(hex: "e0e0e0"), lineWidth: 1)
+                                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
                         )
                 }
             )
@@ -524,19 +524,14 @@ struct WavyEdgeOrange: View {
                 let notchRadius: CGFloat = 4
                 let notchSpacing: CGFloat = 20
 
-                // Start from top-right corner
                 path.move(to: CGPoint(x: width, y: 0))
                 path.addLine(to: CGPoint(x: width, y: height))
                 path.addLine(to: CGPoint(x: 0, y: height))
 
-                // Create semicircular notches from bottom to top (biting into the right/colored side)
                 var y: CGFloat = height - notchSpacing / 2
 
                 while y > 0 {
-                    // Line up to notch
                     path.addLine(to: CGPoint(x: 0, y: y + notchRadius))
-
-                    // Semicircle notch biting to the right (into the colored area)
                     path.addArc(
                         center: CGPoint(x: 0, y: y),
                         radius: notchRadius,
@@ -544,11 +539,9 @@ struct WavyEdgeOrange: View {
                         endAngle: .degrees(-90),
                         clockwise: true
                     )
-
                     y -= notchSpacing
                 }
 
-                // Line to top
                 path.addLine(to: CGPoint(x: 0, y: 0))
                 path.addLine(to: CGPoint(x: width, y: 0))
                 path.closeSubpath()

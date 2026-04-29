@@ -22,8 +22,8 @@ struct WelcomeStep: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // White base - visible before waves rise
-                Color.white
+                // Base adaptive - visible before waves rise
+                Color(NSColor.windowBackgroundColor)
                     .ignoresSafeArea()
 
                 // Single wave layer with gradient - pink tones

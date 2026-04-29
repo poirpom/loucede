@@ -16,18 +16,19 @@ struct PermissionsStep: View {
     @State private var permissionCheckTimer: Timer?
     @State private var floatAnimationActive = false
 
-    // Colors
-    private let accentYellow = Color(hex: "F9A825")
+    // Colors (button — stays vibrant in both modes)
+    private let accentYellow     = Color(hex: "F9A825")
     private let accentYellowDark = Color(hex: "F57F17")
-    private let accentGreen = Color(hex: "00ce44")
-    private let accentGreenDark = Color(hex: "00a838")
-    private let stepBlue = Color(hex: "2196F3")
+    private let accentGreen      = Color(hex: "00ce44")
+    private let accentGreenDark  = Color(hex: "00a838")
+    private let stepBlue         = Color(hex: "2196F3")
+
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left side - White with instructions
+            // Left side - Adaptive with instructions
             ZStack(alignment: .trailing) {
-                Color.white
+                Color(NSColor.windowBackgroundColor)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Spacer()
@@ -35,14 +36,14 @@ struct PermissionsStep: View {
 
                     Text("Accessibilité")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(hex: "1a1a1a"))
+                        .foregroundColor(.primary)
 
                     Spacer()
                         .frame(height: 10)
 
                     Text("L'autorisation d'accessibilité est requise\npour que loucedé fonctionne.")
                         .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "666666"))
+                        .foregroundStyle(.secondary)
                         .lineSpacing(3)
 
                     Spacer()
@@ -323,7 +324,7 @@ struct StepRow: View {
 
             Text(text)
                 .font(.system(size: 13))
-                .foregroundColor(Color(hex: "333333"))
+                .foregroundStyle(.primary)
 
             Spacer()
         }
@@ -331,10 +332,10 @@ struct StepRow: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
+                .fill(Color(NSColor.controlBackgroundColor))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: "e8e8e8"), lineWidth: 1)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
                 )
         )
     }
@@ -355,7 +356,7 @@ struct PermissionCheckItem: View {
 
             Text(text)
                 .font(.system(size: 14))
-                .foregroundColor(Color(hex: "333333"))
+                .foregroundStyle(.primary)
         }
     }
 }
@@ -373,19 +374,14 @@ struct WavyEdge: View {
                 let notchRadius: CGFloat = 4
                 let notchSpacing: CGFloat = 20
 
-                // Start from top-right corner
                 path.move(to: CGPoint(x: width, y: 0))
                 path.addLine(to: CGPoint(x: width, y: height))
                 path.addLine(to: CGPoint(x: 0, y: height))
 
-                // Create semicircular notches from bottom to top (biting into the right/colored side)
                 var y: CGFloat = height - notchSpacing / 2
 
                 while y > 0 {
-                    // Line up to notch
                     path.addLine(to: CGPoint(x: 0, y: y + notchRadius))
-
-                    // Semicircle notch biting to the right (into the colored area)
                     path.addArc(
                         center: CGPoint(x: 0, y: y),
                         radius: notchRadius,
@@ -393,11 +389,9 @@ struct WavyEdge: View {
                         endAngle: .degrees(-90),
                         clockwise: true
                     )
-
                     y -= notchSpacing
                 }
 
-                // Line to top
                 path.addLine(to: CGPoint(x: 0, y: 0))
                 path.addLine(to: CGPoint(x: width, y: 0))
                 path.closeSubpath()
