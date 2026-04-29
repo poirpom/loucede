@@ -15,6 +15,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 // MARK: - Badge state
 
@@ -81,6 +82,8 @@ struct APIKeyStep: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 }
+
+                providerLinksSection
 
                 Spacer()
 
@@ -251,6 +254,37 @@ struct APIKeyStep: View {
                 .frame(height: 36)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Provider quick-links
+
+    private var providerLinksSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Pas encore de clé ?")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 6)
+
+            ProviderLinkButton(
+                iconName: AIProvider.mistral.iconName,
+                label:    "Mistral",
+                url:      URL(string: "https://console.mistral.ai/api-keys/")!,
+                tooltip:  "Obtenir une clé sur la console Mistral"
+            )
+            ProviderLinkButton(
+                iconName: AIProvider.openai.iconName,
+                label:    "OpenAI",
+                url:      URL(string: "https://platform.openai.com/api-keys")!,
+                tooltip:  "Obtenir une clé sur la console OpenAI"
+            )
+            ProviderLinkButton(
+                iconName: AIProvider.anthropic.iconName,
+                label:    "Anthropic",
+                url:      URL(string: "https://console.anthropic.com/settings/keys")!,
+                tooltip:  "Obtenir une clé sur la console Anthropic"
+            )
+        }
+        .padding(.top, 14)
     }
 
     // MARK: - Right panel
@@ -579,6 +613,54 @@ private struct APIKeyWavyEdge: View {
                 path.closeSubpath()
             }
             .fill(Color(hex: "6C5CE7"))
+        }
+    }
+}
+
+// MARK: - Provider link button
+
+private struct ProviderLinkButton: View {
+    let iconName: String
+    let label:    String
+    let url:      URL
+    let tooltip:  String
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: { NSWorkspace.shared.open(url) }) {
+            HStack(spacing: 8) {
+                Image(iconName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+                Text(label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.primary.opacity(isHovered ? 0.04 : 0))
+            )
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
         }
     }
 }
