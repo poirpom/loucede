@@ -1,35 +1,61 @@
-<h1 align="center">loucedé</h1>
+# loucedé — Une IA au bout de tes doigts
 
-<p align="center">L'IA en loucedé, directement depuis votre barre des menus.</p>
+🌐 [loucede.app](https://loucede.app)
 
-<p align="center">
-  <a href="https://loucede.app">Site</a> · <a href="https://github.com/poirpom/loucede/issues">Signaler un bug</a>
-</p>
+Une application macOS effectuant des actions IA sur du texte sélectionné. Sans copier-coller, sans ouvrir un chat, sans attendre. Beaucoup plus rapide donc, mais surtout beaucoup moins chiant.
 
-<br />
+![loucedé](https://res.cloudinary.com/poirpom/image/upload/v1777481584/loucede/motto-home-CD_aqbzpz.png)
 
-## À propos
-
-**loucedé** est une application macOS qui vit dans la barre des menus et déclenche des actions IA sur le texte sélectionné, partout dans le système. Sélectionnez du texte dans n'importe quelle app, appuyez sur `⇧ + ⌥ + A`, choisissez une action — c'est fait.
-
-Votre clé API, votre modèle. Pas d'abonnement, pas d'intermédiaire, les requêtes partent directement chez le fournisseur.
-
-<br />
+---
 
 ## Fonctionnalités
 
-- **Actions personnalisées** — créez autant de prompts que vous voulez, chacun avec son emoji
-- **Sélection rapide** — touches 1-9, 0, - et = depuis le popup (compatible AZERTY/QWERTY)
-- **Trois fournisseurs** — OpenAI, Anthropic (Claude), Mistral
-- **Streaming** — la réponse s'affiche au fur et à mesure
-- **Confidentialité** — votre clé API parle directement au fournisseur, rien ne passe par nos serveurs
-- **Partout** — fonctionne dans toutes les apps, tous les champs de texte
+- Raccourci clavier configurable (par défaut ⌃+⌥+W)
+- Multi-providers : Anthropic, OpenAI, Mistral — au choix avec ta clé API
+- Streaming des réponses
+- Light/dark mode système
+- Mises à jour automatiques
+- Fonctionne partout : navigateur, mail, traitement de texte, PDF…
 
-<br />
+### 🌍 Traduire
+Français, anglais, espagnol, portugais, emojis.
+
+### 🔬 Analyser
+Détection d'incohérences, extraction d'arguments, analyse de biais, génération de questions.
+
+### ⚡ Transformer
+Résumé, correction de fautes, simplification, optimisation SEO, ton professionnel, concision, amélioration du style.
+
+### 🗂️ Structurer
+Extraction de recettes de cuisine, réorganisation logique, conversion en tableau Markdown, génération de todo lists.
+
+### 💡 Proposer
+Titres accrocheurs, plans structurés.
+
+Tu peux modifier ces actions, en désactiver, en créer de nouvelles ou exporter ta config depuis Réglages → Actions.
+
+---
+
+## Pourquoi pas un chat IA classique ?
+
+**Sans loucedé**, pour résumer un article web :
+sélectionner le texte → copier → ouvrir un onglet → attendre que ça charge → écrire un prompt → coller → entrée → attendre la réponse → la lire.
+
+**Avec loucedé** :
+sélectionner le texte → ⌃+⌥+W → choisir 🤏 Résume ce texte → c'est fait.
+
+Beaucoup plus rapide. Et surtout beaucoup moins chiant.
+
+---
 
 ## Installation
 
-Téléchargez la dernière version sur la [page des releases](https://github.com/poirpom/loucede/releases/latest), ou compilez depuis les sources :
+### Prérequis
+
+- macOS 15 (Sequoia) minimum
+- Xcode 16 minimum pour compiler depuis les sources
+
+### Compiler depuis les sources
 
 ```bash
 git clone https://github.com/poirpom/loucede.git
@@ -37,26 +63,45 @@ cd loucede
 open loucede.xcodeproj
 ```
 
-Puis compilez et lancez (`⌘R`).
+Lance avec `⌘R` depuis Xcode.
 
-### Configuration minimale
+> Un binaire notarisé sera disponible sur les [Releases GitHub](https://github.com/poirpom/loucede/releases) dès la sortie de la v1.0.
 
-- macOS 15 (Sequoia) ou plus récent
-- Xcode 26 ou plus récent pour compiler
-- Une clé API chez au moins un fournisseur : [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/settings/keys), ou [Mistral](https://console.mistral.ai/api-keys/)
+### Modèle économique
 
-<br />
+12 utilisations gratuites pour tester, puis 8€ en paiement unique (pas d'abonnement) sur [polar.sh](https://buy.polar.sh/polar_cl_NyddnsIaqM7gVRKFinwyIhM8iHqzoRrJaZfDi2HN0SO).
+
+Le coût d'utilisation des IA dépend ensuite du fournisseur que tu choisis (Mistral, Anthropic ou OpenAI), du modèle et de ton usage. En pratique : quelques euros par an grand max, payés directement au fournisseur — aucun rapport avec loucedé.
+
+---
+
+## Configuration
+
+1. **Permission Accessibilité** — au premier lancement, loucedé demande l'accès à l'API Accessibilité macOS pour lire le texte sélectionné. Autorise-le dans Réglages Système → Confidentialité et sécurité → Accessibilité.
+
+2. **Raccourci global** — par défaut `⌃⌥W`. Modifiable dans Réglages → Général.
+
+3. **Clé API** — dans Réglages → Général, colle ta clé API et choisis ton fournisseur :
+   - Anthropic : [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+   - OpenAI : [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+   - Mistral : [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
+
+---
 
 ## Contribuer
 
-Les PR sont les bienvenues. Ouvrez une issue avant les gros changements pour qu'on discute de la direction.
+Consulte [CONTRIBUTING.md](CONTRIBUTING.md) pour le guide de contribution, le style de code et comment soumettre une PR.
 
-<br />
+---
 
-## Licence et attribution
+## Licence
 
-loucedé est distribué sous **GPL v3** — voir [LICENSE](LICENSE).
+Distribué sous **[GPL v3](LICENSE)**.
 
-Il s'agit d'un fork francophone de **[TexTab](https://github.com/ELPROFUG0/TexTab)** par [ELPROFUG0](https://github.com/ELPROFUG0), lui aussi sous GPL v3. Merci à l'auteur original pour le travail de base.
+---
 
-Les modifications apportées par loucedé — localisation française, restriction aux trois fournisseurs OpenAI / Anthropic / Mistral, sélection des prompts par touches du haut du clavier, import/export JSON, changements d'architecture de licence, suppression des plugins — s'ajoutent au projet original en respectant la GPL v3. Le code reste libre et toute redistribution doit rester sous la même licence.
+## Crédits
+
+- Fork de **[TexTab](https://github.com/ELPROFUG0/TexTab)** par [ELPROFUG0](https://github.com/ELPROFUG0) — merci pour le travail de base
+- Gestion de licence : **[Polar.sh](https://polar.sh)**
+- APIs IA : **[Anthropic](https://anthropic.com)**, **[OpenAI](https://openai.com)**, **[Mistral](https://mistral.ai)**
