@@ -64,7 +64,7 @@ struct WelcomeStep: View {
 
                     // Get Started button - Black style
                     Button(action: onNext) {
-                        Text("Commencer")
+                        Text("Configurer")
                             .font(.system(size: 17, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 200, height: 52)

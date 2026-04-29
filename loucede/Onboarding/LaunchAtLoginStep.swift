@@ -106,7 +106,7 @@ struct LaunchAtLoginStep: View {
 
                     Text("Modifiable à tout moment dans les réglages.")
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "999999"))
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
 
                     Spacer()

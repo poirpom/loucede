@@ -96,7 +96,7 @@ struct ShortcutStep: View {
                     Spacer()
                         .frame(height: 16)
 
-                    Text("Clique sur la case ci-dessus pour enregistrer\nun nouveau raccourci. Modifiable à tout moment\ndans les réglages.")
+                    Text("Clique sur la case ci-dessus\npour enregistrer un nouveau raccourci.")
                         .font(.system(size: 12))
                         .foregroundColor(Color(hex: "999999"))
                         .lineSpacing(2)
@@ -107,7 +107,7 @@ struct ShortcutStep: View {
                     Button(action: {
                         onNext()
                     }) {
-                        Text("Suivant")
+                        Text("Continuer")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -128,7 +128,15 @@ struct ShortcutStep: View {
                     .buttonStyle(ShortcutNoFadeButtonStyle())
 
                     Spacer()
-                        .frame(height: 30)
+                        .frame(height: 10)
+
+                    Text("Modifiable à tout moment dans les réglages.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+
+                    Spacer()
+                        .frame(height: 20)
                 }
                 .padding(.horizontal, 32)
                 .padding(.trailing, 24)

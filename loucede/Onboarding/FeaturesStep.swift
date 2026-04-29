@@ -33,7 +33,8 @@ struct FeaturesStep: View {
                            title: "Copie ou colle",
                            detail: "Le résultat retourne dans l'app active.")
             }
-            .padding(.horizontal, 60)
+            .frame(maxWidth: 420)
+            .frame(maxWidth: .infinity)
 
             Spacer()
 
@@ -57,7 +58,6 @@ struct FeaturesStep: View {
                 Text(title).font(.system(size: 16, weight: .semibold))
                 Text(detail).font(.system(size: 13)).foregroundStyle(.secondary)
             }
-            Spacer()
         }
     }
 }
