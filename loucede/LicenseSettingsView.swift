@@ -38,7 +38,7 @@ struct LicenseSettingsView: View {
     @State private var activationError: String?
 
     /// Erreur transitoire lors de la génération du heroName via LLM.
-    /// Affichée brièvement sous le bouton « Désactiver cet appareil ».
+    /// Affichée brièvement sous la liste des appareils.
     @State private var heroNameError: String?
 
     /// Popover explicatif sur le sobriquet (clic sur le `info.circle`).
@@ -46,6 +46,30 @@ struct LicenseSettingsView: View {
     /// utilisateurs cliquent sans attendre le tooltip, le popover
     /// répond visiblement au clic.
     @State private var showHeroNamePopover: Bool = false
+
+    /// Activation que l'utilisateur veut désactiver (autre que le device
+    /// courant). Présent → déclenche la modale de confirmation dédiée
+    /// dont le wording inclut le label + la date d'activation. `nil` =
+    /// pas de modale ouverte. Pour désactiver le device courant, on
+    /// continue d'utiliser `showDeactivateConfirm` (même modale qu'avant
+    /// commit 3).
+    @State private var otherDeviceToDeactivate: PolarActivationDetail?
+
+    /// Set des `activation_id` actuellement en cours de désactivation.
+    /// Permet le spinner par ligne dans la liste — l'utilisateur peut
+    /// déclencher une autre désactivation en parallèle si besoin sans
+    /// bloquer toute l'UI.
+    @State private var deactivatingActivationIds: Set<String> = []
+
+    /// Présent quand `performActivate` a reçu une 403
+    /// `activationLimitReached`. Déclenche la sheet `ActivationLimitModal`
+    /// qui propose de libérer un slot puis retry l'activation.
+    @State private var showLimitReachedModal: Bool = false
+
+    /// La clé que l'utilisateur a tentée d'activer juste avant le 403.
+    /// Transmise à `ActivationLimitModal` qui s'en sert pour
+    /// `validate` + `getLicenseKey` + `deactivate` + retry `activate`.
+    @State private var pendingActivationKey: String = ""
 
     /// `true` si l'utilisateur a une vraie licence Polar (active ou
     /// offline), indépendamment du flag `#if DEBUG`. Utilisé pour
@@ -55,6 +79,17 @@ struct LicenseSettingsView: View {
     private var hasRealLicense: Bool {
         manager.status == .active || manager.status == .offline
     }
+
+    /// Formatter "DD/MM/YYYY" strict (locale POSIX, pas de
+    /// localisation système). Cohérent avec le pattern utilisé par
+    /// UsageTracker. Affiché dans la liste des appareils et la modale
+    /// de confirmation de désactivation.
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "dd/MM/yyyy"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
 
     var body: some View {
         ScrollView {
@@ -111,6 +146,42 @@ struct LicenseSettingsView: View {
             }
         } message: {
             Text("L'emplacement sera libéré chez loucedé : tu pourras réactiver cette clé sur un autre appareil.")
+        }
+        // Modale « désactiver un AUTRE device » (commit 3) — wording
+        // dédié avec label + date d'activation. Différente de la modale
+        // ci-dessus qui couvre uniquement « (cet appareil) ».
+        .alert(
+            "Désactiver \"\(otherDeviceToDeactivate?.label ?? "")\" ?",
+            isPresented: Binding(
+                get: { otherDeviceToDeactivate != nil },
+                set: { if !$0 { otherDeviceToDeactivate = nil } }
+            )
+        ) {
+            Button("Annuler", role: .cancel) { otherDeviceToDeactivate = nil }
+            Button("Désactiver", role: .destructive) {
+                if let device = otherDeviceToDeactivate {
+                    Task { await performDeactivateOther(device) }
+                }
+            }
+        } message: {
+            if let device = otherDeviceToDeactivate {
+                Text("L'appareil \"\(device.label)\" (activé le \(Self.dateFormatter.string(from: device.createdAt))) sera retiré de tes activations. Tu pourras toujours réactiver loucedé dessus plus tard si besoin.")
+            }
+        }
+        // Sheet 403 (commit 3) — limite d'activations atteinte. Affiche
+        // la liste des appareils, propose d'en désactiver un, retry
+        // l'activation automatiquement après libération du slot.
+        .sheet(isPresented: $showLimitReachedModal) {
+            ActivationLimitModal(
+                pendingKey: pendingActivationKey,
+                onSuccess: {
+                    keyInput = ""
+                    showLimitReachedModal = false
+                },
+                onDismiss: {
+                    showLimitReachedModal = false
+                }
+            )
         }
         .task {
             // Au montage : rafraîchir la liste des activations pour le
@@ -227,32 +298,19 @@ struct LicenseSettingsView: View {
                 infoRow(label: "Email", value: email)
             }
 
-            if let used = manager.activationsUsed, let limit = manager.activationsLimit {
-                infoRow(label: "Appareils activés", value: "\(used) / \(limit)")
-            } else if let limit = manager.activationsLimit {
-                // Fallback : si refreshActivations a échoué (réseau, scope
-                // token manquant, etc.), on affiche au moins la limite
-                // seule sans le compteur courant.
-                infoRow(label: "Limite d'appareils", value: "\(limit)")
-            }
             if let expires = manager.expiresAt {
                 infoRow(label: "Expire le", value: expires.formatted(date: .abbreviated, time: .omitted))
             }
 
-            Button(role: .destructive) {
-                showDeactivateConfirm = true
-            } label: {
-                HStack(spacing: 6) {
-                    if isDeactivating {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text("Désactiver cet appareil")
-                }
-                .frame(minWidth: 200)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isDeactivating)
-            .padding(.top, 8)
+            // Bloc « Mes appareils » (commit 3) — header avec compteur
+            // X/Y + liste des activations avec bouton « Désactiver » par
+            // ligne. Le bouton sur la ligne marquée « (cet appareil) »
+            // déclenche la modale `showDeactivateConfirm` existante
+            // (Phase 6.2) ; les autres lignes ouvrent la modale
+            // `otherDeviceToDeactivate` au wording dédié.
+            // Remplace le bouton bas « Désactiver cet appareil » de
+            // Phase 6.2 (devenu redondant avec la ligne du device courant).
+            devicesSection
 
             // Compteur d'utilisations total (visible uniquement si au
             // moins un usage enregistré).
@@ -268,6 +326,100 @@ struct LicenseSettingsView: View {
                     .frame(maxWidth: 320, alignment: .leading)
             }
         }
+    }
+
+    // MARK: - Devices section (commit 3 — cross-device deactivate)
+
+    /// Section « Mes appareils » : header avec compteur X/Y + liste
+    /// des activations Polar. Visible uniquement quand la licence est
+    /// active (cf. callers dans `activeView`).
+    @ViewBuilder
+    private var devicesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header : titre + compteur X/Y
+            HStack {
+                Text("Mes appareils")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let used = manager.activationsUsed, let limit = manager.activationsLimit {
+                    Text("\(used) / \(limit)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                } else if let limit = manager.activationsLimit {
+                    // Fallback : refreshActivations a échoué, limite
+                    // seule (récupérée par validate au démarrage).
+                    Text("Limite : \(limit)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Liste : placeholder de chargement si refresh pas encore
+            // arrivé, sinon les rows des activations.
+            if manager.activations.isEmpty && (manager.activationsLimit ?? 0) > 0 {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Chargement…")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(manager.activations) { activation in
+                    deviceRow(activation)
+                }
+            }
+        }
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Une ligne de la liste « Mes appareils ». Affiche le label de
+    /// l'activation (avec mention `(cet appareil)` si c'est le device
+    /// courant), la date d'activation, et un bouton « Désactiver » qui
+    /// ouvre la modale de confirmation appropriée. Pendant la
+    /// désactivation, un spinner remplace le bouton (par ligne, pas
+    /// global).
+    @ViewBuilder
+    private func deviceRow(_ activation: PolarActivationDetail) -> some View {
+        let isCurrent = activation.id == manager.currentActivationId
+        let isRowDeactivating = deactivatingActivationIds.contains(activation.id)
+
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(activation.label)
+                        .font(.system(size: 13, weight: .medium))
+                    if isCurrent {
+                        Text("(cet appareil)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text("Activé le \(Self.dateFormatter.string(from: activation.createdAt))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isRowDeactivating {
+                ProgressView().controlSize(.small)
+            } else {
+                Button(role: .destructive) {
+                    if isCurrent {
+                        showDeactivateConfirm = true
+                    } else {
+                        otherDeviceToDeactivate = activation
+                    }
+                } label: {
+                    Text("Désactiver")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     /// Ligne « Activée pour » avec deux modes :
@@ -511,6 +663,14 @@ struct LicenseSettingsView: View {
             // Succès : clear le champ
             keyInput = ""
             activationError = nil
+        } catch LicenseError.activationLimitReached {
+            // 403 (commit 3) : on ouvre la modale dédiée pour permettre
+            // à l'utilisateur de libérer un slot. La modale retry
+            // l'activate automatiquement après désactivation réussie.
+            // Pas d'activationError ici — sinon double signal côté UI
+            // (modal + texte d'erreur sous le formulaire).
+            pendingActivationKey = trimmed
+            showLimitReachedModal = true
         } catch let error as LicenseError {
             activationError = error.localizedDescription
         } catch {
@@ -532,6 +692,28 @@ struct LicenseSettingsView: View {
             // L'erreur est déjà dans manager.lastError (rendue par
             // l'erreur HTTP). On laisse le state actuel.
         }
+    }
+
+    /// Désactive un AUTRE device (pas celui-ci) côté Polar, sans wipe
+    /// du Keychain — la licence reste active sur cet appareil. Loader
+    /// par ligne via `deactivatingActivationIds` (Set) pour ne pas
+    /// bloquer toute l'UI si plusieurs désactivations s'enchaînent.
+    /// Erreurs silencieuses en V1 (peuplent `manager.lastError`, pas
+    /// de toast — note backlog V2 « Toast notifications pour erreurs
+    /// UX licence »).
+    private func performDeactivateOther(_ device: PolarActivationDetail) async {
+        deactivatingActivationIds.insert(device.id)
+        defer { deactivatingActivationIds.remove(device.id) }
+
+        do {
+            try await manager.deactivate(activationId: device.id)
+        } catch {
+            // Silent fail : `manager.lastError` est peuplé. La liste
+            // se rafraîchit via `refreshActivations()` dans le manager
+            // sur succès uniquement, donc en cas d'échec la ligne
+            // reste affichée et l'utilisateur peut retenter.
+        }
+        otherDeviceToDeactivate = nil
     }
 
     /// Ouvre le checkout Polar dans le navigateur par défaut.

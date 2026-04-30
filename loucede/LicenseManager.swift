@@ -154,6 +154,16 @@ final class LicenseManager: ObservableObject {
         hasLicense || hasTrialRemaining
     }
 
+    /// L'`activation_id` du device courant (depuis le Keychain). `nil`
+    /// pour les utilisateurs non licenciés ou pré-Session-3 sans cet
+    /// id en cache. Permet à l'UI (Réglages → Licence, section « Mes
+    /// appareils ») de marquer la ligne correspondante comme
+    /// `(cet appareil)` et d'aiguiller le bouton « Désactiver » vers
+    /// la modale de confirmation appropriée.
+    var currentActivationId: String? {
+        KeychainService.License.activationId
+    }
+
     private init() {
         loadFromKeychain()
     }
@@ -292,6 +302,43 @@ final class LicenseManager: ObservableObject {
             try await LicenseService.shared.deactivate(key: key, activationId: activationId)
             KeychainService.License.wipe()  // garde trial counter
             resetLocalState()
+        } catch let error as LicenseError {
+            lastError = error
+            throw error
+        }
+    }
+
+    /// Désactive une activation **arbitraire** (typiquement un autre
+    /// appareil que celui-ci) chez Polar. Ne touche PAS au Keychain
+    /// local — la licence reste active sur cet appareil, seul le slot
+    /// distant est libéré.
+    ///
+    /// Utilisé par :
+    /// - `LicenseSettingsView` : section « Mes appareils » → bouton
+    ///   « Désactiver » sur une ligne autre que le device courant
+    ///   (ex. ancien Mac vendu/perdu, déconnexion à distance).
+    /// - `ActivationLimitModal` : libération d'un slot avant retry du
+    ///   `/activate` qui a renvoyé 403 `activationLimitReached`.
+    ///
+    /// Pour désactiver **cet appareil**, utiliser `deactivate()` (sans
+    /// arg) qui wipe également le Keychain et reset l'état local.
+    ///
+    /// Throws sur erreur API. Sur succès, déclenche
+    /// `refreshActivations()` pour mettre à jour le compteur X/Y et
+    /// la liste affichée dans les Réglages.
+    func deactivate(activationId: String) async throws {
+        guard let key = KeychainService.License.key else {
+            // Pas de clé locale = on ne peut pas appeler /deactivate.
+            // Cas anormal : l'UI ne devrait pas exposer cette option
+            // si la licence n'est pas active. Throw pour signaler
+            // l'incohérence (visible dans `lastError` côté caller).
+            let error = LicenseError.invalidKey
+            lastError = error
+            throw error
+        }
+        do {
+            try await LicenseService.shared.deactivate(key: key, activationId: activationId)
+            await refreshActivations()
         } catch let error as LicenseError {
             lastError = error
             throw error
