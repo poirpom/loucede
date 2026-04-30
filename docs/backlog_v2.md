@@ -294,8 +294,9 @@ priorité
 
 Passe finale sur **toute** l'UI (popup, liste, résultat, réglages,
 onboarding) :
-- Contrastes : ratios AA/AAA sur les couleurs dark mode (`#2E2E2E`,
-  `#1B1C1C`, `#3F84F7`, textes secondaires)
+- Contrastes : ratios AA/AAA dans les deux modes (clair + sombre) —
+  vérifier `#2E2E2E`, `#1B1C1C`, `#3F84F7`, textes secondaires et leurs
+  équivalents clair
 - Tailles de texte : lisibilité minimum, cohérence footers / labels /
   boutons
 - Focus visible clavier partout (navigation ↑↓, Tab dans réglages)

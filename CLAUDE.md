@@ -1,7 +1,7 @@
 # loucedé — CLAUDE.md
 
 App macOS menu bar en Swift/SwiftUI. Fork de TexTab (GPL v3).
-Interface en français. Dark mode uniquement. Licence GPL v3.
+Interface en français. Suit le mode clair/sombre du système. Licence GPL v3.
 Bundle ID : `app.loucede.loucede`
 
 ---
@@ -42,7 +42,7 @@ Mettre à jour `docs/plan.md` à la fin de chaque session ou batch de commits.
 
 ## Conventions UI
 
-- **Dark mode uniquement** — `NSApp.appearance = .darkAqua` (ne pas modifier)
+- **Mode clair/sombre** — suit le système (forçage `darkAqua` retiré en commit 5ab993b)
 - **Police** : SF Pro partout — aucune référence à Nunito
 - **Couleurs** : popup `#2E2E2E` · zone inférieure `#1B1C1C` · sélection `#3F84F7`
 - **Rendu Markdown** dans la fenêtre résultat (swift-markdown-ui) — throttling 60 Hz via `pendingChunkBuffer`

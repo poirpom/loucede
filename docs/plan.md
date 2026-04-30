@@ -166,7 +166,7 @@ struct Prompt: Identifiable, Codable, Equatable {
 
 ### 7.1 Audit accessibilité visuelle (avant release)
 - Passe finale sur **toute** l'UI (popup, liste, résultat, réglages, onboarding)
-- Contrastes : vérifier ratios AA/AAA sur les couleurs dark mode retenues (`#2E2E2E`, `#1B1C1C`, `#3E65B5`, textes)
+- Contrastes : vérifier ratios AA/AAA dans les deux modes (clair + sombre), couleurs sombre actuelles `#2E2E2E`, `#1B1C1C`, `#3E65B5` + leurs équivalents clair + textes
 - Tailles de texte : lisibilité minimum, cohérence entre footers / labels / boutons
 - Focus visible clavier partout (navigation ↑↓, Tab dans réglages)
 - Test avec "Augmenter le contraste" macOS activé
@@ -177,7 +177,7 @@ struct Prompt: Identifiable, Codable, Equatable {
 | Session | Bloc | Contenu | Statut |
 |---------|------|---------|--------|
 | Session 3 | **8a — Modèle économique V1** | Mode debug `#if DEBUG` · Mécanisme réactivation Mac · Compteur activations X/Y (proxy Scaleway) | 🔴 BLOQUANT |
-| Session 4 | **7.1 — Audit accessibilité** | Contrastes AA/AAA dark mode · Focus clavier · Dynamic Type | 🟠 RECOMMANDÉ |
+| Session 4 | **7.1 — Audit accessibilité** | Contrastes AA/AAA clair + sombre · Focus clavier · Dynamic Type | 🟠 RECOMMANDÉ |
 | Session 5 | **Release 1.0** | Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release | 🔴 BLOQUANT |
 
 ## Ajouts hors plan initial (confirmés par project_loucede.md)
