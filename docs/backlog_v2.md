@@ -44,6 +44,31 @@ license-gated) devra alors observer via `@StateObject` ou
 `@ObservedObject` au lieu d'accéder via `LicenseManager.shared.hasLicense`
 en propriété figée.
 
+### Menu debug pour simuler états licence multiples
+
+**Origine** : Session 3 / Bloc 8a (2026-04-30) — V1 retient un override
+binaire `#if DEBUG hasLicense=true` ; insuffisant pour tester
+systématiquement les écrans d'erreur
+**Statut** : 🌱 À creuser
+
+Aujourd'hui le mode debug se résume à `#if DEBUG hasLicense=true`
+([LicenseManager.swift:79-90](loucede/LicenseManager.swift:79)). Pratique
+pour ne pas bloquer le dev, mais ça empêche de tester les écrans
+d'erreur licence (`.unlicensed`, `.expired`, `.revoked`, `.disabled`,
+`.offline`, `.validating`) sans dépendre d'une vraie clé Polar dans tel
+ou tel état.
+
+Idée : un menu debug (visible uniquement en builds `#if DEBUG`, dans
+Réglages → Licence ou onglet « Développeur » de Général) permettant de
+forcer le `LicenseManager.status` à n'importe quelle valeur de l'enum
+`Status`, plus un override pour `trialUsageCount`. Permettrait de
+faire un tour complet des écrans en quelques clics, sans toucher à
+Polar ni au Keychain.
+
+À creuser quand on aura besoin de tester finement l'UI d'erreur
+(typiquement avant la release 1.0 ou quand on touchera aux écrans
+revoked/disabled/expired).
+
 ### `UsageTracker` → `ObservableObject` injecté plutôt que singleton
 
 **Origine** : Phase 7 (singleton choisi pour V1 par simplicité)

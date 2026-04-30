@@ -73,9 +73,49 @@ final class LicenseManager: ObservableObject {
     /// considère la licence active même sans réseau (status = .offline).
     static let offlineGracePeriod: TimeInterval = 7 * 24 * 3600
 
-    /// Source de vérité pour les fonctionnalités license-gated. En
-    /// Debug, retourne toujours `true` pour ne pas bloquer les tests
-    /// pendant le dev (override compile-time, ne shippe pas en prod).
+    /// Source de vérité pour les fonctionnalités license-gated.
+    ///
+    /// En build Debug, retourne toujours `true` pour ne pas bloquer le
+    /// dev (override compile-time, ne shippe pas en prod). Cet override
+    /// est le **pivot unique** du mode debug : tout le reste cascade
+    /// automatiquement depuis `hasLicense` — pas besoin d'un `#if DEBUG`
+    /// supplémentaire ailleurs dans le code.
+    ///
+    /// ## Surfaces couvertes par cascade
+    ///
+    /// Les sites suivants deviennent automatiquement « gate ouverte » en
+    /// Debug parce qu'ils lisent `hasLicense` (directement ou via une
+    /// computed qui en dépend) :
+    ///
+    /// - `AboutView.swift:99` — bouton « Envoyer une suggestion »
+    ///   (direct : `.disabled(!hasLicense)`).
+    /// - `PopoverState.swift:167` — gate `runAction` via `canRunAction`
+    ///   (cascade `||` : `canRunAction = hasLicense || hasTrialRemaining`).
+    /// - `PopoverState.swift:195` — snapshot `consumesTrial` au lancement
+    ///   du stream (cascade `!` : `consumesTrial = !hasLicense` → pas
+    ///   d'incrément trial en Debug).
+    ///
+    /// ## Bypass intentionnels (n'utilisent PAS l'override)
+    ///
+    /// Certains sites dans `LicenseSettingsView` lisent directement
+    /// `status` ou `trialUsageCount` pour **ne PAS** être masqués par
+    /// l'override — afin que les écrans trial restent testables en Debug :
+    ///
+    /// - `LicenseSettingsView.swift:96` — computed local `hasRealLicense`
+    ///   (basé sur `status == .active || .offline`) pour décider
+    ///   d'afficher le compteur trial. Sans ce bypass, l'override
+    ///   masquerait toujours le compteur en Debug.
+    /// - `LicenseSettingsView.swift:425, :429` — `trialUsageCount` et
+    ///   `hasTrialRemaining` lus directement pour tester l'UI du trial.
+    ///
+    /// ## Limites
+    ///
+    /// L'override est **binaire** : `hasLicense=true` uniquement. Pour
+    /// tester les autres états (`.unlicensed`, `.expired`, `.revoked`,
+    /// `.disabled`, `.offline`, `.validating`), il faut aujourd'hui
+    /// toucher à Polar ou au Keychain manuellement. Item backlog V2 —
+    /// « Menu debug pour simuler états licence multiples » — pour un
+    /// override paramétrable au runtime.
     var hasLicense: Bool {
         #if DEBUG
         return true
