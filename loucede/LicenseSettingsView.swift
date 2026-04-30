@@ -112,6 +112,14 @@ struct LicenseSettingsView: View {
         } message: {
             Text("L'emplacement sera libéré chez loucedé : tu pourras réactiver cette clé sur un autre appareil.")
         }
+        .task {
+            // Au montage : rafraîchir la liste des activations pour le
+            // compteur X/Y (commit 2). Inclut un fallback de migration
+            // si licenseKeyId n'est pas encore en Keychain (utilisateurs
+            // pré-Session-3). Silent fail si réseau down — l'UI affiche
+            // la limite seule en fallback.
+            await manager.refreshActivations()
+        }
     }
 
     // MARK: - Status header (icône + titre)
@@ -219,7 +227,12 @@ struct LicenseSettingsView: View {
                 infoRow(label: "Email", value: email)
             }
 
-            if let limit = manager.activationsLimit {
+            if let used = manager.activationsUsed, let limit = manager.activationsLimit {
+                infoRow(label: "Appareils activés", value: "\(used) / \(limit)")
+            } else if let limit = manager.activationsLimit {
+                // Fallback : si refreshActivations a échoué (réseau, scope
+                // token manquant, etc.), on affiche au moins la limite
+                // seule sans le compteur courant.
                 infoRow(label: "Limite d'appareils", value: "\(limit)")
             }
             if let expires = manager.expiresAt {

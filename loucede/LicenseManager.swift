@@ -51,6 +51,19 @@ final class LicenseManager: ObservableObject {
     @Published private(set) var customerEmail: String?
     @Published private(set) var activationsLimit: Int?
     @Published private(set) var expiresAt: Date?
+
+    /// Nombre d'activations actuellement consommées (X dans le compteur
+    /// X/Y de Réglages → Licence). Populé par `refreshActivations()`.
+    /// `nil` tant que le fetch n'a pas réussi — l'UI affiche alors la
+    /// limite seule en fallback.
+    @Published private(set) var activationsUsed: Int?
+
+    /// Liste détaillée des activations en cours pour la licence active.
+    /// Populée par `refreshActivations()`. Vide tant que pas fetché ou
+    /// en cas d'erreur réseau. Sera consommée par l'UI cross-device
+    /// deactivate au commit 3.
+    @Published private(set) var activations: [PolarActivationDetail] = []
+
     @Published var lastError: LicenseError?
 
     /// Sobriquet super-héros généré une fois sur demande de
@@ -193,12 +206,19 @@ final class LicenseManager: ObservableObject {
             // Stockage Keychain
             KeychainService.License.key = key
             KeychainService.License.activationId = result.id
+            KeychainService.License.licenseKeyId = result.licenseKeyId
             KeychainService.License.lastKnownStatus = result.licenseKey.status.rawValue
             KeychainService.License.lastValidatedAt = Date()
             KeychainService.License.customerEmail = result.licenseKey.customer?.email
 
             // Update state
             updateStateFrom(licenseKey: result.licenseKey)
+
+            // Rafraîchit la liste des activations en background : elle
+            // vient de gagner cette nouvelle entrée, l'UI veut le X/Y à
+            // jour dès que possible. Non-await pour ne pas bloquer le
+            // retour de activate() sur ce 2e round-trip Polar.
+            Task { await refreshActivations() }
         } catch let error as LicenseError {
             status = .unlicensed
             lastError = error
@@ -243,6 +263,7 @@ final class LicenseManager: ObservableObject {
             KeychainService.License.lastKnownStatus = result.status.rawValue
             KeychainService.License.lastValidatedAt = Date()
             KeychainService.License.customerEmail = result.customer?.email
+            KeychainService.License.licenseKeyId = result.id
 
             // Update state
             updateStateFromValidated(result)
@@ -284,6 +305,54 @@ final class LicenseManager: ObservableObject {
         let next = trialUsageCount + 1
         trialUsageCount = next
         KeychainService.License.trialUsageCount = next
+    }
+
+    /// Récupère la liste détaillée des activations chez Polar et met à
+    /// jour `activationsUsed` (compteur X) et `activations[]`. Silent
+    /// fail en cas d'erreur réseau ou Polar — la limite Y reste
+    /// affichée seule en fallback dans l'UI, et la licence reste
+    /// fonctionnelle.
+    ///
+    /// Migration utilisateurs pré-Session-3 : leur `licenseKeyId` n'a
+    /// pas été persisté lors de leur activation initiale (ce code
+    /// n'existait pas). Si on a une `key` mais pas de `licenseKeyId`,
+    /// on déclenche un `validate()` pour le capturer avant de fetcher.
+    /// Coûte un round-trip Polar de plus au premier launch post-update,
+    /// gratuit ensuite (`licenseKeyId` persisté en Keychain).
+    ///
+    /// Le fallback de migration ne se déclenche pas à tort : `wipe()`
+    /// (KeychainService.swift) supprime systématiquement `key` ET
+    /// `licenseKeyId` ensemble. Donc `(licenseKeyId == nil && key != nil)`
+    /// ne peut se produire que sur migration pré-Session-3 ou rollback
+    /// partiel inattendu.
+    ///
+    /// `validate(silent:)` est non-throwing : ses erreurs sont
+    /// matérialisées via `status` / `lastError` en interne, donc pas
+    /// besoin de `try?` autour de l'appel ici.
+    ///
+    /// À appeler depuis `LicenseSettingsView.task` (au montage) et
+    /// après chaque mutation de la liste d'activations (activate
+    /// succeeded — déjà branché ; futur cross-device deactivate du
+    /// commit 3).
+    func refreshActivations() async {
+        if KeychainService.License.licenseKeyId == nil
+            && KeychainService.License.key != nil {
+            await validate(silent: true)
+        }
+
+        guard let id = KeychainService.License.licenseKeyId else { return }
+
+        do {
+            let result = try await LicenseService.shared.getLicenseKey(id: id)
+            if let acts = result.activations {
+                activations = acts
+                activationsUsed = acts.count
+            }
+        } catch {
+            // Silent fail. Status / hasLicense restent inchangés — la
+            // licence est toujours valide, on n'a juste pas la liste à
+            // afficher. UI affichera la limite seule en fallback.
+        }
     }
 
     // MARK: - Internals
@@ -368,6 +437,8 @@ final class LicenseManager: ObservableObject {
         status = .unlicensed
         customerEmail = nil
         activationsLimit = nil
+        activationsUsed = nil
+        activations = []
         expiresAt = nil
         heroName = nil
         lastError = nil

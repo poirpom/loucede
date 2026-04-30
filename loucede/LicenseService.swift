@@ -111,6 +111,23 @@ final class LicenseService {
         )
     }
 
+    /// Récupère la licence + sa liste détaillée des activations. Utilisée
+    /// pour afficher le compteur X/Y dans Réglages → Licence et (commit 3)
+    /// la liste des appareils activés pour permettre un cross-device
+    /// deactivate.
+    ///
+    /// Le proxy traduit ce `POST /get-license-key` en
+    /// `GET /v1/license-keys/{id}` côté Polar (voir `proxy/README.md`
+    /// pour la table de traduction et `proxy/handler.js` pour
+    /// l'implémentation).
+    func getLicenseKey(id: String) async throws -> PolarLicenseKey {
+        LicenseConfig.assertConfigured()
+        return try await postExpectingJSON(
+            path: "get-license-key",
+            body: ["license_key_id": id]
+        )
+    }
+
     // MARK: - Helpers réseau
 
     private func postExpectingJSON<R: Decodable>(path: String, body: [String: String]) async throws -> R {
@@ -243,6 +260,11 @@ struct PolarLicenseKey: Decodable {
     let lastValidatedAt: Date?
     let expiresAt: Date?
     let customer: PolarCustomer?
+    /// Liste des activations actuelles. Présente uniquement quand on
+    /// décode une réponse de `GET /v1/license-keys/{id}` (via le proxy
+    /// `/get-license-key`). Absente sur les réponses de `/activate` —
+    /// d'où l'optionnel, qui se décode en `nil` quand le champ manque.
+    let activations: [PolarActivationDetail]?
 }
 
 /// Forme courte d'une activation (sans la `license_key` parente),
@@ -251,6 +273,21 @@ struct PolarLicenseKey: Decodable {
 struct PolarActivationBase: Decodable {
     let id: String
     let label: String?
+}
+
+/// Détail d'une activation incluse dans la liste retournée par
+/// `GET /v1/license-keys/{id}` (champ `activations`). Contient ce qu'il
+/// faut pour afficher la liste des appareils dans Réglages → Licence
+/// (label, dates) et (commit 3) y attacher un bouton « Désactiver ».
+///
+/// Conforme à `Identifiable` pour `ForEach` direct sur la liste.
+struct PolarActivationDetail: Decodable, Identifiable {
+    let id: String
+    let licenseKeyId: String
+    let label: String
+    let createdAt: Date
+    let modifiedAt: Date?
+    // `meta` (key/value) volontairement ignoré : pas exploité côté UI.
 }
 
 /// Customer associé à la licence — email utile pour afficher dans

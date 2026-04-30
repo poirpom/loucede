@@ -111,6 +111,7 @@ extension KeychainService {
 
         private static let keyAccount             = "loucede.license.key"
         private static let activationIdAccount    = "loucede.license.activationId"
+        private static let licenseKeyIdAccount    = "loucede.license.licenseKeyId"
         private static let trialUsageCountAccount = "loucede.license.trialUsageCount"
         private static let lastValidatedAtAccount = "loucede.license.lastValidatedAt"
         private static let lastKnownStatusAccount = "loucede.license.lastKnownStatus"
@@ -130,6 +131,22 @@ extension KeychainService {
         static var activationId: String? {
             get { KeychainService.read(service: service, account: activationIdAccount) }
             set { setOrDelete(account: activationIdAccount, value: newValue) }
+        }
+
+        /// L'`id` Polar de la licence (UUID, distinct de `key` et de
+        /// `activationId`). Persisté au premier `/activate` réussi puis
+        /// re-confirmé à chaque `/validate`. Utilisé par
+        /// `LicenseService.getLicenseKey(id:)` pour récupérer la liste
+        /// des activations (compteur X/Y dans Réglages → Licence +
+        /// futur cross-device deactivate).
+        ///
+        /// Pour les utilisateurs pré-Session-3 (qui ont activé avant que
+        /// ce code n'existe), cette valeur est `nil` au premier launch
+        /// post-update. `LicenseManager.refreshActivations()` détecte
+        /// ce cas et déclenche un `validate()` pour la peupler.
+        static var licenseKeyId: String? {
+            get { KeychainService.read(service: service, account: licenseKeyIdAccount) }
+            set { setOrDelete(account: licenseKeyIdAccount, value: newValue) }
         }
 
         /// Compteur du trial gratuit (12 utilisations max). Stocké en
@@ -206,6 +223,7 @@ extension KeychainService {
         static func wipe(includingTrialCounter: Bool = false) {
             KeychainService.delete(service: service, account: keyAccount)
             KeychainService.delete(service: service, account: activationIdAccount)
+            KeychainService.delete(service: service, account: licenseKeyIdAccount)
             KeychainService.delete(service: service, account: lastValidatedAtAccount)
             KeychainService.delete(service: service, account: lastKnownStatusAccount)
             KeychainService.delete(service: service, account: customerEmailAccount)

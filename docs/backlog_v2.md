@@ -193,6 +193,70 @@ Notion via un Zap configuré côté admin.
 Un seul redéploiement pour les 3 ajouts → réduit le risque de
 régression et la friction.
 
+### Comparaison timing-safe sur `LOUCEDE_APP_SECRET` (proxy)
+
+**Origine** : audit Session 3 (2026-04-30) — `handler.js` compare le
+header `X-Loucede-App-Key` au secret via `!==` (strict equal JS), donc
+en temps non-constant
+**Statut** : 🌱 À creuser
+
+Aujourd'hui [`proxy/handler.js`](proxy/handler.js) compare le header
+reçu au secret env `LOUCEDE_APP_SECRET` via
+`appKey !== process.env.LOUCEDE_APP_SECRET`. JS court-circuite la
+comparaison au premier byte différent → théoriquement exploitable par
+un attaquant qui mesurerait le RTT pour deviner le secret caractère par
+caractère.
+
+Mitigation : utiliser `crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))`
+en s'assurant que les deux buffers ont la même longueur (sinon
+`timingSafeEqual` throw) — wrapper avec un fallback constant-time sur la
+longueur.
+
+Pas critique en V1 : le secret fait 32 octets (entropie élevée), le RTT
+serveur Scaleway varie naturellement (jitter masque le signal), et même
+si compromis l'attaquant n'aurait gagné que le droit de spammer le
+proxy (le `POLAR_TOKEN` ne fuit pas).
+
+### Logging structuré côté proxy
+
+**Origine** : audit Session 3 (2026-04-30) — `handler.js` ne produit
+aucun log
+**Statut** : 🌱 À creuser
+
+[`proxy/handler.js`](proxy/handler.js) ne loggue rien, donc diagnostic
+à l'aveugle si quelque chose part en vrille (auth qui rate, Polar lent,
+op inconnue spammée…).
+
+Idée : ajouter un log structuré JSON par requête avec :
+- `op` (activate, validate, deactivate, get-license-key)
+- `status` (code HTTP renvoyé)
+- `duration_ms` (durée du forward Polar)
+- `request_id` (UUID généré par requête, retourné en header)
+
+Surtout PAS : le body, les secrets, les keys, ni les credentials. Les
+logs Scaleway Functions sont consultables dans la console côté admin.
+
+### Request ID dans les réponses 502 du proxy
+
+**Origine** : audit Session 3 (2026-04-30) — `handler.js` renvoie
+`{error: "Polar unreachable", detail: String(e)}` en 502, ce qui peut
+fuiter du contenu non maîtrisé du moteur fetch
+**Statut** : 🌱 À creuser
+
+Aujourd'hui en cas d'erreur fetch vers Polar, le proxy retourne
+l'erreur stringifiée brute dans le champ `detail` du body 502. Risque
+mineur : exposition d'info interne (chemins, versions Node, stack
+traces tronquées) qui ne devrait pas atterrir côté client.
+
+Mitigation : remplacer le `detail: String(e)` par un `request_id` UUID
+généré par requête, loggé côté serveur (via le logging structuré
+ci-dessus) avec le détail réel. Le client n'a alors qu'un identifiant
+opaque pour signaler l'incident, le détail reste dans Scaleway.
+
+Pas critique en V1 : la stringification de l'erreur fetch est en pratique
+peu informative (`ENOTFOUND`, `ETIMEDOUT`…), mais hygiène à mettre en
+place quand on touchera au logging structuré.
+
 ---
 
 ## UX Réglages
