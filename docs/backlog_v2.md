@@ -435,6 +435,29 @@ Travail technique :
 l'UI actuelle. Pas urgent : si l'UI actuelle est jugée bien, on
 n'investit pas le temps de refactorer.
 
+### Toast notifications pour erreurs UX licence
+
+**Origine** : Session 3 commit 3 (2026-04-30) — V1 silent fail sur
+erreurs réseau pendant cross-device deactivate / retry échoué
+(peuplent `manager.lastError` mais pas de feedback visible côté UI)
+**Statut** : 🌱 À creuser
+
+Aujourd'hui les opérations de désactivation depuis Réglages → Licence
+(`performDeactivateOther`) fail silencieusement en cas d'erreur
+réseau ou Polar — l'utilisateur clique « Désactiver », rien ne se
+passe visiblement, et il ne sait pas si ça a marché. Idem pour
+`ActivationLimitModal` quand un retry échoue avec une erreur non-403.
+
+Idée : système de toast notifications réutilisable (similaire au
+`ConfirmationToast` qui existe déjà dans `PopoverView` pour
+« Copié ✓ » / « Collé ✓ ») mais pour les erreurs : « Désactivation
+échouée — réessaie. », « Limite atteinte mais le slot n'a pas pu
+être libéré. », etc.
+
+Périmètre potentiel : `LicenseSettingsView.performDeactivateOther`,
+`ActivationLimitModal.performDeactivateAndRetry`, possiblement
+d'autres surfaces qui silent-fail aujourd'hui.
+
 ---
 
 ## UX Popup

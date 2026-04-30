@@ -172,11 +172,11 @@ struct Prompt: Identifiable, Codable, Equatable {
 - Test avec "Augmenter le contraste" macOS activé
 - Test avec Dynamic Type / taille police système augmentée si pertinent
 
-### Phase 7 — État restant (~85 %)
+### Phase 7 — État restant (~92 %)
 
 | Session | Bloc | Contenu | Statut |
 |---------|------|---------|--------|
-| Session 3 | **8a — Modèle économique V1** | Mode debug `#if DEBUG` · Mécanisme réactivation Mac · Compteur activations X/Y (proxy Scaleway) | 🔴 BLOQUANT |
+| Session 3 | **8a — Modèle économique V1** | Mode debug `#if DEBUG` · Mécanisme réactivation Mac · Compteur activations X/Y (proxy Scaleway) | ✅ TERMINÉE 2026-04-30 |
 | Session 4 | **7.1 — Audit accessibilité** | Contrastes AA/AAA clair + sombre · Focus clavier · Dynamic Type | 🟠 RECOMMANDÉ |
 | Session 5 | **Release 1.0** | Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release | 🔴 BLOQUANT |
 
@@ -395,6 +395,19 @@ Trois itérations sur le placement du logo loucedé dans la popup principale (ma
 - Ferrage horizontal : 12pt du bord droit (aligné sur les badges ⌘+touche des actionRows)
 - `pointerCursor()` au survol + `.help("Ouvrir les Réglages")` pour le tooltip natif
 - `Image(nsImage: NSApp.applicationIconImage)` — composite système avec masque squircle déjà appliqué
+
+### Session 3 — Bloc 8a livré + correctif doc (2026-04-30) — ✅ TERMINÉE
+
+3 sous-tâches du Bloc 8a livrées en une session, plus un correctif doc préliminaire. 4 commits poussés sur `origin/main` (hashes recréés via `git am` depuis le worktree CC) :
+
+| # | Tâche | Commit (main) |
+|---|---|---|
+| 0 | Correctif doc : suppression mentions « dark-only » obsolètes (post commit 5ab993b qui avait reverté le forçage `darkAqua`). Touche `CLAUDE.md`, `docs/plan.md`, `docs/backlog_v2.md`. | `cbdf0e8` |
+| 8a.1 | Mode debug `#if DEBUG hasLicense=true` — audit complet de la couverture par cascade (`canRunAction`, `consumesTrial`), documentation détaillée dans `LicenseManager.swift`, note backlog V2 « Menu debug pour simuler états licence multiples ». | `8a49a1c` |
+| 8a.2 | Compteur X/Y appareils activés. Proxy : nouvelle op `/get-license-key` (POST app → GET Polar), refactor `ALLOWED_OPS` array → `OPS` map de descriptors. Source proxy versionnée dans `proxy/handler.js` + `proxy/README.md`. Swift : `LicenseService.getLicenseKey(id:)`, `PolarActivationDetail`, `licenseKeyId` persisté en Keychain (cascade dans `wipe()`), `refreshActivations()` avec fallback migration pré-Session-3, UI affiche « X / Y » avec fallback « Limite : Y ». 3 notes audit proxy en backlog V2 (timing-safe, logging structuré, request_id 502). | `75aa01e` |
+| 8a.3 | Cross-device deactivate UI + flux 403. Section « Mes appareils » dans Réglages → Licence avec bouton « Désactiver » par ligne, mention `(cet appareil)`, modale différenciée (current vs other). `ActivationLimitModal` (nouveau, ~230 lignes) pour le 403 avec retry auto. Suppression du bouton bas « Désactiver cet appareil » de Phase 6.2 (devenu redondant). Note backlog V2 « Toast notifications pour erreurs UX licence ». | `2e9902f` |
+
+Conventions worktree CC ↔ repo principal documentées dans `CLAUDE.md` à la suite.
 
 ### Questions d'architecture à trancher (utilisateur)
 

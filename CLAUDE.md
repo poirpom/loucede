@@ -58,28 +58,27 @@ Mettre à jour `docs/plan.md` à la fin de chaque session ou batch de commits.
 
 ---
 
+## Workflow worktree CC ↔ repo principal
+
+CC opère dans un worktree git isolé (`.claude/worktrees/...`). Xcode build depuis le repo principal (`~/Developer/loucede`). Pour propager les modifs CC :
+
+1. CC fait ses commits dans le worktree.
+2. CC génère un `git format-patch` par commit en fin de session.
+3. L'utilisateur applique chaque patch dans le repo principal via `git am`.
+4. Pas de push depuis le worktree, pas d'édition manuelle dans le repo principal pendant qu'une session CC est en cours.
+
+---
+
 ## État V1 — ce qui reste à faire
 
 ### Tâches actives (dans l'ordre)
 
-- [ ] **Correctifs immédiats** (voir section Correctifs ci-dessous) — à traiter en priorité avant Phase 6.2
-- [ ] **Phase 6.2** — Système de licence Creem.io (`LicenseManager` ObservableObject + Keychain + UI Réglages → Licence). Stub `LicenseManager.swift` déjà en place. Lire `creem-integration.md` avant de coder.
-- [ ] **Phase 6.3** — Onglet « Mises à jour » auto-refresh dans Réglages (via `UpdateChecker`, GitHub Releases)
-- [ ] **Phase 7** — Nettoyage & release (entitlements, Info.plist, onboarding, README.md FR, build + notarisation)
+- [ ] **Session 4 — Audit accessibilité** (Phase 7.1) — Contrastes AA/AAA dans les deux modes (clair + sombre), focus clavier, Dynamic Type
+- [ ] **Session 5 — Release 1.0** — Bump version, notarisation, DMG, GitHub Release
 
 ### Phases terminées — ne pas retoucher sans raison explicite
-Phases 0 → 5, 6.1 (annulée), 6.4 → 6.17 : **toutes terminées**.
+Phases 0 → 5, 6.1 (annulée), 6.2 → 6.18 et Session 3 (Bloc 8a — mode debug + compteur X/Y + cross-device deactivate) : **toutes terminées**.
 Voir `plan.md` pour le détail complet.
-
----
-
-## Correctifs à appliquer (avant Phase 6.2)
-
-- [ ] **Supprimer le modèle d'action « Extrais les actions concrètes »** — redondant avec « Génère un plan d'actions », résultat moins pertinent aux tests
-- [ ] **Remplacer l'emoji du modèle « Génère un plan d'actions »** par ✅. Propager le changement aux actions utilisateurs qui utilisent ce modèle (migration douce)
-- [ ] **Onglet « À propos »** — remplacer les étincelles SF Symbol par le logo loucedé (fichier fourni par l'utilisateur au moment du prompt)
-- [ ] **Menubar icon** — mettre à jour avec les nouveaux fichiers `menubar.png` / `menubar@2x.png` fournis (padding réduit, logo plus grand). Fichiers fournis par l'utilisateur.
-- [ ] **Onglets Réglages** — remplacer les intitulés texte seul par le format `pictogramme + titre` (cohérent macOS). Exemple : `⚙️ Général`, `📝 Actions`, `🤖 Modèles`, `ℹ️ À propos`
 
 ---
 
@@ -138,6 +137,8 @@ Quand l'utilisateur envoie exactement l'un de ces mots-clés seuls, exécute l'a
 
 **!bugs** → Affiche la section "Bugs connus" de `CLAUDE.md`. Aucune introduction.
 
-**!proxy** → Affiche l'URL du proxy Scaleway et rappelle les 3 endpoints disponibles (activate, validate, deactivate). Aucune introduction.
+**!proxy** → Lis et affiche le contenu de `proxy/README.md` (table des endpoints, env vars, déploiement, sécurité). Aucune introduction.
 
 **!phase [X]** → Lis `docs/plan.md` et affiche uniquement le contenu de la Phase X demandée, en Markdown rendu avec cases à cocher (✅ → `- [x]`, ⏭️ → `- [ ]`, ❌ → `- ~~texte barré~~`). Aucune introduction, aucun commentaire.
+
+**!commands** → Liste toutes les commandes !slash disponibles (relit la présente section « Raccourcis de session ») avec leur description courte. Format : tableau Markdown avec colonnes [Nom | Description]. Aucune introduction.
