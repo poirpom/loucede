@@ -39,8 +39,15 @@ struct ActivationStep: View {
             // héritent automatiquement de la taille de police et de la
             // couleur `.secondary` via `foregroundStyle`. Le rendu
             // template du MenuBarIcon est respecté.
+            // Note alignement vertical : `.baselineOffset(-2)` sur le
+            // PNG template MenuBarIcon — sans ça, le PNG s'aligne sur
+            // la bounding box du Text (donc flotte au-dessus de la
+            // ligne) au lieu de la baseline. Le SF Symbol `gearshape`
+            // ne nécessite pas d'offset (alignment baseline natif).
+            // Valeur négative = décalage vers le bas (convention
+            // SwiftUI documentée).
             (Text("Tes réglages sont accessibles depuis la barre des menus ")
-             + Text(Image("MenuBarIcon"))
+             + Text(Image("MenuBarIcon")).baselineOffset(-2)
              + Text(" comme depuis l'appli ")
              + Text(Image(systemName: "gearshape"))
              + Text("."))
