@@ -23,7 +23,10 @@ struct ShortcutStep: View {
         store.mainShortcutModifiers + [store.mainShortcut]
     }
 
-    private let brandOrange = Color(hex: "ff7300")
+    // Étape 4 : orange pastel (Raccourci → catalogue d'actions sur le site).
+    // Le keyboard image (couleurs neutres gris/argent/noir) reste lisible
+    // sur ce fond pastel ; trade-off "perte du peps orange vif" assumé.
+    private let brandOrange = Color(hex: "FFE4CC")
 
     var body: some View {
         HStack(spacing: 0) {

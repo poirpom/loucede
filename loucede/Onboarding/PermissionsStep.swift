@@ -14,11 +14,17 @@ struct PermissionsStep: View {
     @State private var isWaiting = false
     @State private var rotationAngle: Double = 0
     @State private var permissionCheckTimer: Timer?
-    @State private var floatAnimationActive = false
 
-    // Couleurs encore utilisées : right panel status bubble (accentYellow,
-    // accentGreen) + lien help (stepBlue). Les variants Dark, qui étaient
-    // les shadows 3D du bouton, sont supprimées avec le bouton custom.
+    // Étape 4 (palette pastel) :
+    // - `brandPastel` (#CAE9FF) : fond du right panel — bleu pastel,
+    //   "système = configuration" (parallèle avec le site web)
+    // - `accentYellow` / `accentGreen` : conservés pour le signal
+    //   conditionnel de la status bubble (spinner + texte) — la
+    //   transition de couleur est portée par la bubble centrale
+    //   (et triplée par le SF Symbol gauche ajouté Étape 2 +
+    //   le label du bouton primaire)
+    // - `stepBlue` : conservé pour le lien "J'ai besoin d'aide"
+    private let brandPastel  = Color(hex: "CAE9FF")
     private let accentYellow = Color(hex: "F9A825")
     private let accentGreen  = Color(hex: "00ce44")
     private let stepBlue     = Color(hex: "2196F3")
@@ -123,22 +129,11 @@ struct PermissionsStep: View {
             }
             .frame(width: 340)
 
-            // Right side - Yellow/Green with status
+            // Right side — bleu pastel (Étape 4). Les FloatingIcon
+            // décoratifs sont retirés : le pastel apporte assez de douceur,
+            // plus besoin de remplir le vide visuel d'un fond uni vif.
             ZStack {
-                (hasAccessibilityPermission ? accentGreen : accentYellow)
-                    .animation(.easeInOut(duration: 0.5), value: hasAccessibilityPermission)
-
-                // Floating decorative icons with premium animation
-                GeometryReader { geo in
-                    ForEach(0..<8, id: \.self) { index in
-                        FloatingIcon(
-                            index: index,
-                            isGranted: hasAccessibilityPermission,
-                            geoSize: geo.size,
-                            isAnimating: floatAnimationActive
-                        )
-                    }
-                }
+                brandPastel
 
                 // Status indicator
                 HStack(spacing: 10) {
@@ -179,10 +174,6 @@ struct PermissionsStep: View {
             checkAccessibilityPermission()
             startRotationAnimation()
             startPermissionCheck()
-            // Start floating animation
-            withAnimation {
-                floatAnimationActive = true
-            }
         }
         .onDisappear {
             permissionCheckTimer?.invalidate()
@@ -209,97 +200,6 @@ struct PermissionsStep: View {
         isWaiting = true
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
-        }
-    }
-}
-
-// MARK: - Floating Icon Component
-
-struct FloatingIcon: View {
-    let index: Int
-    let isGranted: Bool
-    let geoSize: CGSize
-    let isAnimating: Bool
-
-    @State private var floatOffset: CGFloat = 0
-    @State private var iconRotation: Double = 0
-    @State private var iconScale: CGFloat = 1.0
-
-    private let icons = ["xmark.circle", "exclamationmark.triangle", "shield.slash", "hand.raised.slash", "nosign", "circle.slash", "xmark.octagon", "exclamationmark.circle"]
-    private let grantedIcons = ["checkmark.circle", "checkmark.seal", "hand.thumbsup", "star.fill", "sparkles", "heart.fill", "shield.checkered", "checkmark.circle.fill"]
-
-    private let positions: [(CGFloat, CGFloat)] = [
-        (0.85, 0.10), (0.12, 0.22), (0.82, 0.38),
-        (0.18, 0.52), (0.78, 0.65), (0.08, 0.78),
-        (0.88, 0.85), (0.50, 0.92)
-    ]
-
-    private let sizes: [CGFloat] = [22, 26, 20, 28, 24, 22, 26, 20]
-    private let opacities: [Double] = [0.18, 0.22, 0.15, 0.25, 0.20, 0.17, 0.23, 0.16]
-
-    // Different animation parameters for each icon
-    private var floatDuration: Double {
-        [3.2, 2.8, 3.5, 2.6, 3.0, 3.3, 2.9, 3.1][index]
-    }
-
-    private var floatDistance: CGFloat {
-        [12, 15, 10, 18, 14, 11, 16, 13][index]
-    }
-
-    private var rotationAmount: Double {
-        [8, -10, 12, -8, 10, -12, 8, -10][index]
-    }
-
-    private var animationDelay: Double {
-        Double(index) * 0.15
-    }
-
-    var body: some View {
-        Image(systemName: isGranted ? grantedIcons[index % grantedIcons.count] : icons[index % icons.count])
-            .font(.system(size: sizes[index], weight: .medium))
-            .foregroundColor(.white.opacity(opacities[index]))
-            .scaleEffect(iconScale)
-            .rotationEffect(.degrees(iconRotation))
-            .offset(y: floatOffset)
-            .position(
-                x: geoSize.width * positions[index].0,
-                y: geoSize.height * positions[index].1
-            )
-            .onAppear {
-                startFloatingAnimation()
-            }
-            .onChange(of: isGranted) { _, newValue in
-                // Celebration animation when granted
-                if newValue {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
-                        iconScale = 1.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            iconScale = 1.0
-                        }
-                    }
-                }
-            }
-    }
-
-    private func startFloatingAnimation() {
-        // Floating up and down
-        withAnimation(
-            .easeInOut(duration: floatDuration)
-            .repeatForever(autoreverses: true)
-            .delay(animationDelay)
-        ) {
-            floatOffset = floatDistance
-        }
-
-        // Gentle rotation
-        withAnimation(
-            .easeInOut(duration: floatDuration * 1.2)
-            .repeatForever(autoreverses: true)
-            .delay(animationDelay)
-        ) {
-            iconRotation = rotationAmount
         }
     }
 }

@@ -17,9 +17,10 @@ struct LaunchAtLoginStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
-    // brandBlue utilisé pour le right panel illustration ; brandBlueDark
-    // supprimé (était le shadow 3D du bouton custom).
-    private let brandBlue = Color(hex: "0095ff")
+    // Étape 4 : lavande pastel (Démarrage). LaunchPowerIllustration
+    // adapté avec un cercle bleu loucedé central pour rester visible
+    // sur ce fond clair.
+    private let brandPastel = Color(hex: "DCD0F5")
 
     var body: some View {
         HStack(spacing: 0) {
@@ -102,9 +103,9 @@ struct LaunchAtLoginStep: View {
             }
             .frame(width: 340)
 
-            // MARK: - Côté droit : illustration bleue
+            // MARK: - Côté droit : illustration lavande pastel
             ZStack {
-                brandBlue
+                brandPastel
 
                 VStack(spacing: 24) {
                     Spacer()
@@ -152,22 +153,28 @@ private struct BenefitRow: View {
 
 private struct LaunchPowerIllustration: View {
     @State private var pulseScale: CGFloat = 1.0
-    @State private var glowOpacity: Double = 0.4
+    @State private var glowOpacity: Double = 0.30
+
+    /// Bleu interface loucedé — cohérent avec la sélection popup, le
+    /// bouton "Désactiver cet appareil" en signal, etc.
+    private let interfaceBlue = Color(hex: "3F84F7")
 
     var body: some View {
         ZStack {
-            // Outer pulsing glow ring
+            // Outer pulsing glow ring — blanc translucide (halo lumineux)
+            // sur fond lavande pastel + cercle bleu central.
             Circle()
                 .stroke(Color.white.opacity(glowOpacity), lineWidth: 4)
                 .frame(width: 200, height: 200)
                 .scaleEffect(pulseScale)
 
-            // Inner static circle
+            // Inner static circle — bleu interface loucedé solide pour
+            // rester visible sur fond lavande pastel.
             Circle()
-                .fill(Color.white.opacity(0.18))
+                .fill(interfaceBlue)
                 .frame(width: 160, height: 160)
 
-            // Power symbol
+            // Power symbol — blanc, contraste parfait sur le bleu central.
             Image(systemName: "power")
                 .font(.system(size: 84, weight: .medium))
                 .foregroundColor(.white)
@@ -194,7 +201,7 @@ private struct LaunchHintTooltip: View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "0095ff"))
+                .foregroundColor(Color(hex: "6B4FB8"))
             Text("Toujours là quand tu en as besoin")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color(hex: "333333"))

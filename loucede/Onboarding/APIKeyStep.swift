@@ -31,10 +31,10 @@ struct APIKeyStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
-    // Couleur violet encore utilisée pour l'illustration right panel.
-    // brandVioletDark + colorScheme supprimés (étaient le shadow 3D du
-    // bouton custom, remplacé par .borderedProminent).
-    private let brandViolet = Color(hex: "6C5CE7")
+    // Étape 4 : vert pastel (Clé API → modèles d'API sur le site).
+    // ProviderCards adaptées en blanc translucide pour rester lisibles
+    // sur ce fond clair (cf. APIKeyProviderIllustration ci-dessous).
+    private let brandPastel = Color(hex: "C8EDD8")
 
     @State private var keyInput           = ""
     @State private var badgeState         = BadgeState.none
@@ -281,7 +281,7 @@ struct APIKeyStep: View {
 
     private var rightPanel: some View {
         ZStack {
-            brandViolet
+            brandPastel
             APIKeyProviderIllustration()
         }
         .frame(maxWidth: .infinity)
@@ -525,20 +525,22 @@ private struct ProviderCard: View {
                 .frame(width: 36, height: 36)
             Text(name)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundStyle(.primary)
         }
         .frame(width: 88, height: 98)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                // Fond sombre translucide — rend les logos blancs (OpenAI)
-                // et colorés (Mistral, Claude) visibles sur fond violet
-                .fill(Color(hex: "2a1f6e").opacity(0.65))
+                // Étape 4 : fond blanc translucide pour relief clair sur
+                // fond vert pastel. Les 3 logos (Mistral coloré, OpenAI
+                // teal+blanc, Claude orange/cream) ont leur propre fond
+                // intégré, ils restent visibles sur card blanche.
+                .fill(Color.white.opacity(0.65))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.4), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.28), radius: 14, x: 0, y: 6)
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
     }
 }
 
@@ -549,7 +551,7 @@ private struct APIKeyHintTooltip: View {
         HStack(spacing: 8) {
             Image(systemName: "key.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(hex: "6C5CE7"))
+                .foregroundColor(Color(hex: "3D8B5C"))
             Text("Au choix, ta propre clé")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color(hex: "333333"))
