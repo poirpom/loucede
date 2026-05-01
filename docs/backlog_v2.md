@@ -524,6 +524,27 @@ Améliorable via :
 
 Cosmétique, pas bloquant — le crash était la priorité, c'est résolu.
 
+### Refonte palette pastel sur branche dédiée
+
+**Origine** : Session 4 cadrage roadmap (2026-05-01) — tentative quick-win
+≤ 30 min en Session 5 retenue pour V1, refonte cohérente reportée en V1.1
+**Statut** : 🌱 À creuser
+
+La palette actuelle (sombre `#2E2E2E` / `#1B1C1C`, sélection `#3F84F7`)
+hérite de TexTab. Une palette pastel pourrait mieux refléter l'identité
+loucedé (interface FR, ton plus chaleureux que l'upstream).
+
+Plan en deux temps :
+1. **Session 5 (V1)** — tentative quick-win ≤ 30 min : si on peut donner
+   un coup de pinceau pastel sans casser la cohérence ni demander de
+   grosses retouches, on garde. Sinon on revert et on diffère.
+2. **V1.1** — branche dédiée `palette-pastel`, expérimentation libre,
+   merge ou abandon selon ressenti après tests.
+
+Périmètre potentiel : popup principale, sélection liste, settings,
+onboarding, modales licence. Garder la cohérence sur **tous** les écrans
+pour ne pas créer un effet patchwork.
+
 ---
 
 ## UX Onboarding
@@ -592,6 +613,28 @@ L'ensemble peut encore respirer davantage : espacement inter-lignes, marge botto
 avant les boutons, ou refonte en layout centré pleine hauteur.
 
 À réévaluer post-V1 si des retours signalent une impression d'étroitesse.
+
+### Animations natives SwiftUI — fork des HTML/CSS-style animations actuelles
+
+**Origine** : Session 4 cadrage roadmap (2026-05-01) — reporté en V1.1
+**Statut** : 🌱 À creuser
+
+L'onboarding actuel utilise des animations qui ressemblent à du HTML/CSS
+(transitions opacity/scale, easeInOut basique) plutôt que des animations
+natives SwiftUI plus expressives (`symbolEffect`, `phaseAnimator`,
+particle effects, etc.).
+
+Idée : porter les animations existantes vers des équivalents natifs
+SwiftUI plus modernes, en particulier sur l'onboarding :
+- Symboles SF avec `.symbolEffect(.bounce / .pulse / .variableColor)`
+- `phaseAnimator` pour des séquences scriptées
+- Transitions step-à-step plus fluides (`matchedGeometryEffect`)
+
+Bénéfices : plus modernes visuellement, moins de code custom, meilleur
+rendu sur les nouvelles versions macOS.
+
+À grouper avec d'éventuelles refontes UI plus larges en V1.1 (notamment
+la refonte palette pastel ci-dessus).
 
 ---
 
@@ -888,6 +931,37 @@ Body: { "metadata": { "heroName": "Shadow Falcon" } }
 Scaleway pour un nice-to-have. La newsletter / segmentation n'est pas
 en place côté admin pour l'instant. À implémenter quand le besoin
 serveur sera concret.
+
+### Approche B — Interception automatique de la clé via polling Polar API post-checkout
+
+**Origine** : Session 4 cadrage roadmap (2026-05-01) — Session 6 retient
+l'approche A (email pour récupérer la clé) en V1 ; l'approche B est
+reportée en V1.1
+**Statut** : 🌱 À creuser
+
+L'**approche A retenue pour V1** (Session 6) : après le checkout
+Polar embarqué (WKWebView), l'utilisateur reçoit un email Polar avec
+sa clé licence et la copie-colle manuellement dans le formulaire
+d'activation de l'app. Simple et robuste, mais 2 actions utilisateur
+en plus.
+
+L'**approche B (V1.1)** : après le checkout, l'app commence à poller
+l'API Polar (probablement `GET /v1/customer-portal/license-keys/` ou
+équivalent côté proxy) pour détecter automatiquement la clé fraîchement
+créée pour ce customer. Active la licence sans action utilisateur,
+expérience plus fluide.
+
+Pré-requis :
+- Endpoint dédié côté proxy Scaleway (avec rate limiting pour éviter
+  l'abus pendant un polling actif)
+- Connaître l'email du customer (capturé pendant le checkout WKWebView
+  via JS bridge ou attribut DOM exposé par Polar)
+- Stratégie de polling avec timeout raisonnable (~30 s avec backoff)
+- Fallback explicite vers approche A si polling timeout (afficher le
+  formulaire de saisie manuelle de la clé)
+
+À tester quand A sera stable et qu'on aura les premiers retours
+utilisateurs sur le flow d'achat.
 
 ---
 

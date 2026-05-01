@@ -172,13 +172,24 @@ struct Prompt: Identifiable, Codable, Equatable {
 - Test avec "Augmenter le contraste" macOS activé
 - Test avec Dynamic Type / taille police système augmentée si pertinent
 
-### Phase 7 — État restant (~92 %)
+### Phase 7 — État restant (~95 %)
+
+Roadmap V1 actualisée (décision 2026-05-01) — l'audit accessibilité initialement prévu en Session 4 est reporté en V1.1. Sessions 5/6/7 cadrées pour la release.
 
 | Session | Bloc | Contenu | Statut |
 |---------|------|---------|--------|
 | Session 3 | **8a — Modèle économique V1** | Mode debug `#if DEBUG` · Mécanisme réactivation Mac · Compteur activations X/Y (proxy Scaleway) | ✅ TERMINÉE 2026-04-30 |
-| Session 4 | **7.1 — Audit accessibilité** | Contrastes AA/AAA clair + sombre · Focus clavier · Dynamic Type | 🟠 RECOMMANDÉ |
-| Session 5 | **Release 1.0** | Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release | 🔴 BLOQUANT |
+| Session 4 | **Investigation bugs + nettoyage** | Bug A reliquats TexTab · Bug B onboarding réaffiché (résout aussi Bug C Alfred bloqué en cascade) · housekeeping doc | ✅ TERMINÉE 2026-05-01 |
+| Session 5 | **Refonte onboarding** | Premier écran enrichi · boutons système · mention Réglages dans dernier écran · tentative pastel ≤30 min | 🟠 RECOMMANDÉ |
+| Session 6 | **Popup d'achat embedded Polar** | Approche A (email pour récupérer la clé) · WKWebView checkout | 🔴 BLOQUANT |
+| Session 7 | **Release v1.0.0** | Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release | 🔴 BLOQUANT |
+
+#### V1.1 et au-delà (reportés post-release)
+
+- **Audit accessibilité complet** (ex Phase 7.1) — Contrastes AA/AAA clair + sombre, focus clavier, Dynamic Type
+- **Approche B Polar** — polling de l'API Polar pour interception automatique de la clé post-checkout (vs email manuel de l'approche A)
+- **Refonte palette pastel** sur branche dédiée pour expérimentation cohérente sur tous les écrans
+- **Animations natives SwiftUI** — fork des HTML/CSS-style animations actuelles vers des équivalents natifs (notamment onboarding)
 
 ## Ajouts hors plan initial (confirmés par project_loucede.md)
 - **Mistral** comme 3e provider (plan mentionnait OpenAI + Anthropic)
@@ -408,6 +419,17 @@ Trois itérations sur le placement du logo loucedé dans la popup principale (ma
 | 8a.3 | Cross-device deactivate UI + flux 403. Section « Mes appareils » dans Réglages → Licence avec bouton « Désactiver » par ligne, mention `(cet appareil)`, modale différenciée (current vs other). `ActivationLimitModal` (nouveau, ~230 lignes) pour le 403 avec retry auto. Suppression du bouton bas « Désactiver cet appareil » de Phase 6.2 (devenu redondant). Note backlog V2 « Toast notifications pour erreurs UX licence ». | `2e9902f` |
 
 Conventions worktree CC ↔ repo principal documentées dans `CLAUDE.md` à la suite.
+
+### Session 4 — Investigation bugs + nettoyage (2026-05-01) — ✅ TERMINÉE
+
+3 bugs identifiés au démarrage de session, résolus en chaîne. Bug C s'est révélé être une cascade du Bug B et n'a pas demandé de correction propre. Plus housekeeping doc en clôture.
+
+| # | Bug / tâche | Détail |
+|---|---|---|
+| Bug A | Reliquats TexTab | Variable `catIcon` renommée en `menuBarIcon` dans `loucedeApp.swift:189-191` (héritage TexTab où l'icône menu bar était un chat). Suppression de `loucede/ChatView.swift` (534 lignes de dead code, 0 référence externe). 2 notes ajoutées au backlog V2 (diagnostic icône TexTab résiduelle si réapparition + refactor naming `IconPickerView.swift` → `ActionIconView.swift`). |
+| Bug B | Onboarding réaffiché à chaque démarrage | `OnboardingManager.shared.completeOnboarding()` n'était appelé NULLE PART → la valeur UserDefaults `loucede_has_completed_onboarding` restait toujours `false`. Fix : ajout de cet appel dans le callback `onComplete` côté `loucedeApp.swift` (avant `setupApp()` pour robustesse). |
+| Bug C | Alfred bloqué au démarrage | Résolu en cascade par Bug B — testé après reboot complet : loucedé démarre sans onboarding, Alfred fonctionne immédiatement. Pas de correction propre nécessaire. |
+| Housekeeping | Doc + roadmap | Retrait mention obsolète `creem-integration.md` dans CLAUDE.md « Mémoire projet » (Polar a remplacé Creem en Phase 6.2). Roadmap V1 actualisée (Sessions 5/6/7 = onboarding refonte / popup checkout Polar / release). Audit accessibilité reporté en V1.1. |
 
 ### Questions d'architecture à trancher (utilisateur)
 

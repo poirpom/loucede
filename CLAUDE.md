@@ -109,7 +109,6 @@ Tout item du `backlog.md` est hors scope V1, notamment :
 |---|---|
 | `docs/plan.md` | Plan complet 7 phases, décisions, commits |
 | `docs/backlog_v2.md` | ~25 items post-V1 structurés par thématique |
-| `~/.claude/projects/…/memory/creem-integration.md` | SKILL.md Creem.io (1017 lignes) pour Phase 6.2 |
 | `~/.claude/projects/…/memory/user_profile.md` | Profil et préférences utilisateur |
 | Git log | Historique immuable des actions effectuées |
 
