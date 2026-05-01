@@ -143,6 +143,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showOnboarding() {
         let onboardingView = OnboardingView(onComplete: { [weak self] in
+            // Persiste AVANT toute autre action : si setupApp() plante,
+            // la complétion est quand même enregistrée et l'onboarding
+            // ne se réaffichera pas au prochain lancement.
+            OnboardingManager.shared.completeOnboarding()
             self?.onboardingWindow?.close()
             self?.onboardingWindow = nil
             self?.setupApp()
