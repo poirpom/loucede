@@ -92,7 +92,7 @@ struct PermissionsStep: View {
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 16)
                         .transition(.opacity.combined(with: .scale))
                     }
 

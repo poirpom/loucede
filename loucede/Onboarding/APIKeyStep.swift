@@ -103,25 +103,26 @@ struct APIKeyStep: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Spacer().frame(height: 8)
+                Spacer().frame(height: 16)
 
                 skipButton
 
                 Spacer().frame(height: 6)
 
-                // Avertissement factuel — discret mais informatif
+                // Avertissement factuel — discret mais informatif. Ferré
+                // gauche pour cohérence avec le reste du panneau.
                 Text("Une clé API est nécessaire pour utiliser loucedé.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Color(hex: "F39C12"))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
 
                 Spacer().frame(height: 4)
 
                 Text("Modifiable à tout moment dans les réglages.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer().frame(height: 24)
             }
@@ -227,22 +228,22 @@ struct APIKeyStep: View {
 
     /// Action plus engagée que le simple skip — l'utilisateur force-pass
     /// après une erreur de validation. `.bordered` (pas `.plain`) pour
-    /// signaler que c'est une décision active.
+    /// signaler que c'est une décision active. Content-sized, ferré
+    /// gauche via le parent VStack(.leading).
     private var continueAnywayButton: some View {
         Button("Continuer quand même", action: saveAndContinue)
             .buttonStyle(.bordered)
             .controlSize(.regular)
-            .frame(maxWidth: .infinity)
     }
 
     /// Skip total — `.plain` discret pour ne pas concurrencer le bouton
-    /// primaire « Valider ».
+    /// primaire « Valider ». Content-sized, ferré gauche via le parent
+    /// VStack(.leading).
     private var skipButton: some View {
         Button("Configurer plus tard", action: { onNext() })
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
     }
 
     // MARK: - Provider quick-links

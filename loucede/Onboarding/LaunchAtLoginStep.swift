@@ -75,17 +75,17 @@ struct LaunchAtLoginStep: View {
                     }
 
                     Spacer()
-                        .frame(height: 12)
+                        .frame(height: 16)
 
                     // Bouton skip : "Pas maintenant" reste .plain (action
-                    // mineure pour utilisateurs qui veulent passer rapidement)
+                    // mineure pour utilisateurs qui veulent passer rapidement),
+                    // ferré gauche pour cohérence avec le reste du panneau.
                     Button("Pas maintenant") {
                         // Pas d'appel à setEnabled(false) — l'état par défaut
                         // de SMAppService est `.notRegistered`, donc rien à faire.
                         onNext()
                     }
                     .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
 
                     Spacer()
                         .frame(height: 6)
@@ -93,7 +93,7 @@ struct LaunchAtLoginStep: View {
                     Text("Modifiable à tout moment dans les réglages.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Spacer()
                         .frame(height: 24)

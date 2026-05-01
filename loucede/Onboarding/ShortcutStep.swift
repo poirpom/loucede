@@ -115,12 +115,12 @@ struct ShortcutStep: View {
                     }
 
                     Spacer()
-                        .frame(height: 10)
+                        .frame(height: 14)
 
                     Text("Modifiable à tout moment dans les réglages.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Spacer()
                         .frame(height: 20)
