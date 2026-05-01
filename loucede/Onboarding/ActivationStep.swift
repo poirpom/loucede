@@ -33,8 +33,10 @@ struct ActivationStep: View {
             HStack(spacing: 16) {
                 Button("Retour", action: onBack)
                     .buttonStyle(.bordered)
+                    .controlSize(.regular)
                 Button("Terminer", action: onComplete)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
 
             Spacer().frame(height: 30)

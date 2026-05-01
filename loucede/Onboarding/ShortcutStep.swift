@@ -103,29 +103,16 @@ struct ShortcutStep: View {
 
                     Spacer()
 
-                    // Next button
-                    Button(action: {
-                        onNext()
-                    }) {
-                        Text("Continuer")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                ZStack {
-                                    // Bottom shadow layer (3D effect) - darker orange
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(Color(hex: "cc5c00"))
-                                        .offset(y: 5)
+                    // Boutons système : Retour secondaire + Continuer primaire
+                    HStack(spacing: 12) {
+                        Button("Retour", action: onBack)
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
 
-                                    // Main button
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(brandOrange)
-                                }
-                            )
+                        Button("Continuer", action: onNext)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
                     }
-                    .buttonStyle(ShortcutNoFadeButtonStyle())
 
                     Spacer()
                         .frame(height: 10)
@@ -546,14 +533,5 @@ struct KeyboardHintArrow: Shape {
         path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
         path.closeSubpath()
         return path
-    }
-}
-
-// MARK: - No Fade Button Style
-
-struct ShortcutNoFadeButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(1)
     }
 }

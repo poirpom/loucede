@@ -99,41 +99,12 @@ struct WelcomeStep: View {
 
     // MARK: - Bouton "Commencer"
 
-    /// Bouton noir avec effet 3D (shadow inférieure). Style hérité du
-    /// précédent WelcomeStep — sera basculé en bouton système en
-    /// Étape 2 (boutons système sur les 5 écrans).
+    /// Bouton système `.borderedProminent` accent macOS, taille `.large`
+    /// (cohérence native + impact visuel pour onboarding). Étape 2 :
+    /// remplace le custom 3D black hérité de TexTab.
     private var commencerButton: some View {
-        Button(action: onNext) {
-            Text("Commencer")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 200, height: 52)
-                .background(
-                    ZStack {
-                        // Bottom shadow layer (3D effect)
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(hex: "333333"))
-                            .offset(y: 5)
-
-                        // Main button
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(hex: "1a1a1a"))
-                    }
-                )
-        }
-        .buttonStyle(WelcomeNoFadeButtonStyle())
-    }
-}
-
-// MARK: - No Fade Button Style
-//
-// Conservé pour Étape 1. Sera retiré en Étape 2 quand le bouton sera
-// basculé en `.borderedProminent` (style système qui gère son propre
-// feedback de tap).
-
-struct WelcomeNoFadeButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(1)
+        Button("Commencer", action: onNext)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
     }
 }

@@ -40,8 +40,12 @@ struct FeaturesStep: View {
             Spacer()
 
             HStack(spacing: 16) {
-                Button("Retour", action: onBack).buttonStyle(.bordered)
-                Button("Continuer", action: onNext).buttonStyle(.borderedProminent)
+                Button("Retour", action: onBack)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                Button("Continuer", action: onNext)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
 
             Spacer().frame(height: 30)

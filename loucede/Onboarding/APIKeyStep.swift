@@ -31,9 +31,10 @@ struct APIKeyStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
-    private let brandViolet     = Color(hex: "6C5CE7")
-    private let brandVioletDark = Color(hex: "5649C0")
-    @Environment(\.colorScheme) private var colorScheme
+    // Couleur violet encore utilisée pour l'illustration right panel.
+    // brandVioletDark + colorScheme supprimés (étaient le shadow 3D du
+    // bouton custom, remplacé par .borderedProminent).
+    private let brandViolet = Color(hex: "6C5CE7")
 
     @State private var keyInput           = ""
     @State private var badgeState         = BadgeState.none
@@ -88,7 +89,13 @@ struct APIKeyStep: View {
 
                 Spacer()
 
-                validateButton
+                // Boutons système : Retour secondaire + Valider primaire
+                HStack(spacing: 12) {
+                    Button("Retour", action: onBack)
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                    validateButton
+                }
 
                 if showContinueAnyway {
                     Spacer().frame(height: 10)
@@ -206,59 +213,36 @@ struct APIKeyStep: View {
 
     private var validateButton: some View {
         Button(action: { Task { await performValidate() } }) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if isValidating {
-                    ProgressView().controlSize(.small).tint(.white)
+                    ProgressView().controlSize(.small)
                 }
                 Text(isValidating ? "Validation…" : "Valider et continuer")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                ZStack {
-                    // Shadow 3D — uniquement quand le bouton est actif pour éviter
-                    // la transparence mutuelle "pâteuse" en disabled + dark mode
-                    if isValidateEnabled {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(brandVioletDark)
-                            .offset(y: 5)
-                    }
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isValidateEnabled ? brandViolet : brandViolet.opacity(0.4))
-                }
-            )
-            .shadow(
-                color: colorScheme == .dark && isValidateEnabled
-                    ? brandViolet.opacity(0.25) : .clear,
-                radius: 4, x: 0, y: 2
-            )
         }
-        .buttonStyle(APIKeyNoFadeButtonStyle())
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
         .disabled(!isValidateEnabled)
     }
 
+    /// Action plus engagée que le simple skip — l'utilisateur force-pass
+    /// après une erreur de validation. `.bordered` (pas `.plain`) pour
+    /// signaler que c'est une décision active.
     private var continueAnywayButton: some View {
-        Button(action: saveAndContinue) {
-            Text("Continuer quand même")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(brandViolet)
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-        }
-        .buttonStyle(.plain)
+        Button("Continuer quand même", action: saveAndContinue)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .frame(maxWidth: .infinity)
     }
 
+    /// Skip total — `.plain` discret pour ne pas concurrencer le bouton
+    /// primaire « Valider ».
     private var skipButton: some View {
-        Button(action: { onNext() }) {
-            Text("Configurer plus tard")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-        }
-        .buttonStyle(.plain)
+        Button("Configurer plus tard", action: { onNext() })
+            .buttonStyle(.plain)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
     }
 
     // MARK: - Provider quick-links
@@ -630,14 +614,6 @@ private struct ProviderLinkButton: View {
                 NSCursor.pop()
             }
         }
-    }
-}
-
-// MARK: - Button style
-
-private struct APIKeyNoFadeButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(1)
     }
 }
 

@@ -17,8 +17,9 @@ struct LaunchAtLoginStep: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
-    private let brandBlue     = Color(hex: "0095ff")
-    private let brandBlueDark = Color(hex: "0070cc")
+    // brandBlue utilisé pour le right panel illustration ; brandBlueDark
+    // supprimé (était le shadow 3D du bouton custom).
+    private let brandBlue = Color(hex: "0095ff")
 
     var body: some View {
         HStack(spacing: 0) {
@@ -59,47 +60,32 @@ struct LaunchAtLoginStep: View {
 
                     Spacer()
 
-                    // Bouton primaire : activer
-                    Button(action: {
-                        LaunchAtLoginManager.shared.setEnabled(true)
-                        onNext()
-                    }) {
-                        Text("Activer")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                ZStack {
-                                    // Bottom shadow layer (3D effect)
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(brandBlueDark)
-                                        .offset(y: 5)
+                    // Boutons système : Retour secondaire + Activer primaire
+                    HStack(spacing: 12) {
+                        Button("Retour", action: onBack)
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
 
-                                    // Main button
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(brandBlue)
-                                }
-                            )
+                        Button("Activer") {
+                            LaunchAtLoginManager.shared.setEnabled(true)
+                            onNext()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
-                    .buttonStyle(LaunchAtLoginNoFadeButtonStyle())
 
                     Spacer()
                         .frame(height: 12)
 
-                    // Bouton secondaire : passer
-                    Button(action: {
+                    // Bouton skip : "Pas maintenant" reste .plain (action
+                    // mineure pour utilisateurs qui veulent passer rapidement)
+                    Button("Pas maintenant") {
                         // Pas d'appel à setEnabled(false) — l'état par défaut
                         // de SMAppService est `.notRegistered`, donc rien à faire.
                         onNext()
-                    }) {
-                        Text("Pas maintenant")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
 
                     Spacer()
                         .frame(height: 6)
@@ -229,15 +215,6 @@ private struct LaunchHintTooltip: View {
                 floatOffset = -6
             }
         }
-    }
-}
-
-// MARK: - No Fade Button Style
-
-private struct LaunchAtLoginNoFadeButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(1)
     }
 }
 

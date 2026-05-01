@@ -16,12 +16,12 @@ struct PermissionsStep: View {
     @State private var permissionCheckTimer: Timer?
     @State private var floatAnimationActive = false
 
-    // Colors (button — stays vibrant in both modes)
-    private let accentYellow     = Color(hex: "F9A825")
-    private let accentYellowDark = Color(hex: "F57F17")
-    private let accentGreen      = Color(hex: "00ce44")
-    private let accentGreenDark  = Color(hex: "00a838")
-    private let stepBlue         = Color(hex: "2196F3")
+    // Couleurs encore utilisées : right panel status bubble (accentYellow,
+    // accentGreen) + lien help (stepBlue). Les variants Dark, qui étaient
+    // les shadows 3D du bouton, sont supprimées avec le bouton custom.
+    private let accentYellow = Color(hex: "F9A825")
+    private let accentGreen  = Color(hex: "00ce44")
+    private let stepBlue     = Color(hex: "2196F3")
 
 
     var body: some View {
@@ -79,33 +79,42 @@ struct PermissionsStep: View {
 
                     Spacer()
 
-                    // 3D Duolingo-style button
-                    Button(action: {
-                        if hasAccessibilityPermission {
-                            onNext()
-                        } else {
-                            grantPermissions()
+                    // Signal visuel "permission accordée" — uniquement quand
+                    // hasAccessibilityPermission == true. Étape 2 : remplace
+                    // le toggle de couleur du bouton par un signal SF Symbol
+                    // dédié (cohérence avec accent macOS uniforme sur les
+                    // boutons primaires).
+                    if hasAccessibilityPermission {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.shield.fill")
+                                .foregroundStyle(.green)
+                            Text("Permission accordée")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
                         }
-                    }) {
-                        Text(hasAccessibilityPermission ? "Continuer" : "Autoriser l'accès")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                ZStack {
-                                    // Bottom shadow layer (3D effect) - lighter color
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(hasAccessibilityPermission ? Color(hex: "58d965") : Color(hex: "FFD54F"))
-                                        .offset(y: 5)
-
-                                    // Main button - original color
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(hasAccessibilityPermission ? Color(hex: "00ce44") : accentYellow)
-                                }
-                            )
+                        .padding(.bottom, 4)
+                        .transition(.opacity.combined(with: .scale))
                     }
-                    .buttonStyle(PermissionsNoFadeButtonStyle())
+
+                    // Boutons système : Retour secondaire + primaire toggle
+                    // ("Autoriser l'accès" / "Continuer" selon état).
+                    HStack(spacing: 12) {
+                        Button("Retour", action: onBack)
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+
+                        Button(action: {
+                            if hasAccessibilityPermission {
+                                onNext()
+                            } else {
+                                grantPermissions()
+                            }
+                        }) {
+                            Text(hasAccessibilityPermission ? "Continuer" : "Autoriser l'accès")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    }
 
                     Spacer()
                         .frame(height: 30)
@@ -355,11 +364,3 @@ struct PermissionCheckItem: View {
     }
 }
 
-// MARK: - No Fade Button Style
-
-struct PermissionsNoFadeButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(1)
-    }
-}
