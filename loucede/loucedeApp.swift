@@ -186,9 +186,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            if let catIcon = NSImage(named: "MenuBarIcon") {
-                catIcon.isTemplate = true
-                button.image = catIcon
+            if let menuBarIcon = NSImage(named: "MenuBarIcon") {
+                menuBarIcon.isTemplate = true
+                button.image = menuBarIcon
             } else {
                 button.image = NSImage(systemSymbolName: "text.cursor", accessibilityDescription: "loucedé")
             }

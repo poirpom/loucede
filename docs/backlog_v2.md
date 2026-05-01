@@ -257,6 +257,48 @@ Pas critique en V1 : la stringification de l'erreur fetch est en pratique
 peu informative (`ENOTFOUND`, `ETIMEDOUT`…), mais hygiène à mettre en
 place quand on touchera au logging structuré.
 
+### Diagnostic icône TexTab résiduelle (cache macOS / DerivedData stale)
+
+**Origine** : Session 4 Bug A — Faab a observé une fois l'icône TexTab
+(le chat du projet upstream) dans la barre des menus à la place de
+l'icône loucedé, lors d'un lancement CC en Session 3. Diagnostic Bug A
+a confirmé que tous les assets et le code sont propres (icône loucedé
+partout). Probablement un cache macOS ou un DerivedData stale.
+**Statut** : 🌱 À creuser
+
+Si l'incident se reproduit (icône TexTab visible dans la status bar
+au lancement de loucedé), commencer par :
+1. `killall Dock` — force le rafraîchissement de la barre de menus
+2. Xcode → Product → Clean Build Folder (`⌘⇧K`)
+3. `rm -rf ~/Library/Developer/Xcode/DerivedData/loucede-*`
+4. Si subsiste : `sudo rm -rf /Library/Caches/com.apple.iconservices.store` (cache d'icônes système, demande logout)
+
+Vérifier aussi qu'aucune ancienne build TexTab.app ne traîne dans
+`/Applications`, `~/Downloads`, ou la Corbeille (LaunchServices peut
+re-référencer son icône).
+
+Si reproductible sur build clean depuis un commit récent, ouvrir un
+ticket dédié.
+
+### Refactor naming fichiers post-fork (IconPickerView → ActionIconView)
+
+**Origine** : Session 4 Bug A diagnostic — `IconPickerView.swift`
+contient désormais `ActionIconView` + `EmojiPickerButton` (Phase 6.10),
+le nom de fichier ne reflète plus son contenu réel
+**Statut** : 🌱 À creuser
+
+Le fichier [IconPickerView.swift](loucede/IconPickerView.swift) a été
+volontairement conservé sous son nom d'origine en Phase 6.10 « pour
+éviter un remaniement du projet Xcode », mais son contenu actuel est :
+- `ActionIconView` (composant d'affichage emoji + fallback gris)
+- `EmojiPickerButton` (bouton-emoji ouvrant le picker système ancré)
+
+Le renommer en `ActionIconView.swift` (ou `EmojiViews.swift`) pour
+cohérence. Pas urgent : le contenu n'est pas mensonger, mais introduit
+du bruit dans `git blame` quand quelqu'un cherche le composant
+`ActionIconView` par nom de fichier. À grouper avec d'autres petits
+refactors de naming si jamais on en a d'autres.
+
 ---
 
 ## UX Réglages
