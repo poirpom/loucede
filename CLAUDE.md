@@ -73,11 +73,11 @@ CC opère dans un worktree git isolé (`.claude/worktrees/...`). Xcode build dep
 
 ### Tâches actives (dans l'ordre)
 
-- [ ] **Session 4 — Audit accessibilité** (Phase 7.1) — Contrastes AA/AAA dans les deux modes (clair + sombre), focus clavier, Dynamic Type
-- [ ] **Session 5 — Release 1.0** — Bump version, notarisation, DMG, GitHub Release
+- [ ] **Session 6 — Popup d'achat embedded Polar** — Approche A (email pour récupérer la clé) · WKWebView checkout
+- [ ] **Session 7 — Release v1.0.0** — Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release
 
 ### Phases terminées — ne pas retoucher sans raison explicite
-Phases 0 → 5, 6.1 (annulée), 6.2 → 6.18 et Session 3 (Bloc 8a — mode debug + compteur X/Y + cross-device deactivate) : **toutes terminées**.
+Phases 0 → 5, 6.1 (annulée), 6.2 → 6.18, Session 3 (Bloc 8a — mode debug + compteur X/Y + cross-device deactivate), Session 4 (bugs + cleanup) et Session 5 (refonte onboarding + palette pastel) : **toutes terminées**.
 Voir `plan.md` pour le détail complet.
 
 ---

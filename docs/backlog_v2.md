@@ -524,26 +524,25 @@ Améliorable via :
 
 Cosmétique, pas bloquant — le crash était la priorité, c'est résolu.
 
-### Refonte palette pastel sur branche dédiée
+### ~~Refonte palette pastel sur branche dédiée~~ ✅ ADOPTÉE en Session 5 (2026-05-02)
 
 **Origine** : Session 4 cadrage roadmap (2026-05-01) — tentative quick-win
-≤ 30 min en Session 5 retenue pour V1, refonte cohérente reportée en V1.1
-**Statut** : 🌱 À creuser
+≤ 30 min en Session 5 retenue pour V1, refonte cohérente initialement
+reportée en V1.1
+**Statut** : ✅ Adoptée — Session 5 Étape 4
 
-La palette actuelle (sombre `#2E2E2E` / `#1B1C1C`, sélection `#3F84F7`)
-hérite de TexTab. Une palette pastel pourrait mieux refléter l'identité
-loucedé (interface FR, ton plus chaleureux que l'upstream).
+La tentative quick-win a finalement permis d'adopter la palette pastel
+sur **les 5 écrans d'onboarding** avec adaptations ciblées des
+illustrations (cf. plan.md → Session 5 → Étape 4). Mapping retenu :
+Welcome rose `#FFD6E0` · Permissions bleu `#CAE9FF` · Shortcut orange
+`#FFE4CC` · APIKey vert `#C8EDD8` · LaunchAtLogin lavande `#DCD0F5`.
 
-Plan en deux temps :
-1. **Session 5 (V1)** — tentative quick-win ≤ 30 min : si on peut donner
-   un coup de pinceau pastel sans casser la cohérence ni demander de
-   grosses retouches, on garde. Sinon on revert et on diffère.
-2. **V1.1** — branche dédiée `palette-pastel`, expérimentation libre,
-   merge ou abandon selon ressenti après tests.
-
-Périmètre potentiel : popup principale, sélection liste, settings,
-onboarding, modales licence. Garder la cohérence sur **tous** les écrans
-pour ne pas créer un effet patchwork.
+Périmètre **encore à couvrir post-V1** (popup principale, sélection
+liste, settings, modales licence) : à reprendre en V1.1 si signal
+utilisateur en ce sens. Pour l'instant, l'onboarding est cohérent en
+pastel mais le reste de l'app garde la palette sombre actuelle
+(`#2E2E2E` / `#1B1C1C` / `#3F84F7`) — décalage assumé entre première
+expérience pastel et usage quotidien plus sobre.
 
 ---
 

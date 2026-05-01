@@ -172,23 +172,22 @@ struct Prompt: Identifiable, Codable, Equatable {
 - Test avec "Augmenter le contraste" macOS activé
 - Test avec Dynamic Type / taille police système augmentée si pertinent
 
-### Phase 7 — État restant (~95 %)
+### Phase 7 — État restant (~97 %)
 
-Roadmap V1 actualisée (décision 2026-05-01) — l'audit accessibilité initialement prévu en Session 4 est reporté en V1.1. Sessions 5/6/7 cadrées pour la release.
+Roadmap V1 actualisée (décision 2026-05-01) — l'audit accessibilité initialement prévu en Session 4 est reporté en V1.1. Sessions 5/6/7 cadrées pour la release. Refonte palette pastel adoptée en Session 5 (initialement reportée en V1.1, finalement intégrée à V1).
 
 | Session | Bloc | Contenu | Statut |
 |---------|------|---------|--------|
 | Session 3 | **8a — Modèle économique V1** | Mode debug `#if DEBUG` · Mécanisme réactivation Mac · Compteur activations X/Y (proxy Scaleway) | ✅ TERMINÉE 2026-04-30 |
 | Session 4 | **Investigation bugs + nettoyage** | Bug A reliquats TexTab · Bug B onboarding réaffiché (résout aussi Bug C Alfred bloqué en cascade) · housekeeping doc | ✅ TERMINÉE 2026-05-01 |
-| Session 5 | **Refonte onboarding** | Premier écran enrichi · boutons système · mention Réglages dans dernier écran · tentative pastel ≤30 min | 🟠 RECOMMANDÉ |
+| Session 5 | **Refonte onboarding** | Premier écran enrichi (popup preview + IBM Plex Mono Bold Italic) · boutons système · mention Réglages · palette pastel sur 5 écrans avec adaptations illustrations | ✅ TERMINÉE 2026-05-02 |
 | Session 6 | **Popup d'achat embedded Polar** | Approche A (email pour récupérer la clé) · WKWebView checkout | 🔴 BLOQUANT |
 | Session 7 | **Release v1.0.0** | Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release | 🔴 BLOQUANT |
 
 #### V1.1 et au-delà (reportés post-release)
 
-- **Audit accessibilité complet** (ex Phase 7.1) — Contrastes AA/AAA clair + sombre, focus clavier, Dynamic Type
+- **Audit accessibilité complet** (ex Phase 7.1) — Contrastes AA/AAA clair + sombre, focus clavier, Dynamic Type. Inclut une vérification ciblée des teintes pastel adoptées en S5 (status bubble Permissions, tooltips APIKey/LaunchAtLogin) sur les zones les plus critiques.
 - **Approche B Polar** — polling de l'API Polar pour interception automatique de la clé post-checkout (vs email manuel de l'approche A)
-- **Refonte palette pastel** sur branche dédiée pour expérimentation cohérente sur tous les écrans
 - **Animations natives SwiftUI** — fork des HTML/CSS-style animations actuelles vers des équivalents natifs (notamment onboarding)
 
 ## Ajouts hors plan initial (confirmés par project_loucede.md)
@@ -430,6 +429,20 @@ Conventions worktree CC ↔ repo principal documentées dans `CLAUDE.md` à la s
 | Bug B | Onboarding réaffiché à chaque démarrage | `OnboardingManager.shared.completeOnboarding()` n'était appelé NULLE PART → la valeur UserDefaults `loucede_has_completed_onboarding` restait toujours `false`. Fix : ajout de cet appel dans le callback `onComplete` côté `loucedeApp.swift` (avant `setupApp()` pour robustesse). |
 | Bug C | Alfred bloqué au démarrage | Résolu en cascade par Bug B — testé après reboot complet : loucedé démarre sans onboarding, Alfred fonctionne immédiatement. Pas de correction propre nécessaire. |
 | Housekeeping | Doc + roadmap | Retrait mention obsolète `creem-integration.md` dans CLAUDE.md « Mémoire projet » (Polar a remplacé Creem en Phase 6.2). Roadmap V1 actualisée (Sessions 5/6/7 = onboarding refonte / popup checkout Polar / release). Audit accessibilité reporté en V1.1. |
+
+### Session 5 — Refonte onboarding (2026-05-02) — ✅ TERMINÉE
+
+5 étapes (4 UX + 1 housekeeping) livrées en 8 commits cumulés. Onboarding entièrement repensé pour les premiers utilisateurs réels : cohérence cross-touchpoint avec le site web, conventions natives macOS, identité chromatique pastel.
+
+| # | Étape | Détail |
+|---|---|---|
+| 1 | Refonte WelcomeStep | Premier écran enrichi avec screenshot du popup principal (`PopupPreview` asset light/dark adaptive). Wordmark « loucedé » en IBM Plex Mono Bold Italic embarquée dans le bundle (`loucede/Fonts/` + `Info.plist` ATSApplicationFontsPath). 3 layouts comparés en runtime via pill picker dev (Centré / Split classique / Full pastel) → split classique retenu (cohérence cross-touchpoint avec le site). Conventions worktree CC documentées suite au piège de l'Étape 1. |
+| 2 | Boutons système | Tous les boutons d'onboarding basculés en `.borderedProminent` `.controlSize(.large)` (primaires) ou `.bordered` `.controlSize(.regular)` (secondaires) ou `.plain` (skip). Suppression des 5 custom `*NoFadeButtonStyle`. Ajout des boutons « Retour » manquants sur PermissionsStep, ShortcutStep, APIKeyStep, LaunchAtLoginStep (le callback `onBack` était présent en prop mais non exposé — dette UX réglée). PermissionsStep : signal SF Symbol `checkmark.shield.fill` vert ajouté quand permission accordée (remplace le toggle de couleur du bouton). Polish ferrage gauche cohérent + spacings. |
+| 3 | Mention Réglages | Ajout d'une mention discrète dans ActivationStep : « Tes réglages sont accessibles depuis la barre des menus [MenuBarIcon] comme depuis l'appli [gearshape]. » Icônes inline via `Text(Image(...))` concaténation. Calibrage `.baselineOffset(-4)` sur `MenuBarIcon` pour aligner le PNG template sur la baseline (le SF Symbol `gearshape` s'aligne automatiquement). |
+| 4 | Palette pastel | Adoption sur les 5 écrans : Welcome rose `#FFD6E0` (déjà fait Étape 1) · Permissions bleu `#CAE9FF` · Shortcut orange `#FFE4CC` · APIKey vert `#C8EDD8` · LaunchAtLogin lavande `#DCD0F5`. Adaptations ciblées des illustrations : suppression des 8 FloatingIcon décoratifs + struct (-88 lignes) et `floatAnimationActive` dans PermissionsStep, ProviderCards en blanc translucide + nom `.primary` + tooltip `key.fill` `#3D8B5C` dans APIKeyStep, LaunchPowerIllustration cercle solide bleu loucedé `#3F84F7` + halo opacity réduit + tooltip `sparkles` lavande foncée `#6B4FB8` dans LaunchAtLoginStep. |
+| 5 | Housekeeping | Doc + roadmap : `plan.md` Phase 7 ~95→~97 % + détail Session 5 (ce tableau), `backlog_v2.md` palette pastel marquée ✅ adoptée en S5 + audit a11y V1.1 enrichi d'une vérification ciblée des teintes pastel, `CLAUDE.md` tâches actives passe à Sessions 6+7 et phases terminées incluent S4 + S5. (Ce commit lui-même.) |
+
+Note : la refonte palette pastel était initialement notée pour V1.1 (sur branche dédiée). L'opportunité d'intégration cohérente avec la Session 5 onboarding s'est présentée et a été retenue — entrée backlog V1.1 marquée adoptée en S5.
 
 ### Questions d'architecture à trancher (utilisateur)
 
