@@ -3,16 +3,9 @@
 //  loucede
 //
 //  Session 5 — Refonte premier écran d'onboarding (2026-05-01).
-//
-//  3 layouts en parallèle togglés via un pill picker dev (top-right) :
-//  - Centré      : full pastel rose, wordmark + tagline + screenshot + bouton
-//                  empilés verticalement, style "accueil cérémoniel"
-//  - Split       : HStack 50/50, gauche = adaptive (windowBackgroundColor)
-//                  + texte/bouton, droite = pastel rose + screenshot
-//  - Full pastel : HStack 50/50, les DEUX panneaux en pastel rose
-//
-//  Le pill et les 2 layouts non retenus seront retirés au commit final
-//  d'Étape 1 une fois le choix utilisateur tranché en runtime.
+//  Layout final retenu : Split classique (gauche adaptive système /
+//  droite pastel rose). Cohérent cross-touchpoint avec le site web
+//  (texte sur container blanc, visuels sur fond rose pastel).
 //
 
 import SwiftUI
@@ -20,19 +13,8 @@ import SwiftUI
 struct WelcomeStep: View {
     var onNext: () -> Void
 
-    /// Mode d'affichage sélectionnable au runtime via le pill picker.
-    /// Sera figé sur le mode retenu au commit final d'Étape 1.
-    @State private var layoutMode: LayoutMode = .centered
-
-    enum LayoutMode: String, CaseIterable, Identifiable {
-        case centered   = "Centré"
-        case split      = "Split"
-        case fullPastel = "Full pastel"
-        var id: String { rawValue }
-    }
-
-    // MARK: - Animation states (Étape 1 — cf. spec : on retire la wave,
-    // on garde fade-in titre + spring bouton)
+    // MARK: - Animation states (Étape 1 — fade-in titre + spring bouton,
+    // wave animée retirée pour cohérence avec le screenshot statique)
 
     @State private var textOpacity: Double = 0
     @State private var buttonOpacity: Double = 0
@@ -47,27 +29,11 @@ struct WelcomeStep: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Layout actif
-            Group {
-                switch layoutMode {
-                case .centered:   centeredLayout
-                case .split:      splitLayout
-                case .fullPastel: fullPastelLayout
-                }
-            }
-
-            // Pill dev — à retirer au commit final d'Étape 1
-            Picker("Layout", selection: $layoutMode) {
-                ForEach(LayoutMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-            .frame(width: 200)
-            .padding(12)
+        HStack(spacing: 0) {
+            leftPanel
+            rightPanel
         }
+        .ignoresSafeArea()
         .onAppear {
             // Fade-in du titre
             withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
@@ -81,160 +47,61 @@ struct WelcomeStep: View {
         }
     }
 
-    // MARK: - Layout A : Centré
+    // MARK: - Left panel : adaptive système avec wordmark + tagline + bouton
 
+    /// Le fond `Color(NSColor.windowBackgroundColor)` s'adapte au mode
+    /// système (light/dark). Couleurs texte en `.primary` / `.secondary`
+    /// — pas d'ombre nécessaire, contraste OK natif.
     @ViewBuilder
-    private var centeredLayout: some View {
-        ZStack {
-            // Background full pastel
-            brandPastel.ignoresSafeArea()
-
-            VStack(spacing: 28) {
-                // Bloc texte (wordmark + tagline)
-                VStack(spacing: 6) {
-                    // V1 : choix esthétique assumé (blanc sur rose pastel < AA WCAG).
-                    // À revoir lors de l'audit a11y V1.1 : ombre renforcée OU couleur sombre.
+    private var leftPanel: some View {
+        Color(NSColor.windowBackgroundColor)
+            // Wordmark + tagline, vertical-centrés via l'alignment de
+            // l'overlay (.leading = horizontal-left + vertical-center).
+            .overlay(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("loucedé")
-                        .font(.custom("IBMPlexMono-BoldItalic", size: 56))
-                        .tracking(-1.7)
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 3)
+                        .font(.custom("IBMPlexMono-BoldItalic", size: 48))
+                        .tracking(-1.4)
+                        .foregroundColor(.primary)
 
                     Text("Une IA au bout de tes doigts")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
                 }
                 .opacity(textOpacity)
-
-                // Screenshot du popup
-                Image("PopupPreview")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 320)
-                    .opacity(textOpacity)
-
-                // Bouton "Commencer"
+                .padding(.leading, 40)
+            }
+            // Bouton "Commencer" en bas à gauche, fixé.
+            .overlay(alignment: .bottomLeading) {
                 commencerButton
                     .opacity(buttonOpacity)
                     .offset(y: buttonOffset)
+                    .padding(.leading, 40)
+                    .padding(.bottom, 40)
             }
-            .padding(.horizontal, 40)
-            // Top padding compense la zone du pill picker en haut à droite
-            .padding(.top, 24)
-        }
     }
 
-    // MARK: - Layout B.1 : Split classique
+    // MARK: - Right panel : pastel rose avec screenshot popup centré
 
+    /// L'overlay sans alignment explicite utilise `.center` par défaut.
+    /// Le screenshot s'auto-adapte au mode système (light/dark) via
+    /// l'Asset Catalog `PopupPreview.imageset/`.
     @ViewBuilder
-    private var splitLayout: some View {
-        HStack(spacing: 0) {
-            // Left panel : adaptive (windowBackgroundColor)
-            ZStack {
-                Color(NSColor.windowBackgroundColor)
-                    .ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 24) {
-                    Spacer().frame(height: 16)
-
-                    // Bloc texte — sur fond adaptive, on utilise .primary
-                    // (pas .white) pour rester lisible en light mode.
-                    // (Compromis honnête : la spec wordmark blanc + shadow
-                    // ne s'applique qu'aux backgrounds pastel, cf. layouts
-                    // A et Full pastel ci-dessous.)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("loucedé")
-                            .font(.custom("IBMPlexMono-BoldItalic", size: 48))
-                            .tracking(-1.4)
-                            .foregroundColor(.primary)
-
-                        Text("Une IA au bout de tes doigts")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    }
-                    .opacity(textOpacity)
-
-                    Spacer()
-
-                    commencerButton
-                        .opacity(buttonOpacity)
-                        .offset(y: buttonOffset)
-
-                    Spacer().frame(height: 30)
-                }
-                .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Right panel : pastel + screenshot
-            ZStack {
-                brandPastel.ignoresSafeArea()
+    private var rightPanel: some View {
+        brandPastel
+            .overlay {
                 Image("PopupPreview")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 300)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
     }
 
-    // MARK: - Layout B.2 : Full pastel (les 2 panneaux en rose)
-
-    @ViewBuilder
-    private var fullPastelLayout: some View {
-        HStack(spacing: 0) {
-            // Left panel : pastel + texte/bouton
-            ZStack {
-                brandPastel.ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 24) {
-                    Spacer().frame(height: 16)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        // V1 : choix esthétique assumé (blanc sur rose pastel < AA WCAG).
-                        // À revoir lors de l'audit a11y V1.1 : ombre renforcée OU couleur sombre.
-                        Text("loucedé")
-                            .font(.custom("IBMPlexMono-BoldItalic", size: 48))
-                            .tracking(-1.4)
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 3)
-
-                        Text("Une IA au bout de tes doigts")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                    }
-                    .opacity(textOpacity)
-
-                    Spacer()
-
-                    commencerButton
-                        .opacity(buttonOpacity)
-                        .offset(y: buttonOffset)
-
-                    Spacer().frame(height: 30)
-                }
-                .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Right panel : pastel + screenshot
-            ZStack {
-                brandPastel.ignoresSafeArea()
-                Image("PopupPreview")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 300)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    // MARK: - Bouton "Commencer" (réutilisé dans les 3 layouts)
+    // MARK: - Bouton "Commencer"
 
     /// Bouton noir avec effet 3D (shadow inférieure). Style hérité du
-    /// précédent WelcomeStep, sera basculé en bouton système en Étape 2.
+    /// précédent WelcomeStep — sera basculé en bouton système en
+    /// Étape 2 (boutons système sur les 5 écrans).
     private var commencerButton: some View {
         Button(action: onNext) {
             Text("Commencer")
