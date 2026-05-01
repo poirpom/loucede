@@ -28,6 +28,26 @@ struct ActivationStep: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
+            // Mention accès aux Réglages — cohérence visuelle avec ce
+            // que l'utilisateur va voir dans les 30 secondes : l'icône
+            // template `MenuBarIcon` dans la status bar (asset partagé
+            // avec `loucedeApp.setupMenuBar`) et le bouton « Réglages »
+            // dans le popup (SF Symbol `gearshape` partagé avec
+            // `MenuBarMenuView.swift:45` + `PopoverView.swift:592`).
+            //
+            // Concaténation Text + Text(Image(...)) : les icônes
+            // héritent automatiquement de la taille de police et de la
+            // couleur `.secondary` via `foregroundStyle`. Le rendu
+            // template du MenuBarIcon est respecté.
+            (Text("Tes réglages sont accessibles depuis la barre des menus ")
+             + Text(Image("MenuBarIcon"))
+             + Text(" comme depuis l'appli ")
+             + Text(Image(systemName: "gearshape"))
+             + Text("."))
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             Spacer()
 
             HStack(spacing: 16) {
