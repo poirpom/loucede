@@ -47,7 +47,7 @@ struct ActivationStep: View {
             // Valeur négative = décalage vers le bas (convention
             // SwiftUI documentée).
             (Text("Tes réglages sont accessibles depuis la barre des menus ")
-             + Text(Image("MenuBarIcon")).baselineOffset(-2)
+             + Text(Image("MenuBarIcon")).baselineOffset(-4)
              + Text(" comme depuis l'appli ")
              + Text(Image(systemName: "gearshape"))
              + Text("."))
