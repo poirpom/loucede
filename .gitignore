@@ -24,6 +24,15 @@ loucede/Secrets.swift
 # Ne doit JAMAIS être versionné
 documents-persos/
 
+# Private docs (symlinks to ~/Developer/loucede-private/)
+# plan.md et backlog_v2.md ont été sortis du repo public à partir du
+# 2026-05-03 pour héberger des éléments stratégiques sensibles dans un
+# repo git LOCAL privé (jamais pushé). Les fichiers à ces chemins sont
+# désormais des symlinks vers ~/Developer/loucede-private/. L'historique
+# git public d'avant cette date reste inchangé (acceptation rétroactive).
+docs/plan.md
+docs/backlog_v2.md
+
 # CocoaPods (if used)
 Pods/
 
