@@ -658,6 +658,50 @@ Le système de vérif live (Phase 4.3) couvre une partie du problème
 pas que de **nouveaux** modèles existent. Une revue manuelle tous les
 3-6 mois reste nécessaire.
 
+### Apple Intelligence via Foundation Models Framework
+
+**Origine** : Capture Session 5 clôture (2026-05-02) — Apple a annoncé
+à la WWDC 2025 le Foundation Models Framework qui ouvre les modèles
+on-device d'Apple Intelligence aux développeurs tiers via API native
+Swift (iOS 26+, macOS aligné)
+**Statut** : 🌱 À creuser
+
+Piste future intéressante pour loucedé : intégrer les modèles
+on-device Apple Intelligence comme **option supplémentaire** (ou à
+terme remplacement) des fournisseurs IA actuels
+(Mistral / OpenAI / Anthropic).
+
+**Avantages potentiels :**
+- 100 % local — aucune donnée ne quitte la machine (argument privacy
+  fort, cohérent avec le positionnement loucedé)
+- Pas de clé API à gérer → suppression possible de `APIKeyStep` de
+  l'onboarding (zero-config si Apple Intelligence sélectionné)
+- Pas de coût utilisateur ni de coût serveur
+- Pas de latence réseau, fonctionne offline
+- Argument marketing fort (« loucedé tourne 100 % sur ton Mac »)
+
+**Contraintes / risques :**
+- Modèles locaux Apple = capacité réduite vs Claude Sonnet / GPT-4o
+  (à valider runtime quand le framework sera testable)
+- Apple Silicon only (M1+) avec macOS suffisamment récent —
+  exclusion des utilisateurs Intel ou anciens OS
+- Apple peut limiter ou changer l'API à tout moment (dépendance
+  écosystème)
+- Pas de choix de modèle côté utilisateur (vs aujourd'hui :
+  3 fournisseurs + plusieurs modèles par fournisseur)
+- État réel du framework à re-vérifier au moment d'attaquer la
+  feature (annoncé WWDC 2025 mais déploiement public à confirmer)
+
+**Approche d'intégration pressentie :** coexistence plutôt que
+remplacement. Apple Intelligence devient un **4e fournisseur** dans
+le picker `AIProvider`, à côté de Mistral / OpenAI / Anthropic.
+`APIKeyStep` skipé conditionnellement si Apple Intelligence sélectionné
+(zero-config).
+
+**Timing :** V1.2 ou V2.0 selon état réel du framework et capacités
+des modèles. Pas V1 (release proche, scope verrouillé). Pas V3
+(l'opportunité mérite d'être explorée plus tôt vu l'argument privacy).
+
 ---
 
 ## Fonctionnalités hors scope V1
