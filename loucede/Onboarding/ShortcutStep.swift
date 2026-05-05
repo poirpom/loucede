@@ -393,7 +393,7 @@ struct KeyboardHintTooltip: View {
 
             // Tooltip content
             VStack(spacing: 8) {
-                // Main row: [⌘] ou [⌥] + [W]
+                // Main row: [⌘] ou [⌥] + [&]
                 HStack(spacing: 8) {
                     KeyboardHintKey(text: "\u{2318}", isActive: activeKeyIndex == 0)
                     Text("ou")
@@ -403,11 +403,11 @@ struct KeyboardHintTooltip: View {
                     Text("+")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color(hex: "999999"))
-                    KeyboardHintKey(text: "W", isActive: false)
+                    KeyboardHintKey(text: "&", isActive: false)
                 }
 
                 // Subtitle
-                Text("Choisis ⌘ ou ⌥, combine avec une lettre")
+                Text("Choisis ⌘ ou ⌥, combine avec une touche")
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "666666"))
 

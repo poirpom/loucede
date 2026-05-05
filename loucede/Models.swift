@@ -109,12 +109,15 @@ class ActionsStore: ObservableObject {
     @Published var verifiedModelIds: [AIProvider: Set<String>] = [:]
     /// Providers en cours de vérif live (spinner UI).
     @Published var verifyingProviders: Set<AIProvider> = []
-    @Published var mainShortcut: String = "W"
-    @Published var mainShortcutModifiers: [String] = ["^", "\u{2325}"]
+    @Published var mainShortcut: String = "&"
+    @Published var mainShortcutModifiers: [String] = ["\u{2325}"]
     // Keycode Carbon de la touche physique. Source de vérité pour RegisterEventHotKey,
     // car les dictionnaires lettre→keycode sont QWERTY-only (cassait en AZERTY).
-    // Défaut = 6 (touche "W" sur AZERTY FR, touche "Z" sur QWERTY US).
-    @Published var mainShortcutKeyCode: UInt16 = 6
+    // Défaut = 18 (touche "&" sur AZERTY FR, touche "1" sur QWERTY US — Option seul,
+    // main gauche, pas de conflit avec le shortcut système Delete Word ⌃⌥W).
+    // Bascule depuis ⌃⌥W (keyCode 6) le 2026-05-05 suite au conflit Delete Word
+    // découvert lors du test build notarisé.
+    @Published var mainShortcutKeyCode: UInt16 = 18
 
     private let actionsKey = "loucede_actions"
     private let apiKeysKey = "loucede_api_keys"
