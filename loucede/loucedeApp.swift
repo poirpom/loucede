@@ -372,10 +372,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static let popoverActionRowHeight: CGFloat = 36
     /// Spacing entre lignes dans le `VStack(spacing: 2)` de la liste.
     static let popoverActionRowSpacing: CGFloat = 2
-    /// Nombre max d'actions visibles dans la liste avant scroll.
-    /// Point 2 pre-V1 (2026-05-07) : était 11 lignes au total avec le
-    /// settings row fixe ; ce row a été retiré donc 10 actions = 10 lignes.
-    static let popoverMaxVisibleActions: Int = 10
     /// Hauteur du chrome qui entoure la liste (top bar logo + search bar
     /// + dividers + footer nav 2 lignes). Ne dépend pas du nombre
     /// d'actions. Mesure empirique validée à ±2pt sur Sequoia 15.x.
@@ -384,10 +380,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 12+12 = 52pt + divider 1pt = 53pt), même sans selection. Quand
     /// selection, le preview cohabite avec le logo dans la même top bar
     /// — voir `popoverPreviewHeight` pour le delta.
-    /// Point 2 pre-V1 (2026-05-07) : 165 → 137 (−28pt). Retrait du
+    /// Point 2 pre-V1 (2026-05-08) : 165 → 158 (−7pt). Retrait du
     /// `settingsRow` fixe (−38pt) + footer passé de 1 à 2 lignes avec
-    /// Divider central (+10pt). À calibrer runtime.
-    static let popoverChromeHeight: CGFloat = 137
+    /// Divider central (+31pt : ligne 1 padding vertical 8pt = 34pt
+    /// + Divider 1pt + ligne 2 padding vertical 6pt = 30pt vs ancien
+    /// single row 33pt). Calibration runtime confirmée 2026-05-08.
+    static let popoverChromeHeight: CGFloat = 158
+    /// Hauteur maximale du popup en mode liste (Point 2 pre-V1, 2026-05-08).
+    /// La popup est désormais à hauteur DYNAMIQUE — elle s'adapte au nombre
+    /// d'actions visibles jusqu'à ce plafond. Avec V1 (limite 15 actions),
+    /// 740pt suffit à afficher la totalité sans scroll :
+    ///   chrome (158) + 15 actions × 36pt + 14 spacings × 2pt = 158 + 568 = 726pt
+    ///   + 12pt buffer pour selection preview éventuelle = 738pt → arrondi à 740pt
+    /// Si la limite d'actions augmente en V1.x (>15), il faudra réintroduire
+    /// un ScrollViewReader + auto-scroll vers l'item sélectionné lors de la
+    /// nav clavier (cf. backlog).
+    static let popoverMaxHeight: CGFloat = 740
     /// Delta de hauteur ADDITIONNEL quand un aperçu de texte est affiché
     /// (= différence entre top bar avec preview vs top bar logo seul).
     /// Phase 6.18-fix-2 : 67 → 12. Avant, popoverPreviewHeight était la
@@ -424,39 +432,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case resultExpanded
     }
 
-    /// Hauteur idéale du popup en fonction de l'état courant. Calculée au
-    /// moment de `showPopover()` puis figée pour toute la session — on ne
-    /// resize PAS pendant la frappe dans le champ recherche (sinon le popup
-    /// tremblerait à chaque caractère qui filtrerait la liste).
-    static func calculatedPopoverHeight() -> CGFloat {
+    /// Hauteur idéale du popup en fonction de l'état courant.
+    /// Point 2 pre-V1 (2026-05-08) : popup à hauteur DYNAMIQUE — elle
+    /// s'adapte au nombre d'actions visibles, capée par `popoverMaxHeight`.
+    /// Le paramètre `actionCount` permet aux call-sites qui connaissent
+    /// le nombre d'actions filtrées (ex. `PopoverView` après recherche)
+    /// de passer cette valeur ; sinon on retombe sur `actions.count` pour
+    /// l'ouverture initiale (search vide à ce moment-là, cf. `reset()`).
+    static func calculatedPopoverHeight(actionCount: Int? = nil) -> CGFloat {
         // Empty state : popup minimaliste (texte contextuel + 1 item
         // « Configure une clé API » + footer nav simplifié). Pas de
         // search bar, pas de liste, pas de settingsRow. Hauteur fixe
-        // + delta selection éventuel.
+        // + delta selection éventuel. Le paramètre actionCount est
+        // ignoré dans cette branche.
         if !ActionsStore.shared.hasUsableProvider {
             let withSelection = CapturedTextManager.shared.hasSelection
             return popoverEmptyStateHeight + (withSelection ? popoverPreviewHeight : 0)
         }
 
-        let actionCount = ActionsStore.shared.actions.count
-        let visibleCount = min(actionCount, popoverMaxVisibleActions)
+        let count = actionCount ?? ActionsStore.shared.actions.count
 
         let listHeight: CGFloat
-        if visibleCount == 0 {
+        if count == 0 {
             listHeight = popoverEmptyListHeight
         } else {
-            listHeight = CGFloat(visibleCount) * popoverActionRowHeight
-                       + CGFloat(visibleCount - 1) * popoverActionRowSpacing
+            listHeight = CGFloat(count) * popoverActionRowHeight
+                       + CGFloat(count - 1) * popoverActionRowSpacing
         }
 
         let withSelection = CapturedTextManager.shared.hasSelection
         // Phase 6.3 : ajout conditionnel de la ligne « Mise à jour disponible »
         // (+ 1 Divider = ~1pt, absorbé dans la marge empirique de la constante).
         let withUpdate = UpdateChecker.shared.updateAvailable
-        return popoverChromeHeight
+        let contentHeight = popoverChromeHeight
              + listHeight
              + (withSelection ? popoverPreviewHeight : 0)
              + (withUpdate ? popoverUpdateRowHeight : 0)
+        return min(popoverMaxHeight, contentHeight)
     }
 
     /// Bascule la fenêtre popup vers le mode demandé avec animation fluide
@@ -468,7 +480,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// tantôt « retour résultat compact »). Le mode explicite est désormais
     /// une `PopoverMode`, ce qui empêche le call site de prendre la mauvaise
     /// décision pour la hauteur cible.
-    func resizePopover(to mode: PopoverMode) {
+    func resizePopover(to mode: PopoverMode, actionCount: Int? = nil) {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
         let screenRect = screen.visibleFrame
         let width: CGFloat
@@ -476,7 +488,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .list:
             width = Self.popoverDefaultWidth
-            height = Self.calculatedPopoverHeight()
+            // Point 2 pre-V1 (2026-05-08) : passe le compte filtré quand
+            // disponible (cf. PopoverView .onChange(of: searchQuery)) pour
+            // que la popup se redimensionne dynamiquement pendant la frappe.
+            height = Self.calculatedPopoverHeight(actionCount: actionCount)
         case .resultCompact:
             width = Self.popoverDefaultWidth
             height = Self.popoverResultCompactHeight

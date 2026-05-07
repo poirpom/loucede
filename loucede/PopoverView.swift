@@ -149,7 +149,10 @@ struct PopoverView: View {
             // pendant l'animation NSWindow.
             if newValue == nil {
                 state.suspendFlush()
-                globalAppDelegate?.resizePopover(to: .list)
+                // Point 2 pre-V1 (2026-05-08) : passe le compte filtré pour
+                // que la popup retrouve sa taille dynamique (cohérent avec
+                // l'éventuelle search active à ce moment).
+                globalAppDelegate?.resizePopover(to: .list, actionCount: filteredActions.count)
                 // Phase 6.14-fix-2 : set instantané, pas de withAnimation
                 // (cf. `toggleResultExpanded` pour l'analyse complète).
                 if resultExpanded {
@@ -416,6 +419,10 @@ struct PopoverView: View {
                 // Point 2 pre-V1 (2026-05-07) : retrait du settings row,
                 // borne haute = filteredActions.count - 1. Guard liste vide :
                 // si pas d'action visible (recherche sans match), no-op.
+                // Auto-scroll inutile en V1 : la popup est dimensionnée pour
+                // afficher toutes les actions sans scroll (limite V1 = 15
+                // actions, popup max ≈ 740pt). Si la limite augmente en V1.x,
+                // ajouter un ScrollViewReader + pulse keyboard (cf. backlog).
                 guard !filteredActions.isEmpty else { return .handled }
                 state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
                 return .handled
@@ -440,8 +447,13 @@ struct PopoverView: View {
         }
         // Reset l'index sélectionné quand la liste filtrée change, sinon on peut
         // pointer hors-bornes après filtrage.
+        // Point 2 pre-V1 (2026-05-08) : redimensionne aussi la popup pour
+        // qu'elle s'adapte dynamiquement au nombre d'actions visibles
+        // après filtrage (search à 1 résultat → popup compacte ; clear
+        // search → popup retrouve sa pleine hauteur).
         .onChange(of: state.searchQuery) { _, _ in
             state.selectedIndex = 0
+            globalAppDelegate?.resizePopover(to: .list, actionCount: filteredActions.count)
         }
         // 2026-05-07 : recalcule la taille de la fenêtre quand le provider
         // bascule de « pas utilisable » à « utilisable » (ou inverse) sans
@@ -526,6 +538,14 @@ struct PopoverView: View {
                 }
                 Divider()
 
+                // Point 2 pre-V1 (2026-05-07) : popup à hauteur dynamique
+                // (cf. AppDelegate.calculatedPopoverHeight). Le ScrollView
+                // n'a plus de .frame(maxHeight:) figée — il s'adapte à
+                // l'espace alloué par la NSWindow, qui est elle-même calculée
+                // pour afficher TOUTES les actions sans scroll (jusqu'à la
+                // limite V1 = 15 actions, popup max ≈ 740pt). Si la liste
+                // dépasse le cap (V1.x avec >15 actions), SwiftUI active
+                // naturellement le scroll dans l'espace restant.
                 ScrollView {
                     if filteredActions.isEmpty {
                         Text("Aucune action trouvée")
@@ -542,12 +562,6 @@ struct PopoverView: View {
                         .padding(.horizontal, 8)
                     }
                 }
-                // Phase 6.9b : cap aligné sur le calcul de hauteur côté
-                // AppDelegate (10 actions × 36pt + 9 spacings × 2pt = 378pt).
-                // En dessous de 10 actions, la liste prend sa hauteur naturelle
-                // — la fenêtre AppKit est déjà dimensionnée pour ne pas laisser
-                // d'espace vide.
-                .frame(maxHeight: 378)
 
                 // Phase 6.3 : ligne « Mise à jour disponible » conditionnelle
                 // au-dessus du footer quand UpdateChecker détecte une version
@@ -563,11 +577,12 @@ struct PopoverView: View {
                 }
 
                 // Footer 2 lignes (Point 2 pre-V1, 2026-05-07) :
-                // - Ligne 1 : navigation popup (↑↓ ↵ esc)
-                // - Ligne 2 : shortcuts vers d'autres surfaces (⌘, ⌘D)
-                // Divider central pour séparation visuelle nette des deux
-                // groupes conceptuels. Padding vertical réduit à 6pt par
-                // ligne (vs 8pt en single-row) pour éviter d'alourdir.
+                // - Ligne 1 : navigation popup (↑↓ ↵ esc) — padding vertical
+                //   8pt (calibré runtime) pour respirer entre les deux dividers
+                //   qui l'encadrent (au-dessus : zone scroll/updateRow ; en
+                //   dessous : Divider central footer).
+                // - Ligne 2 : shortcuts vers d'autres surfaces (⌘, ⌘D) —
+                //   padding vertical 6pt (plus serré, ligne 2 = appoint).
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {
                         // Phase 1.4e : mêmes dimensions typographiques que les
@@ -585,7 +600,7 @@ struct PopoverView: View {
                         Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
 
                     Divider()
 
