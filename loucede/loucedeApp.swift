@@ -384,8 +384,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// `settingsRow` fixe (−38pt) + footer passé de 1 à 2 lignes avec
     /// Divider central (+31pt : ligne 1 padding vertical 8pt = 34pt
     /// + Divider 1pt + ligne 2 padding vertical 6pt = 30pt vs ancien
-    /// single row 33pt). Calibration runtime confirmée 2026-05-08.
-    static let popoverChromeHeight: CGFloat = 158
+    /// single row 33pt).
+    /// Point 2 calibration bug (2026-05-08) : 158 → 162 (+4pt).
+    /// Le radius inférieur du highlight bleu de la dernière action
+    /// était mordu de ~2-5px par le bord inférieur du viewport. Cause
+    /// non diagnostiquée précisément (probable padding.bottom interne
+    /// non comptabilisé OU radius/shadow item débordant la rowHeight
+    /// déclarée). Calage empirique : à monter à 164 si 162 insuffisant.
+    static let popoverChromeHeight: CGFloat = 162
     /// Hauteur maximale du popup en mode liste (Point 2 pre-V1, 2026-05-08).
     /// La popup est désormais à hauteur DYNAMIQUE — elle s'adapte au nombre
     /// d'actions visibles jusqu'à ce plafond. Avec V1 (limite 15 actions),
