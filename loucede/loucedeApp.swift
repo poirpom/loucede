@@ -395,13 +395,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Hauteur maximale du popup en mode liste (Point 2 pre-V1, 2026-05-08).
     /// La popup est désormais à hauteur DYNAMIQUE — elle s'adapte au nombre
     /// d'actions visibles jusqu'à ce plafond. Avec V1 (limite 15 actions),
-    /// 740pt suffit à afficher la totalité sans scroll :
-    ///   chrome (158) + 15 actions × 36pt + 14 spacings × 2pt = 158 + 568 = 726pt
-    ///   + 12pt buffer pour selection preview éventuelle = 738pt → arrondi à 740pt
+    /// 744pt couvre le pire cas (15 actions + selection preview) :
+    ///   chrome (162) + 15 actions × 36pt + 14 spacings × 2pt = 162 + 568 = 730pt
+    ///   + 12pt selection preview = 742pt → arrondi à 744pt (2pt de marge)
+    /// Calage : 740 → 744 (2026-05-08, suite au bump chrome 158 → 162 qui
+    /// poussait contentHeight au-delà du cap dans le cas 15 actions + preview).
     /// Si la limite d'actions augmente en V1.x (>15), il faudra réintroduire
     /// un ScrollViewReader + auto-scroll vers l'item sélectionné lors de la
     /// nav clavier (cf. backlog).
-    static let popoverMaxHeight: CGFloat = 740
+    static let popoverMaxHeight: CGFloat = 744
     /// Delta de hauteur ADDITIONNEL quand un aperçu de texte est affiché
     /// (= différence entre top bar avec preview vs top bar logo seul).
     /// Phase 6.18-fix-2 : 67 → 12. Avant, popoverPreviewHeight était la
