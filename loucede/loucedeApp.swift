@@ -372,18 +372,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static let popoverActionRowHeight: CGFloat = 36
     /// Spacing entre lignes dans le `VStack(spacing: 2)` de la liste.
     static let popoverActionRowSpacing: CGFloat = 2
-    /// Nombre max d'actions visibles dans la liste avant scroll. Plus le
-    /// settings row fixe sous la liste = 11 lignes affichées au total.
+    /// Nombre max d'actions visibles dans la liste avant scroll.
+    /// Point 2 pre-V1 (2026-05-07) : était 11 lignes au total avec le
+    /// settings row fixe ; ce row a été retiré donc 10 actions = 10 lignes.
     static let popoverMaxVisibleActions: Int = 10
     /// Hauteur du chrome qui entoure la liste (top bar logo + search bar
-    /// + dividers + settings row + footer nav). Ne dépend pas du nombre
+    /// + dividers + footer nav 2 lignes). Ne dépend pas du nombre
     /// d'actions. Mesure empirique validée à ±2pt sur Sequoia 15.x.
     /// Phase 6.18-fix-2 (2026-04-28) : 108 → 161 (+53). Le logo loucedé
     /// est désormais TOUJOURS visible dans la top bar (28pt + paddings
     /// 12+12 = 52pt + divider 1pt = 53pt), même sans selection. Quand
     /// selection, le preview cohabite avec le logo dans la même top bar
     /// — voir `popoverPreviewHeight` pour le delta.
-    static let popoverChromeHeight: CGFloat = 165 // +4pt : champ recherche avec marge/fond (2026-04-29)
+    /// Point 2 pre-V1 (2026-05-07) : 165 → 137 (−28pt). Retrait du
+    /// `settingsRow` fixe (−38pt) + footer passé de 1 à 2 lignes avec
+    /// Divider central (+10pt). À calibrer runtime.
+    static let popoverChromeHeight: CGFloat = 137
     /// Delta de hauteur ADDITIONNEL quand un aperçu de texte est affiché
     /// (= différence entre top bar avec preview vs top bar logo seul).
     /// Phase 6.18-fix-2 : 67 → 12. Avant, popoverPreviewHeight était la
@@ -400,7 +404,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// calibrer runtime — valeur initiale empirique (2026-05-07).
     static let popoverEmptyStateHeight: CGFloat = 210
     /// Phase 6.3 : hauteur de la ligne « Mise à jour disponible » dans le popup.
-    /// Même structure et padding que `settingsRow` → identique à `popoverActionRowHeight`.
+    /// Même structure et padding qu'une action row standard → identique à
+    /// `popoverActionRowHeight`. Note : `settingsRow` qui partageait
+    /// historiquement la même hauteur a été retiré au Point 2 pre-V1.
     static let popoverUpdateRowHeight: CGFloat = 36
     /// Hauteur du popup en mode résultat compact (header action + ScrollView
     /// 300pt + footer boutons). Mesurée empiriquement.

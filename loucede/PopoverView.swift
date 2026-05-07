@@ -244,7 +244,8 @@ struct PopoverView: View {
                 }
             }
 
-            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g) + ⌘, Réglages.
+            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g) + ⌘, Réglages
+            // + ⌘D Doc (Point 2 pre-V1, 2026-05-07).
             // On passe les slots derrière ⌘ pour libérer les frappes nues (chiffres
             // inclus) au profit du champ de recherche libre de la liste.
             if mods == [.command] {
@@ -253,6 +254,18 @@ struct PopoverView: View {
                 // (la virgule n'est pas à la même position physique en AZERTY / QWERTY).
                 if event.charactersIgnoringModifiers == "," {
                     settingsHandler()
+                    return nil
+                }
+                // ⌘D — ouvre la doc Notion publique dans le browser par défaut
+                // (Point 2 pre-V1). Implémentation temporaire — Point 4 du
+                // backlog la remplacera par une webview interne. La touche D
+                // (keycode 2) n'est pas dans `positionShortcuts` donc aucun
+                // conflit avec un slot d'action. Check placé AVANT le guard
+                // de position par défense (au cas où la table évoluerait).
+                if event.charactersIgnoringModifiers == "d" {
+                    if let url = URL(string: "https://loucede.notion.site/") {
+                        NSWorkspace.shared.open(url)
+                    }
                     return nil
                 }
                 guard let position = Self.position(forPhysicalKeyCode: event.keyCode),
@@ -336,8 +349,12 @@ struct PopoverView: View {
             // Si selection : preview à gauche + logo à droite (alignment
             // .top pour que le logo soit aligné avec la première ligne du
             // preview). Si pas de selection : Spacer à gauche + logo à
-            // droite (le logo reste accessible pour ouvrir les Réglages
-            // peu importe le contexte d'ouverture du popup).
+            // droite.
+            // Point 2 pre-V1 (2026-05-07) : le logo devient passif —
+            // élément d'identité visuelle uniquement. Réglages reste
+            // accessible via ⌘, dans le footer ligne 2 (cf. actionsListView)
+            // ou via l'item « 🔑 Configure une clé API » en empty state.
+            // Évite deux chemins redondants vers Réglages.
             HStack(alignment: .top, spacing: 8) {
                 if textManager.hasSelection {
                     Text(textManager.capturedText)
@@ -349,18 +366,11 @@ struct PopoverView: View {
                     Spacer()
                 }
 
-                Button {
-                    onOpenSettings()
-                } label: {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .pointerCursor()
-                .help("Ouvrir les Réglages")
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 28, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -403,15 +413,17 @@ struct PopoverView: View {
                 state.selectedIndex = max(0, state.selectedIndex - 1)
                 return .handled
             case .downArrow:
-                // Phase 6.7 : +1 pour inclure le settings row (index = filteredActions.count).
-                state.selectedIndex = min(filteredActions.count, state.selectedIndex + 1)
+                // Point 2 pre-V1 (2026-05-07) : retrait du settings row,
+                // borne haute = filteredActions.count - 1. Guard liste vide :
+                // si pas d'action visible (recherche sans match), no-op.
+                guard !filteredActions.isEmpty else { return .handled }
+                state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
                 return .handled
             case .return:
-                // Phase 6.7 : si selectedIndex pointe sur le settings row (dernier
-                // index = filteredActions.count), on ouvre les Réglages.
-                if state.selectedIndex == filteredActions.count {
-                    onOpenSettings()
-                } else if filteredActions.indices.contains(state.selectedIndex) {
+                // Point 2 pre-V1 (2026-05-07) : retrait du settings row, ↵ ne
+                // déclenche plus que les actions. Réglages désormais via ⌘,
+                // dans le footer ligne 2.
+                if filteredActions.indices.contains(state.selectedIndex) {
                     state.runAction(filteredActions[state.selectedIndex])
                 }
                 return .handled
@@ -447,9 +459,10 @@ struct PopoverView: View {
     // MARK: - Actions list (ex-zone basse de mainView)
 
     /// Zone basse de la popup en mode normal : search bar, liste d'actions,
-    /// updateRow conditionnel, settingsRow, footer nav. Extrait de `mainView`
-    /// le 2026-05-07 pour permettre la bascule avec `emptyStateView` sans
-    /// dupliquer la top bar.
+    /// updateRow conditionnel, footer nav 2 lignes. Extrait de `mainView`
+    /// le 2026-05-07 (Point 1 pre-V1) pour permettre la bascule avec
+    /// `emptyStateView` sans dupliquer la top bar. Footer 2 lignes adopté
+    /// le même jour (Point 2 pre-V1) en remplacement du `settingsRow` fixe.
     private var actionsListView: some View {
         // Phase 1.4i : zone basse de la popup (liste + footer nav) en
         // controlBackgroundColor, légèrement distincte du chrome supérieur.
@@ -536,10 +549,11 @@ struct PopoverView: View {
                 // d'espace vide.
                 .frame(maxHeight: 378)
 
-                // Phase 6.7 : ligne Réglages fixe sous la liste, toujours accessible.
-                // Séparateur visuel + item navigable (↑↓+↵) + raccourci ⌘, standard macOS.
-                // Phase 6.3 : ligne « Mise à jour disponible » insérée au-dessus de
-                // Réglages quand UpdateChecker détecte une version plus récente.
+                // Phase 6.3 : ligne « Mise à jour disponible » conditionnelle
+                // au-dessus du footer quand UpdateChecker détecte une version
+                // plus récente. Point 2 pre-V1 (2026-05-07) : settingsRow
+                // retiré, Réglages désormais accessible via ⌘, dans le footer
+                // ligne 2.
                 Divider()
                 if updateChecker.updateAvailable {
                     updateRow()
@@ -547,26 +561,44 @@ struct PopoverView: View {
                         .padding(.top, 2)
                     Divider()
                 }
-                settingsRow()
-                    .padding(.horizontal, 8)
-                    .padding(.top, 2)
 
-                HStack(spacing: 8) {
-                    // Phase 1.4e : mêmes dimensions typographiques que les boutons
-                    // de la fenêtre résultat (13pt, taille .body par défaut) pour
-                    // cohérence visuelle entre les deux footers.
-                    KeyboardKey("↑")
-                    KeyboardKey("↓")
-                    Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
-                    Spacer()
-                    KeyboardKey("↵")
-                    Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
-                    Spacer()
-                    KeyboardKey("esc")
-                    Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
+                // Footer 2 lignes (Point 2 pre-V1, 2026-05-07) :
+                // - Ligne 1 : navigation popup (↑↓ ↵ esc)
+                // - Ligne 2 : shortcuts vers d'autres surfaces (⌘, ⌘D)
+                // Divider central pour séparation visuelle nette des deux
+                // groupes conceptuels. Padding vertical réduit à 6pt par
+                // ligne (vs 8pt en single-row) pour éviter d'alourdir.
+                VStack(spacing: 0) {
+                    HStack(spacing: 8) {
+                        // Phase 1.4e : mêmes dimensions typographiques que les
+                        // boutons de la fenêtre résultat (13pt, taille .body
+                        // par défaut) pour cohérence visuelle entre les deux
+                        // footers.
+                        KeyboardKey("↑")
+                        KeyboardKey("↓")
+                        Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
+                        Spacer()
+                        KeyboardKey("↵")
+                        Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
+                        Spacer()
+                        KeyboardKey("esc")
+                        Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+
+                    Divider()
+
+                    HStack(spacing: 8) {
+                        KeyboardKey("⌘,")
+                        Text("Réglages").font(.system(size: 13)).foregroundStyle(.primary)
+                        Spacer()
+                        KeyboardKey("⌘D")
+                        Text("Doc").font(.system(size: 13)).foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
             }
             .background(Color(NSColor.controlBackgroundColor))
     }
@@ -700,34 +732,6 @@ struct PopoverView: View {
 
     private var updateOrange: Color {
         Color(red: 0.976, green: 0.620, blue: 0.043) // #F59E0B
-    }
-
-    /// Ligne « Réglages » fixe sous la liste d'actions (Phase 6.7).
-    /// Toujours accessible : navigable ↑↓+↵ (index = `filteredActions.count`)
-    /// + raccourci ⌘, standard macOS (géré dans le monitor NSEvent).
-    /// Visuellement alignée sur `actionRow` (même padding, même radius, même
-    /// couleur de sélection #3F84F7) pour cohérence.
-    private func settingsRow() -> some View {
-        let isSelected = state.selectedIndex == filteredActions.count
-        return HStack(spacing: 10) {
-            // Icône engrenage SF Symbol, calibrée sur la boîte 20×20 des
-            // ActionIconView pour alignement vertical avec les actions.
-            Image(systemName: "gearshape")
-                .font(.system(size: 14))
-                .frame(width: 20, height: 20)
-            Text("Réglages")
-                .font(.system(size: 13))
-            Spacer()
-            KeyboardKey("⌘,")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .foregroundStyle(isSelected ? Color.white : Color.primary)
-        .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .contentShape(Rectangle())
-        .onTapGesture { onOpenSettings() }
-        .onHover { hovering in if hovering { state.selectedIndex = filteredActions.count } }
     }
 
     // MARK: - Result
