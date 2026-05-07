@@ -394,6 +394,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static let popoverPreviewHeight: CGFloat = 12
     /// Hauteur du message « Aucune action trouvée » quand la liste est vide.
     static let popoverEmptyListHeight: CGFloat = 61
+    /// Hauteur du popup en mode « empty state » (pas de clé API configurée
+    /// pour le provider courant). Top bar + texte contextuel + 1 item
+    /// « Configure une clé API » + footer nav simplifié. Mesure à
+    /// calibrer runtime — valeur initiale empirique (2026-05-07).
+    static let popoverEmptyStateHeight: CGFloat = 210
     /// Phase 6.3 : hauteur de la ligne « Mise à jour disponible » dans le popup.
     /// Même structure et padding que `settingsRow` → identique à `popoverActionRowHeight`.
     static let popoverUpdateRowHeight: CGFloat = 36
@@ -418,6 +423,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// resize PAS pendant la frappe dans le champ recherche (sinon le popup
     /// tremblerait à chaque caractère qui filtrerait la liste).
     static func calculatedPopoverHeight() -> CGFloat {
+        // Empty state : popup minimaliste (texte contextuel + 1 item
+        // « Configure une clé API » + footer nav simplifié). Pas de
+        // search bar, pas de liste, pas de settingsRow. Hauteur fixe
+        // + delta selection éventuel.
+        if !ActionsStore.shared.hasUsableProvider {
+            let withSelection = CapturedTextManager.shared.hasSelection
+            return popoverEmptyStateHeight + (withSelection ? popoverPreviewHeight : 0)
+        }
+
         let actionCount = ActionsStore.shared.actions.count
         let visibleCount = min(actionCount, popoverMaxVisibleActions)
 

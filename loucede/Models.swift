@@ -196,6 +196,20 @@ class ActionsStore: ObservableObject {
         apiKeys[selectedProvider] ?? ""
     }
 
+    /// `true` si le provider courant a au moins de quoi fonctionner :
+    /// vérifie la PRÉSENCE d'une clé API non-vide pour `selectedProvider`.
+    /// Pas d'appel réseau — uniquement une vérification de présence.
+    ///
+    /// Future-proof Apple Intelligence (V1.x) : une fois le provider
+    /// `.appleIntelligence` ajouté à l'enum, étendre le check en
+    /// `|| selectedProvider == .appleIntelligence` (la disponibilité
+    /// runtime est gérée à l'intérieur du provider lui-même, pas de
+    /// clé utilisateur requise).
+    var hasUsableProvider: Bool {
+        !apiKey.isEmpty
+        // V1.x Apple Intelligence : || selectedProvider == .appleIntelligence
+    }
+
     var selectedModelId: String {
         selectedModelIds[selectedProvider] ?? selectedProvider.defaultModelId
     }

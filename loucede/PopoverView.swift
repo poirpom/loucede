@@ -214,6 +214,19 @@ struct PopoverView: View {
             // de recherche, ⌘, Réglages…) ne s'applique qu'en vue liste.
             guard state.activeAction == nil else { return event }
 
+            // 2026-05-07 : empty state — neutralise toutes les shortcuts
+            // de liste (slots ⌘1-0, Backspace de search) qui n'ont pas de
+            // sens et déclencheraient des actions cassées (LLM appelé
+            // sans clé API). Seul ⌘, (Réglages) reste fonctionnel pour
+            // rester aligné avec le standard macOS.
+            if !store.hasUsableProvider {
+                if mods == [.command] && event.charactersIgnoringModifiers == "," {
+                    settingsHandler()
+                    return nil
+                }
+                return event
+            }
+
             // --- Sans modifier : Backspace géré ici, le reste passe à SwiftUI.
             // Raison : .onKeyPress(.delete) est peu fiable sur macOS (le
             // système intercepte souvent avant SwiftUI), alors que le
@@ -355,19 +368,102 @@ struct PopoverView: View {
 
             Divider()
 
-            // Phase 1.4i : zone basse de la popup (liste + footer nav) en
-            // controlBackgroundColor, légèrement distincte du chrome supérieur.
-            VStack(spacing: 0) {
-                // Phase 1.4g : bandeau de recherche toujours visible, avec
-                // placeholder « Rechercher » pour signaler la fonction à
-                // l'utilisateur. Alimenté par la frappe directe (onKeyPress
-                // ci-dessous), backspace supprime le dernier char.
-                // Curseur clignotant : feedback visuel « champ actif » — le popup
-                // reçoit la saisie en permanence via onKeyPress, donc il n'y a pas
-                // de vrai @FocusState sur un TextField à refléter. On affiche
-                // simplement un curseur qui clignote pour que l'utilisateur
-                // comprenne qu'il peut taper directement.
-                HStack(spacing: 6) {
+            // 2026-05-07 : empty state quand le provider courant n'a pas de
+            // clé API configurée (cf. `ActionsStore.hasUsableProvider`).
+            // Évite la liste d'actions « cassée » qui afficherait un message
+            // d'erreur LLM à la première utilisation. Le bouton logo en top
+            // bar reste fonctionnel (deuxième chemin vers Réglages).
+            if !store.hasUsableProvider {
+                emptyStateView
+            } else {
+                actionsListView
+            }
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focus, equals: .main)
+        // Handler clavier SwiftUI pour flèches + Entrée + saisie de recherche.
+        // Backspace (⌫) et Esc (⎋) sont gérés par le monitor NSEvent
+        // (cf. installSlotMonitorIfNeeded) car .onKeyPress(.delete/.escape) est
+        // peu fiable sur macOS quand la fenêtre est préchargée (NSHostingView) —
+        // le système intercepte souvent avant que SwiftUI ne reçoive l'event.
+        .onKeyPress(phases: .down) { press in
+            // 2026-05-07 : empty state — ↵ ouvre Réglages, le reste est ignoré
+            // (Esc géré par le NSEvent monitor, indépendant de l'état).
+            if !store.hasUsableProvider {
+                if press.key == .return {
+                    onOpenSettings()
+                    return .handled
+                }
+                return .ignored
+            }
+
+            switch press.key {
+            case .upArrow:
+                state.selectedIndex = max(0, state.selectedIndex - 1)
+                return .handled
+            case .downArrow:
+                // Phase 6.7 : +1 pour inclure le settings row (index = filteredActions.count).
+                state.selectedIndex = min(filteredActions.count, state.selectedIndex + 1)
+                return .handled
+            case .return:
+                // Phase 6.7 : si selectedIndex pointe sur le settings row (dernier
+                // index = filteredActions.count), on ouvre les Réglages.
+                if state.selectedIndex == filteredActions.count {
+                    onOpenSettings()
+                } else if filteredActions.indices.contains(state.selectedIndex) {
+                    state.runAction(filteredActions[state.selectedIndex])
+                }
+                return .handled
+            default:
+                // Phase 1.4g : tout caractère imprimable mono-char alimente
+                // la recherche (lettres, accents, chiffres, espace, ponctuation).
+                if press.characters.count == 1, let ch = press.characters.first,
+                   ch.isLetter || ch.isNumber || ch.isPunctuation || ch == " " {
+                    state.searchQuery.append(ch)
+                    return .handled
+                }
+                return .ignored
+            }
+        }
+        // Reset l'index sélectionné quand la liste filtrée change, sinon on peut
+        // pointer hors-bornes après filtrage.
+        .onChange(of: state.searchQuery) { _, _ in
+            state.selectedIndex = 0
+        }
+        // 2026-05-07 : recalcule la taille de la fenêtre quand le provider
+        // bascule de « pas utilisable » à « utilisable » (ou inverse) sans
+        // que la popup ait été fermée entre-temps. Cas d'usage : utilisateur
+        // ouvre popup empty state → garde popup ouverte → ouvre Réglages →
+        // configure une clé → ferme Réglages → la popup se redimensionne
+        // automatiquement vers le mode liste (et inverse si suppression de
+        // la clé). Sans ce hook, la NSWindow resterait figée à la taille
+        // d'ouverture.
+        .onChange(of: store.hasUsableProvider) { _, _ in
+            globalAppDelegate?.resizePopover(to: .list)
+        }
+    }
+
+    // MARK: - Actions list (ex-zone basse de mainView)
+
+    /// Zone basse de la popup en mode normal : search bar, liste d'actions,
+    /// updateRow conditionnel, settingsRow, footer nav. Extrait de `mainView`
+    /// le 2026-05-07 pour permettre la bascule avec `emptyStateView` sans
+    /// dupliquer la top bar.
+    private var actionsListView: some View {
+        // Phase 1.4i : zone basse de la popup (liste + footer nav) en
+        // controlBackgroundColor, légèrement distincte du chrome supérieur.
+        VStack(spacing: 0) {
+            // Phase 1.4g : bandeau de recherche toujours visible, avec
+            // placeholder « Rechercher » pour signaler la fonction à
+            // l'utilisateur. Alimenté par la frappe directe (onKeyPress
+            // ci-dessous), backspace supprime le dernier char.
+            // Curseur clignotant : feedback visuel « champ actif » — le popup
+            // reçoit la saisie en permanence via onKeyPress, donc il n'y a pas
+            // de vrai @FocusState sur un TextField à refléter. On affiche
+            // simplement un curseur qui clignote pour que l'utilisateur
+            // comprenne qu'il peut taper directement.
+            HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -473,49 +569,76 @@ struct PopoverView: View {
                 .padding(.vertical, 8)
             }
             .background(Color(NSColor.controlBackgroundColor))
-        }
-        .focusable()
-        .focusEffectDisabled()
-        .focused($focus, equals: .main)
-        // Handler clavier SwiftUI pour flèches + Entrée + saisie de recherche.
-        // Backspace (⌫) et Esc (⎋) sont gérés par le monitor NSEvent
-        // (cf. installSlotMonitorIfNeeded) car .onKeyPress(.delete/.escape) est
-        // peu fiable sur macOS quand la fenêtre est préchargée (NSHostingView) —
-        // le système intercepte souvent avant que SwiftUI ne reçoive l'event.
-        .onKeyPress(phases: .down) { press in
-            switch press.key {
-            case .upArrow:
-                state.selectedIndex = max(0, state.selectedIndex - 1)
-                return .handled
-            case .downArrow:
-                // Phase 6.7 : +1 pour inclure le settings row (index = filteredActions.count).
-                state.selectedIndex = min(filteredActions.count, state.selectedIndex + 1)
-                return .handled
-            case .return:
-                // Phase 6.7 : si selectedIndex pointe sur le settings row (dernier
-                // index = filteredActions.count), on ouvre les Réglages.
-                if state.selectedIndex == filteredActions.count {
-                    onOpenSettings()
-                } else if filteredActions.indices.contains(state.selectedIndex) {
-                    state.runAction(filteredActions[state.selectedIndex])
-                }
-                return .handled
-            default:
-                // Phase 1.4g : tout caractère imprimable mono-char alimente
-                // la recherche (lettres, accents, chiffres, espace, ponctuation).
-                if press.characters.count == 1, let ch = press.characters.first,
-                   ch.isLetter || ch.isNumber || ch.isPunctuation || ch == " " {
-                    state.searchQuery.append(ch)
-                    return .handled
-                }
-                return .ignored
+    }
+
+    // MARK: - Empty state (pas de clé API configurée — 2026-05-07)
+
+    /// Vue alternative à `actionsListView` quand `store.hasUsableProvider`
+    /// est `false`. Affiche un texte contextuel + un seul item
+    /// « 🔑 Configure une clé API » (toujours rendu en état sélectionné
+    /// pour que ↵ ouvre Réglages directement) + un footer nav simplifié.
+    /// Le bouton logo en top bar reste fonctionnel (deuxième chemin
+    /// vers Réglages).
+    private var emptyStateView: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 16) {
+                Text("Pour utiliser loucedé, configure une clé API")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                configureAPIKeyRow()
+                    .padding(.horizontal, 8)
             }
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
+
+            Spacer(minLength: 0)
+
+            Divider()
+
+            // Footer nav simplifié : pas de ↑↓ (un seul item, rien à
+            // naviguer). Layout symétrique avec Spacer central —
+            // à valider runtime selon le ressenti (potentielle
+            // flottaison sur footer si court ; à reposer en ferrage
+            // à gauche « ↵ Valider · esc Fermer » si nécessaire).
+            HStack(spacing: 8) {
+                KeyboardKey("↵")
+                Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
+                Spacer()
+                KeyboardKey("esc")
+                Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
         }
-        // Reset l'index sélectionné quand la liste filtrée change, sinon on peut
-        // pointer hors-bornes après filtrage.
-        .onChange(of: state.searchQuery) { _, _ in
-            state.selectedIndex = 0
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    /// Item unique de l'empty state — clic ou ↵ ouvre Réglages → Général.
+    /// Toujours rendu en état « sélectionné » (couleur #3F84F7 + texte
+    /// blanc) pour que ↵ marche directement et que l'utilisateur visualise
+    /// immédiatement l'action par défaut. Pas de raccourci ⌘+touche
+    /// affiché à droite : c'est une action contextuelle, pas une action
+    /// utilisateur.
+    private func configureAPIKeyRow() -> some View {
+        HStack(spacing: 10) {
+            Text("🔑")
+                .font(.system(size: 14))
+                .frame(width: 20, height: 20)
+            Text("Configure une clé API")
+                .font(.system(size: 13))
+            Spacer()
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .foregroundStyle(Color.white)
+        .background(Color(hex: "3F84F7"))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onTapGesture { onOpenSettings() }
+        .pointerCursor()
     }
 
     private func actionRow(action: Action, index: Int) -> some View {
