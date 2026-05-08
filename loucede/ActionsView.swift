@@ -12,11 +12,45 @@ import UniformTypeIdentifiers
 // MARK: - Actions Settings
 
 struct ActionsSettingsView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var store = ActionsStore.shared
     @Binding var selectedAction: Action?
 
+    /// Mini-session Point 3 pre-V1 (2026-05-08) : couleur de texte
+    /// adaptive light/dark mode. Aligné sur le pattern de `TemplatesView`
+    /// pour que le header de cet onglet match exactement le style du
+    /// header de l'onglet Modèles.
+    var textGrayColor: Color {
+        colorScheme == .light
+            ? Color(white: 0.35)
+            : Color(white: 0.65)
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
+            // Header — Mini-session Point 3 pre-V1 (2026-05-08).
+            // Strictement aligné sur le header de `TemplatesView` (titre 18pt
+            // bold à gauche + secondary text 12pt à droite, padding 24/20/16).
+            // « Glisse pour réorganiser » communique la nouvelle affordance
+            // drag-and-drop introduite dans cette session.
+            HStack {
+                Text("Tes actions")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(textGrayColor)
+
+                Spacer()
+
+                Text("Glisse pour réorganiser")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            HStack(spacing: 0) {
             // Sidebar - Actions list
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
@@ -39,6 +73,26 @@ struct ActionsSettingsView: View {
                                 )
                                 .onTapGesture {
                                     selectedAction = action
+                                }
+                                // Mini-session Point 3 pre-V1 (2026-05-08) :
+                                // chaque ActionListRow remplie est une zone
+                                // de drop. Quand un autre `action.id` est
+                                // déposé ici, on appelle `moveAction` avec
+                                // l'index courant comme destination
+                                // (sémantique « drop at position »).
+                                // Les `EmptySlotRow` ne câblent PAS
+                                // `.dropDestination` → bounce-back natif
+                                // SwiftUI sur drop hors-zone.
+                                .dropDestination(for: String.self) { items, _ in
+                                    guard let droppedIDStr = items.first,
+                                          let droppedID = UUID(uuidString: droppedIDStr),
+                                          let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID }),
+                                          fromIndex != position
+                                    else { return false }
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        store.moveAction(from: fromIndex, to: position)
+                                    }
+                                    return true
                                 }
                             } else {
                                 EmptySlotRow(
@@ -199,6 +253,7 @@ struct ActionsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(NSColor.windowBackgroundColor))
             }
+            }   // closes the inner HStack(spacing: 0) { sidebar + editor }
         }
     }
 
@@ -345,6 +400,51 @@ struct ActionListRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            // Mini-session Point 3 pre-V1 (2026-05-08) : poignée de
+            // drag-and-drop. Position fixe à gauche (convention macOS).
+            // Toujours visible, couleur secondaire pour rester discrète.
+            // Curseur `openHand` au survol (distinct du `pointingHand`
+            // utilisé pour les zones cliquables — signale spécifiquement
+            // « drag » plutôt que « click »). La zone draggable est limitée
+            // à cette poignée (`.draggable` apposé ICI), pas à toute la
+            // ligne — sinon conflit avec l'`onTapGesture` de sélection
+            // appliqué au call-site.
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+                .draggable(action.id.uuidString) {
+                    // Drag preview : mini-card icône + nom (cohérent avec
+                    // le rendu de l'action dans la sidebar, mais isolée
+                    // de la grille pour éviter qu'AppKit ne montre la
+                    // pleine ligne avec backgrounds/dividers pendant le
+                    // drag).
+                    HStack(spacing: 8) {
+                        ActionIconView(icon: action.icon, boxSize: 24, fontSize: 18)
+                        Text(action.name.isEmpty ? "Nouvelle action" : action.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(textGrayColor)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.controlBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.openHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+
             // Icon (Phase 6.4 : emoji via ActionIconView, avec fallback
             // placeholder gris pour les SF legacy non migrés)
             ActionIconView(icon: action.icon, boxSize: 24, fontSize: 18)

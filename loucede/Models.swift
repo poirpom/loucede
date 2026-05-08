@@ -684,6 +684,25 @@ class ActionsStore: ObservableObject {
         saveActions()
     }
 
+    /// Réordonne une action de `sourceIndex` vers `destinationIndex` dans
+    /// `actions`. Sémantique « drop at position » : après l'opération,
+    /// l'action initialement à `sourceIndex` se trouve à `destinationIndex`
+    /// (cohérent avec l'attente UI quand l'utilisateur drag puis drop).
+    /// L'ordre étant intrinsèque à l'array Swift, l'autosave dans
+    /// UserDefaults persiste le nouvel ordre sans clé supplémentaire.
+    /// Les raccourcis ⌘1-⌘0 / ⌘A/Z/E/R/T sont réattribués automatiquement
+    /// puisqu'ils sont calculés dynamiquement depuis l'index dans
+    /// `actions` (cf. `ActionsStore.shortcut(forPosition:)`).
+    /// Point 3 pre-V1 (2026-05-08).
+    func moveAction(from sourceIndex: Int, to destinationIndex: Int) {
+        guard actions.indices.contains(sourceIndex),
+              actions.indices.contains(destinationIndex),
+              sourceIndex != destinationIndex else { return }
+        let action = actions.remove(at: sourceIndex)
+        actions.insert(action, at: destinationIndex)
+        saveActions()
+    }
+
     // MARK: - Export / Import JSON (Phase 2.4)
 
     /// Enveloppe stable pour les fichiers d'export/import. Versionnée via `schema`
