@@ -176,29 +176,24 @@ struct ActionsSettingsView: View {
                                 .lineSpacing(2)
                         }
 
-                        // Bouton "Nouvelle action" - style 3D Duolingo
+                        // Bouton « Nouvelle action ».
+                        // Mini-session 2026-05-08 : remplace le custom 3D
+                        // « Duolingo » hérité de TexTab par le style système
+                        // macOS, cohérent avec le pattern adopté en Session 5
+                        // pour l'onboarding (cf. `Onboarding/WelcomeStep.swift`
+                        // → bouton « Commencer ») — `.borderedProminent` +
+                        // `.controlSize(.large)`. Ajout du SF Symbol `plus`
+                        // via `Label` : renforce l'intention de création,
+                        // convention macOS (Finder, Calendar, Notes), et
+                        // cohérent avec le « + » placeholder de
+                        // `EmojiPickerButton` ajouté dans le commit précédent.
                         Button(action: {
                             addNewAction()
                         }) {
-                            Text("Nouvelle action")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 40)
-                                .padding(.vertical, 12)
-                                .background(
-                                    ZStack {
-                                        // Bottom layer (3D effect) - darker blue
-                                        RoundedRectangle(cornerRadius: 22)
-                                            .fill(Color(red: 0.0, green: 0.45, blue: 0.8))
-                                            .offset(y: 4)
-
-                                        // Top layer - #0095ff
-                                        RoundedRectangle(cornerRadius: 22)
-                                            .fill(Color(red: 0.0, green: 0.584, blue: 1.0))
-                                    }
-                                )
+                            Label("Nouvelle action", systemImage: "plus")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
