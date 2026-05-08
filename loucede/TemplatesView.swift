@@ -510,11 +510,26 @@ struct TemplatesView: View {
 
     /// Mini-session catalogue (2026-05-08) : un modèle est considéré
     /// « déjà ajouté » si une action existe avec `originTemplateName`
-    /// égal au nom du template. Match par origine (pas par état) — donc
-    /// préservé même si l'utilisateur a renommé l'action ou modifié son
-    /// prompt après ajout.
+    /// égal au nom du template, OU si une action a simplement le même
+    /// nom que le template. Le match `OR` couvre :
+    ///   - actions du seed default V1 (Résume, Corrige, Style, Traduis FR,
+    ///     Todo) → match par `name`, leur `originTemplateName` est `nil`
+    ///   - actions pré-mini-session (créées avant 2026-05-08) → match
+    ///     par `name`, idem `originTemplateName == nil`
+    ///   - actions post-mini-session non renommées → matchent les deux
+    ///   - actions post-mini-session **renommées** par l'utilisateur →
+    ///     match par `originTemplateName` (le `name` ne matche plus)
+    ///   - userTemplates (catégorie « Mes modèles ») → match par `name`,
+    ///     puisqu'un userTemplate dérive d'une action `isInTemplates: true`
+    ///     dont le `name` est identique
+    /// Edge case accepté V1 : si l'utilisateur crée manuellement une
+    /// action nommée comme un built-in sans origine, la coche apparaît
+    /// quand même sur le built-in (homonymie pure traitée comme
+    /// « déjà présent dans la liste »).
     func isTemplateAdded(_ template: PromptSuggestion) -> Bool {
-        store.actions.contains { $0.originTemplateName == template.name }
+        store.actions.contains { action in
+            action.originTemplateName == template.name || action.name == template.name
+        }
     }
 
     func addTemplateToActions(_ template: PromptSuggestion) {
