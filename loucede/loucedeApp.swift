@@ -7,7 +7,6 @@ import SwiftUI
 import AppKit
 import Carbon.HIToolbox
 import Combine
-import WebKit
 
 @main
 struct loucedeApp: App {
@@ -48,15 +47,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var quickPromptWindow: NSWindow?
     var settingsWindow: NSWindow?
     var onboardingWindow: NSWindow?
-    /// Fenêtre dédiée à la documentation Notion (Point 4 pre-V1, 2026-05-08).
+    /// Fenêtre dédiée à la documentation (Point 4 pre-V1, 2026-05-08).
+    /// Phase de transition : héberge actuellement un placeholder
+    /// « En construction » (cf. `DocumentationView`), en attendant
+    /// l'intégration native Notion API + Scaleway proxy + swift-markdown-ui
+    /// développée en 4 incréments (A → D).
     /// Créée à la première ouverture, mise au front à chaque ⌘D suivant.
     /// Persistance position/taille via `setFrameAutosaveName` (mécanisme
     /// natif AppKit, pas de UserDefaults manuel).
     var docWindow: NSWindow?
-    /// Référence vers le WKWebView interne, mémorisée par
-    /// `DocumentationWebView.makeNSView` pour permettre les reloads
-    /// d'URL sans recréer le composant entre les opens.
-    weak var docWebView: WKWebView?
     var eventMonitor: Any?
     var localEventMonitor: Any?
     var hotKeyRef: EventHotKeyRef?
@@ -752,30 +751,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// URL Notion publique de la documentation loucedé (vue filtrée
-    /// pour les tutos utilisateurs publiés). Point 4 pre-V1 (2026-05-08).
-    /// V2 remplacera cette webview par un rendu natif via Notion API +
-    /// proxy Scaleway + swift-markdown-ui (cf. `vision-doc-integration.md`).
-    static let documentationURL = URL(string: "https://loucede.notion.site/35a2f817bcad80669957ef9850c5efbe?v=35a2f817bcad8038a90f000c759113c6")!
-
-    /// Ouvre (ou ramène au front) la fenêtre de documentation interne.
+    /// Ouvre (ou ramène au front) la fenêtre de documentation.
     /// Point 4 pre-V1 (2026-05-08) — appelée par le shortcut ⌘D du popup.
+    ///
+    /// Phase de transition (cf. `DocumentationView`) : la fenêtre héberge
+    /// actuellement un placeholder « En construction » statique, donc
+    /// pas de logique de reload — `existing.makeKeyAndOrderFront` suffit.
+    /// Quand l'intégration native Notion API + swift-markdown-ui sera
+    /// branchée (incréments A → D), c'est `DocumentationView` qui
+    /// récupérera son propre cycle de chargement / refresh.
     ///
     /// Comportement :
     /// - Si la fenêtre n'existe pas encore → la crée (900×700, centrée,
     ///   resizable, position/taille auto-persistées via
     ///   `setFrameAutosaveName`).
-    /// - Si la fenêtre existe MAIS est cachée (utilisateur l'a fermée
-    ///   via ⌘W) → la ramène et reload l'URL d'accueil (cf. décision
-    ///   produit : retour à l'URL d'accueil à chaque ouverture).
-    /// - Si la fenêtre est déjà visible → la met au front + reload URL
-    ///   (idem, retour à l'accueil).
+    /// - Si la fenêtre existe (visible ou cachée par ⌘W précédent) →
+    ///   la met / ramène au front.
     @objc func openDocumentation() {
         if let existing = docWindow {
-            // La fenêtre survit aux fermetures (`isReleasedWhenClosed = false`).
-            // On reload l'URL d'accueil systématiquement à chaque ⌘D
-            // pour matcher la décision produit.
-            docWebView?.load(URLRequest(url: Self.documentationURL))
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -789,9 +782,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.title = "Documentation loucedé"
         window.minSize = NSSize(width: 600, height: 400)
-        window.contentView = NSHostingView(
-            rootView: DocumentationView(url: Self.documentationURL)
-        )
+        window.contentView = NSHostingView(rootView: DocumentationView())
         window.center()
         // Persistance native AppKit : la frame est sauvegardée auto
         // dans UserDefaults sous la clé « NSWindow Frame loucede.documentation »
