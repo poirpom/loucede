@@ -451,7 +451,13 @@ struct TemplatesView: View {
     @Environment(\.colorScheme) var colorScheme
     @StateObject private var store = ActionsStore.shared
     @State private var selectedCategory: PromptCategory? = nil
-    @State private var addedTemplateId: UUID? = nil
+    /// Mini-session catalogue (2026-05-08) : la bascule auto vers l'onglet
+    /// Actions après ajout d'un modèle a été retirée. Le callback reste
+    /// câblé côté `SettingsView` pour usage futur potentiel (ex. bouton
+    /// « Voir dans Actions » sur les cards déjà ajoutées) mais n'est plus
+    /// appelé par `addTemplateToActions`. Le state transient `addedTemplateId`
+    /// a aussi été retiré : le feedback visuel est désormais porté par la
+    /// coche verte permanente (state persistant via `originTemplateName`).
     var onNavigateToActions: (Action) -> Void
 
     /// Modèles publiés par l'utilisateur (correctif 2026-04-28). Rendus
@@ -502,27 +508,38 @@ struct TemplatesView: View {
             : Color(white: 0.65)
     }
 
+    /// Mini-session catalogue (2026-05-08) : un modèle est considéré
+    /// « déjà ajouté » si une action existe avec `originTemplateName`
+    /// égal au nom du template. Match par origine (pas par état) — donc
+    /// préservé même si l'utilisateur a renommé l'action ou modifié son
+    /// prompt après ajout.
+    func isTemplateAdded(_ template: PromptSuggestion) -> Bool {
+        store.actions.contains { $0.originTemplateName == template.name }
+    }
+
     func addTemplateToActions(_ template: PromptSuggestion) {
         // V1 : nombre d'actions illimité.
+        // Mini-session catalogue (2026-05-08) : `originTemplateName` permet
+        // d'afficher la coche verte « déjà ajoutée » sur la card du template
+        // correspondant (`isTemplateAdded(_:)` ci-dessus). Lien stable across
+        // launches puisque les noms de templates sont des `let` au scope du
+        // fichier.
         let newAction = Action(
             name: template.name,
             icon: template.icon,
             prompt: template.prompt,
-            actionType: .ai
+            actionType: .ai,
+            originTemplateName: template.name
         )
-        store.addAction(newAction)
-
-        // Show confirmation
+        // Wrappe dans withAnimation pour que la transition « + » → coche
+        // verte sur la card soit animée par le ressort déjà câblé sur
+        // `TemplateCard` (cf. `.animation(.spring, value: isAdded)`).
+        // Plus de bascule auto vers l'onglet Actions ni de flash transitoire :
+        // le feedback visuel est porté par la coche verte permanente, et
+        // l'utilisateur reste sur Modèles pour ajouter d'autres templates
+        // en série sans interruption du flow.
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            addedTemplateId = template.id
-        }
-
-        // Navigate to Actions tab after a short delay and select the new action
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation {
-                addedTemplateId = nil
-            }
-            onNavigateToActions(newAction)
+            store.addAction(newAction)
         }
     }
 
@@ -583,7 +600,7 @@ struct TemplatesView: View {
                     ForEach(filteredTemplates) { template in
                         TemplateCard(
                             template: template,
-                            isAdded: addedTemplateId == template.id,
+                            isAdded: isTemplateAdded(template),
                             onTap: {
                                 addTemplateToActions(template)
                             }

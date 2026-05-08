@@ -57,8 +57,16 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     /// L'action apparaît alors dans l'onglet Modèles, catégorie « Mes modèles ».
     /// Correctif 2026-04-28.
     var isInTemplates: Bool
+    /// Nom du template d'origine si l'action a été ajoutée depuis l'onglet
+    /// Modèles. Utilisé pour afficher la coche verte « déjà ajoutée » sur
+    /// la card du template correspondant (cf. `TemplatesView.TemplateCard`).
+    /// Le lien est par ORIGINE (nom du template au moment de l'ajout), pas
+    /// par état actuel — donc préservé même si l'utilisateur renomme l'action,
+    /// modifie son prompt ou son emoji. `nil` pour les actions du seed et
+    /// pour les actions créées avant le 2026-05-08 (mini-session catalogue).
+    var originTemplateName: String?
 
-    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false) {
+    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false, originTemplateName: String? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -67,10 +75,11 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         self.actionType = actionType
         self.shortDescription = shortDescription
         self.isInTemplates = isInTemplates
+        self.originTemplateName = originTemplateName
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, icon, prompt, slotIndex, actionType, shortDescription, isInTemplates
+        case id, name, icon, prompt, slotIndex, actionType, shortDescription, isInTemplates, originTemplateName
     }
 
     init(from decoder: Decoder) throws {
@@ -83,6 +92,7 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         actionType = try container.decodeIfPresent(ActionType.self, forKey: .actionType) ?? .ai
         shortDescription = try container.decodeIfPresent(String.self, forKey: .shortDescription)
         isInTemplates = try container.decodeIfPresent(Bool.self, forKey: .isInTemplates) ?? false
+        originTemplateName = try container.decodeIfPresent(String.self, forKey: .originTemplateName)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -95,6 +105,7 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encode(actionType, forKey: .actionType)
         try container.encodeIfPresent(shortDescription, forKey: .shortDescription)
         try container.encode(isInTemplates, forKey: .isInTemplates)
+        try container.encodeIfPresent(originTemplateName, forKey: .originTemplateName)
     }
 }
 
