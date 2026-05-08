@@ -115,7 +115,28 @@ struct ActionsSettingsView: View {
             Divider()
 
             // Editor or Empty State
-            if let action = selectedAction {
+            //
+            // Mini-session bug fix (2026-05-08) : la parent @State
+            // `selectedAction` peut être STALE — Phase 6.8c-fix avait retiré
+            // la réassignation de `selectedAction` dans `onSave` (ci-dessous)
+            // pour éviter des boucles de re-render pendant la frappe. Le
+            // trade-off : la snapshot du parent reste figée à la dernière
+            // valeur posée par `addNewAction` ou par un clic sidebar, et
+            // diverge du store dès la première frappe utilisateur.
+            //
+            // Tant que `ActionsSettingsView` reste vivante, l'éditeur a son
+            // propre `@State var action` qui suit l'utilisateur — pas de bug
+            // visible. Mais au tab switch (`Group.id(selectedTab)` dans
+            // SettingsView détruit puis recrée cette vue), l'éditeur est
+            // recréé avec la valeur stale du parent → champs vides au retour
+            // sur l'onglet Actions après un détour par Modèles.
+            //
+            // Fix : on re-fetch toujours depuis le store par id avant de
+            // construire l'éditeur. Coût : O(n) avec n ≤ 15 (cap V1) =
+            // trivial. Aucune mutation, aucun risque de réintroduire le
+            // render-loop documenté en Phase 6.8c-fix.
+            if let staleSelected = selectedAction,
+               let action = store.actions.first(where: { $0.id == staleSelected.id }) {
                 ActionEditorView(
                     action: action,
                     onSave: { updatedAction in
