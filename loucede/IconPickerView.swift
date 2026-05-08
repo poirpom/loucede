@@ -168,7 +168,30 @@ struct EmojiPickerButton: View {
         // visuellement la cliquabilité du composant que l'utilisateur ait
         // déjà choisi un emoji ou non. Cohérent avec le fait que le clic
         // ouvre le picker quel que soit l'état actuel.
-        .pointerCursor()
+        //
+        // Pourquoi `.onContinuousHover` + `NSCursor.set()` plutôt que le
+        // helper `.pointerCursor()` standard du projet (cf. PopoverView) :
+        // le `TextField` invisible posé au-dessus de l'`ActionIconView`
+        // (quelques lignes plus haut) sert d'ancrage pour le picker emoji
+        // système. Or `TextField` est implémentée via `NSTextField` (AppKit)
+        // qui possède sa propre `NSTrackingArea` appelant
+        // `NSCursor.iBeam.set()` dès l'entrée — indépendamment de
+        // `.allowsHitTesting(false)` qui n'agit qu'au niveau SwiftUI.
+        // `.pointerCursor()` utilise `push/pop` (gestion de la pile NSCursor)
+        // qui est visuellement écrasée par le `.set()` direct d'AppKit.
+        // La solution : utiliser nous-mêmes `.set()` à chaque mouvement de
+        // curseur via `.onContinuousHover`, ce qui ré-écrase le `iBeam.set()`
+        // posé par le tracking area NSTextField.
+        // À la sortie de la zone, on remet `arrow.set()` explicitement —
+        // pas de pile à dépiler puisqu'on n'utilise pas `push`.
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                NSCursor.pointingHand.set()
+            case .ended:
+                NSCursor.arrow.set()
+            }
+        }
         .onTapGesture {
             isFocused = true
             // Léger délai (~50 ms) pour laisser SwiftUI propager le focus
