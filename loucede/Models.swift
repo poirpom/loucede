@@ -685,21 +685,43 @@ class ActionsStore: ObservableObject {
     }
 
     /// Réordonne une action de `sourceIndex` vers `destinationIndex` dans
-    /// `actions`. Sémantique « drop at position » : après l'opération,
-    /// l'action initialement à `sourceIndex` se trouve à `destinationIndex`
-    /// (cohérent avec l'attente UI quand l'utilisateur drag puis drop).
+    /// `actions`. Sémantique « drop BEFORE target » : l'action draggée
+    /// atterrit JUSTE AU-DESSUS de la row à `destinationIndex` (avant
+    /// shift). Cohérent avec l'indicateur visuel « ligne bleue au top edge
+    /// de la targeted row » introduit en suivi du Point 3 (2026-05-08).
+    ///
+    /// Cas particulier « drop at end » : appeler avec
+    /// `destinationIndex == actions.count` (= une position au-delà du
+    /// dernier index valide). Le clamp interne envoie l'item à la fin de
+    /// l'array post-removal.
+    ///
+    /// Détail de l'ajustement d'index : si `sourceIndex < destinationIndex`,
+    /// après removal les indices >= sourceIndex shiftent de 1 vers le bas,
+    /// donc `destinationIndex` doit aussi être décrémenté pour pointer sur
+    /// la même row. Si `sourceIndex > destinationIndex`, removal n'affecte
+    /// pas les indices < sourceIndex, donc destinationIndex reste valide.
+    ///
     /// L'ordre étant intrinsèque à l'array Swift, l'autosave dans
     /// UserDefaults persiste le nouvel ordre sans clé supplémentaire.
     /// Les raccourcis ⌘1-⌘0 / ⌘A/Z/E/R/T sont réattribués automatiquement
     /// puisqu'ils sont calculés dynamiquement depuis l'index dans
     /// `actions` (cf. `ActionsStore.shortcut(forPosition:)`).
-    /// Point 3 pre-V1 (2026-05-08).
+    /// Point 3 pre-V1 (2026-05-08, ajusté en suivi pour cohérence
+    /// indicateur ↔ moveAction).
     func moveAction(from sourceIndex: Int, to destinationIndex: Int) {
         guard actions.indices.contains(sourceIndex),
-              actions.indices.contains(destinationIndex),
+              destinationIndex >= 0,
+              destinationIndex <= actions.count,
               sourceIndex != destinationIndex else { return }
         let action = actions.remove(at: sourceIndex)
-        actions.insert(action, at: destinationIndex)
+        let adjustedDest: Int
+        if sourceIndex < destinationIndex {
+            adjustedDest = destinationIndex - 1
+        } else {
+            adjustedDest = destinationIndex
+        }
+        let clampedDest = min(max(adjustedDest, 0), actions.count)
+        actions.insert(action, at: clampedDest)
         saveActions()
     }
 

@@ -15,6 +15,13 @@ struct ActionsSettingsView: View {
     @Environment(\.colorScheme) var colorScheme
     @StateObject private var store = ActionsStore.shared
     @Binding var selectedAction: Action?
+    /// Suivi de l'index de la row actuellement survolée par un drag actif.
+    /// Mis à jour via les closures `isTargeted` de chaque `.dropDestination`.
+    /// Affiche une ligne bleue au top edge de la row correspondante via
+    /// `.overlay(alignment: .top)`. Reset à `nil` au drop (succès ou échec)
+    /// et quand le curseur sort de toutes les zones de drop.
+    /// Suivi Point 3 pre-V1 (2026-05-08).
+    @State private var dropTargetIndex: Int?
 
     /// Mini-session Point 3 pre-V1 (2026-05-08) : couleur de texte
     /// adaptive light/dark mode. Aligné sur le pattern de `TemplatesView`
@@ -79,11 +86,24 @@ struct ActionsSettingsView: View {
                                 // de drop. Quand un autre `action.id` est
                                 // déposé ici, on appelle `moveAction` avec
                                 // l'index courant comme destination
-                                // (sémantique « drop at position »).
-                                // Les `EmptySlotRow` ne câblent PAS
-                                // `.dropDestination` → bounce-back natif
-                                // SwiftUI sur drop hors-zone.
+                                // (sémantique « drop BEFORE target », cf.
+                                // doc-string de `moveAction`).
+                                // Les `EmptySlotRow` non-next-available ne
+                                // câblent PAS `.dropDestination` → bounce-
+                                // back natif SwiftUI. Seul le slot
+                                // immédiatement après la dernière action
+                                // (`position == store.actions.count`) est
+                                // une zone de drop pour permettre le
+                                // « drop at end ».
+                                .overlay(alignment: .top) {
+                                    if dropTargetIndex == position {
+                                        Rectangle()
+                                            .fill(Color.accentColor)
+                                            .frame(height: 2)
+                                    }
+                                }
                                 .dropDestination(for: String.self) { items, _ in
+                                    defer { dropTargetIndex = nil }
                                     guard let droppedIDStr = items.first,
                                           let droppedID = UUID(uuidString: droppedIDStr),
                                           let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID }),
@@ -93,25 +113,65 @@ struct ActionsSettingsView: View {
                                         store.moveAction(from: fromIndex, to: position)
                                     }
                                     return true
-                                }
-                            } else {
-                                EmptySlotRow(
-                                    position: position,
-                                    isNextAvailable: position == store.actions.count
-                                )
-                                .onTapGesture {
-                                    // Seul le prochain slot libre crée une action.
-                                    // Les slots ultérieurs sont juste informatifs
-                                    // (preview du raccourci à venir).
-                                    if position == store.actions.count {
-                                        addNewAction()
+                                } isTargeted: { isTargeted in
+                                    if isTargeted {
+                                        dropTargetIndex = position
+                                    } else if dropTargetIndex == position {
+                                        // Garde-fou contre les races : on ne
+                                        // nile que si on était la row targeted
+                                        // (sinon une autre row vient d'être
+                                        // entrée et on effacerait son indicator).
+                                        dropTargetIndex = nil
                                     }
                                 }
+                            } else if position == store.actions.count {
+                                // Slot immédiatement après la dernière action :
+                                // tappable (création) ET drop zone (drop at end).
+                                // L'indicateur s'affiche au top edge — visuellement
+                                // « below last filled row ».
+                                EmptySlotRow(position: position, isNextAvailable: true)
+                                    .onTapGesture { addNewAction() }
+                                    .overlay(alignment: .top) {
+                                        if dropTargetIndex == position {
+                                            Rectangle()
+                                                .fill(Color.accentColor)
+                                                .frame(height: 2)
+                                        }
+                                    }
+                                    .dropDestination(for: String.self) { items, _ in
+                                        defer { dropTargetIndex = nil }
+                                        guard let droppedIDStr = items.first,
+                                              let droppedID = UUID(uuidString: droppedIDStr),
+                                              let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID })
+                                        else { return false }
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            // Destination = actions.count → moveAction
+                                            // clampe et place l'item à la fin post-removal.
+                                            store.moveAction(from: fromIndex, to: store.actions.count)
+                                        }
+                                        return true
+                                    } isTargeted: { isTargeted in
+                                        if isTargeted {
+                                            dropTargetIndex = position
+                                        } else if dropTargetIndex == position {
+                                            dropTargetIndex = nil
+                                        }
+                                    }
+                            } else {
+                                // Slots ultérieurs : informatifs uniquement
+                                // (preview du raccourci à venir). Pas tappable,
+                                // pas droppable.
+                                EmptySlotRow(position: position, isNextAvailable: false)
                             }
                         }
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 8)
+                    // Suivi Point 3 pre-V1 (2026-05-08) : animation rapide
+                    // de l'indicateur de drop. easeInOut 0.1s suit le
+                    // mouvement souris sans lag perceptible. Pas spring
+                    // (perçu trop bouncy pour un indicator de drop).
+                    .animation(.easeInOut(duration: 0.1), value: dropTargetIndex)
                 }
                 .scrollIndicators(.hidden)
 
