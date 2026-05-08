@@ -7,6 +7,7 @@ import SwiftUI
 import AppKit
 import Carbon.HIToolbox
 import Combine
+import WebKit
 
 @main
 struct loucedeApp: App {
@@ -47,6 +48,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var quickPromptWindow: NSWindow?
     var settingsWindow: NSWindow?
     var onboardingWindow: NSWindow?
+    /// Fenêtre dédiée à la documentation Notion (Point 4 pre-V1, 2026-05-08).
+    /// Créée à la première ouverture, mise au front à chaque ⌘D suivant.
+    /// Persistance position/taille via `setFrameAutosaveName` (mécanisme
+    /// natif AppKit, pas de UserDefaults manuel).
+    var docWindow: NSWindow?
+    /// Référence vers le WKWebView interne, mémorisée par
+    /// `DocumentationWebView.makeNSView` pour permettre les reloads
+    /// d'URL sans recréer le composant entre les opens.
+    weak var docWebView: WKWebView?
     var eventMonitor: Any?
     var localEventMonitor: Any?
     var hotKeyRef: EventHotKeyRef?
@@ -739,6 +749,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         settingsWindow = window
         settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// URL Notion publique de la documentation loucedé (vue filtrée
+    /// pour les tutos utilisateurs publiés). Point 4 pre-V1 (2026-05-08).
+    /// V2 remplacera cette webview par un rendu natif via Notion API +
+    /// proxy Scaleway + swift-markdown-ui (cf. `vision-doc-integration.md`).
+    static let documentationURL = URL(string: "https://loucede.notion.site/35a2f817bcad80669957ef9850c5efbe?v=35a2f817bcad8038a90f000c759113c6")!
+
+    /// Ouvre (ou ramène au front) la fenêtre de documentation interne.
+    /// Point 4 pre-V1 (2026-05-08) — appelée par le shortcut ⌘D du popup.
+    ///
+    /// Comportement :
+    /// - Si la fenêtre n'existe pas encore → la crée (900×700, centrée,
+    ///   resizable, position/taille auto-persistées via
+    ///   `setFrameAutosaveName`).
+    /// - Si la fenêtre existe MAIS est cachée (utilisateur l'a fermée
+    ///   via ⌘W) → la ramène et reload l'URL d'accueil (cf. décision
+    ///   produit : retour à l'URL d'accueil à chaque ouverture).
+    /// - Si la fenêtre est déjà visible → la met au front + reload URL
+    ///   (idem, retour à l'accueil).
+    @objc func openDocumentation() {
+        if let existing = docWindow {
+            // La fenêtre survit aux fermetures (`isReleasedWhenClosed = false`).
+            // On reload l'URL d'accueil systématiquement à chaque ⌘D
+            // pour matcher la décision produit.
+            docWebView?.load(URLRequest(url: Self.documentationURL))
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Documentation loucedé"
+        window.minSize = NSSize(width: 600, height: 400)
+        window.contentView = NSHostingView(
+            rootView: DocumentationView(url: Self.documentationURL)
+        )
+        window.center()
+        // Persistance native AppKit : la frame est sauvegardée auto
+        // dans UserDefaults sous la clé « NSWindow Frame loucede.documentation »
+        // et restaurée au prochain lancement (override le `center()` ci-dessus
+        // dès le 2e open).
+        window.setFrameAutosaveName("loucede.documentation")
+        window.isReleasedWhenClosed = false
+
+        docWindow = window
+        docWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 

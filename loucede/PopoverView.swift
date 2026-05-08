@@ -259,16 +259,16 @@ struct PopoverView: View {
                     settingsHandler()
                     return nil
                 }
-                // ⌘D — ouvre la doc Notion publique dans le browser par défaut
-                // (Point 2 pre-V1). Implémentation temporaire — Point 4 du
-                // backlog la remplacera par une webview interne. La touche D
-                // (keycode 2) n'est pas dans `positionShortcuts` donc aucun
-                // conflit avec un slot d'action. Check placé AVANT le guard
-                // de position par défense (au cas où la table évoluerait).
+                // ⌘D — ouvre la doc Notion publique dans une fenêtre webview
+                // interne loucedé (Point 4 pre-V1, 2026-05-08). Si la fenêtre
+                // existe déjà, elle est mise au front et reload l'URL
+                // d'accueil. Cf. `AppDelegate.openDocumentation()`.
+                // La touche D (keycode 2) n'est pas dans `positionShortcuts`
+                // donc aucun conflit avec un slot d'action. Check placé AVANT
+                // le guard de position par défense (au cas où la table
+                // évoluerait).
                 if event.charactersIgnoringModifiers == "d" {
-                    if let url = URL(string: "https://loucede.notion.site/") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    globalAppDelegate?.openDocumentation()
                     return nil
                 }
                 guard let position = Self.position(forPhysicalKeyCode: event.keyCode),
