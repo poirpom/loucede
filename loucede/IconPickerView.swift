@@ -20,10 +20,30 @@ import AppKit
 
 // MARK: - Action Icon View (affichage)
 
+/// Style du placeholder rendu quand `icon` n'est pas un emoji valide
+/// (mini-session 2026-05-08). Distingue deux contextes d'affichage :
+/// - `.grayCircle` (défaut) : lecture seule. Petit cercle gris discret
+///   pour les surfaces non-éditables (sidebar Actions, cards Modèles,
+///   popup principale). Communique « pas d'emoji, sans plus ».
+/// - `.plusButton` : édition. Cercle stroké avec un « + » centré, pour
+///   les surfaces où l'utilisateur peut cliquer pour ouvrir le picker
+///   emoji (panneau détail Actions via `EmojiPickerButton`). Communique
+///   « clique ici pour choisir un emoji ».
+enum IconPlaceholderStyle {
+    case grayCircle
+    case plusButton
+}
+
 /// Affiche l'icône d'une action — soit un emoji (cas normal après
-/// Phase 6.4), soit un placeholder gris si la chaîne stockée n'est
-/// pas un emoji valide (icônes SF Symbols legacy d'actions custom
-/// créées avant la migration, ou `icon` vide).
+/// Phase 6.4), soit un placeholder si la chaîne stockée n'est pas un
+/// emoji valide (icônes SF Symbols legacy d'actions custom créées
+/// avant la migration, ou `icon` vide, ou la valeur `"star"` posée par
+/// défaut par `addNewAction` — héritée de TextAd, jamais remappée
+/// puisque hors du seed historique de Phase 6.4).
+///
+/// Le style du placeholder est paramétrable via `placeholderStyle` :
+/// rond gris discret (défaut, lecture seule) ou bouton « + » avec
+/// cercle stroké (édition).
 ///
 /// Boîte de taille fixe pour éviter que la liste popup "danse"
 /// selon la forme de chaque emoji (drapeau court et large vs
@@ -35,6 +55,11 @@ struct ActionIconView: View {
     /// Taille de la police emoji. Fixée pour homogénéiser le rendu
     /// visuel entre emojis de "poids" différents.
     var fontSize: CGFloat = 16
+    /// Style du placeholder quand `icon` n'est pas un emoji valide.
+    /// Mini-session 2026-05-08 : ajout pour distinguer lecture seule
+    /// vs édition. Défaut `.grayCircle` rétrocompat avec tous les
+    /// call-sites existants.
+    var placeholderStyle: IconPlaceholderStyle = .grayCircle
 
     var body: some View {
         Group {
@@ -42,15 +67,33 @@ struct ActionIconView: View {
                 Text(icon)
                     .font(.system(size: fontSize))
             } else {
-                // Fallback : SF Symbol legacy non migré, ou icon vide.
-                // Cercle gris discret — l'utilisateur clique dessus pour
-                // ouvrir le picker système et choisir un emoji.
-                Circle()
-                    .fill(Color.gray.opacity(0.25))
-                    .frame(width: fontSize * 0.7, height: fontSize * 0.7)
+                placeholder
             }
         }
         .frame(width: boxSize, height: boxSize)
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
+        switch placeholderStyle {
+        case .grayCircle:
+            // Rond gris discret — surfaces lecture seule.
+            Circle()
+                .fill(Color.gray.opacity(0.25))
+                .frame(width: fontSize * 0.7, height: fontSize * 0.7)
+        case .plusButton:
+            // Cercle stroké + « + » centré — surface éditable. La
+            // taille suit fontSize pour rester proportionnelle à la
+            // boîte (24pt fontSize → 24pt cercle → 13pt plus).
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.4), lineWidth: 1.5)
+                    .frame(width: fontSize, height: fontSize)
+                Image(systemName: "plus")
+                    .font(.system(size: fontSize * 0.55, weight: .medium))
+                    .foregroundColor(Color.gray.opacity(0.6))
+            }
+        }
     }
 }
 
@@ -77,6 +120,13 @@ struct EmojiPickerButton: View {
     @Binding var icon: String
     var boxSize: CGFloat = 36
     var fontSize: CGFloat = 24
+    /// Style du placeholder propagé à l'`ActionIconView` interne quand
+    /// `icon` n'est pas un emoji. Mini-session 2026-05-08 : par défaut
+    /// `.plusButton` parce que ce composant est par construction destiné
+    /// aux surfaces éditables (le clic ouvre le picker). Si un call-site
+    /// veut un placeholder discret malgré l'éditabilité, il peut passer
+    /// `.grayCircle` explicitement.
+    var placeholderStyle: IconPlaceholderStyle = .plusButton
 
     /// Champ-tampon invisible : reçoit l'emoji inséré par la palette
     /// système. Vidé après chaque traitement pour ne pas accumuler les
@@ -86,8 +136,14 @@ struct EmojiPickerButton: View {
 
     var body: some View {
         ZStack {
-            // Affichage visible — identique au reste de l'app.
-            ActionIconView(icon: icon, boxSize: boxSize, fontSize: fontSize)
+            // Affichage visible — identique au reste de l'app, avec
+            // propagation du style de placeholder choisi par le call-site.
+            ActionIconView(
+                icon: icon,
+                boxSize: boxSize,
+                fontSize: fontSize,
+                placeholderStyle: placeholderStyle
+            )
 
             // TextField caché posé sur la même boîte que l'emoji.
             // - opacity 0.001 : invisible mais reste focusable (opacity 0
@@ -108,6 +164,11 @@ struct EmojiPickerButton: View {
                 }
         }
         .contentShape(Rectangle())
+        // Mini-session 2026-05-08 : curseur main au survol — signale
+        // visuellement la cliquabilité du composant que l'utilisateur ait
+        // déjà choisi un emoji ou non. Cohérent avec le fait que le clic
+        // ouvre le picker quel que soit l'état actuel.
+        .pointerCursor()
         .onTapGesture {
             isFocused = true
             // Léger délai (~50 ms) pour laisser SwiftUI propager le focus
@@ -162,10 +223,20 @@ struct EmojiPickerButton: View {
     .padding()
 }
 
-#Preview("ActionIcon – fallback") {
+#Preview("ActionIcon – fallback gray") {
     HStack {
-        ActionIconView(icon: "text.cursor") // SF legacy → placeholder
-        ActionIconView(icon: "")             // vide → placeholder
+        ActionIconView(icon: "text.cursor") // SF legacy → placeholder rond gris
+        ActionIconView(icon: "")             // vide → placeholder rond gris
+        ActionIconView(icon: "star")         // legacy TextAd → placeholder rond gris
+    }
+    .padding()
+}
+
+#Preview("ActionIcon – fallback plus") {
+    HStack {
+        ActionIconView(icon: "", boxSize: 36, fontSize: 24, placeholderStyle: .plusButton)
+        ActionIconView(icon: "star", boxSize: 36, fontSize: 24, placeholderStyle: .plusButton)
+        ActionIconView(icon: "🔥", boxSize: 36, fontSize: 24, placeholderStyle: .plusButton)
     }
     .padding()
 }

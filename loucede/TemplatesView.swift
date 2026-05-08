@@ -694,6 +694,14 @@ struct TemplateCard: View {
                     // On garde la boîte 3D colorée (couleur catégorie) en
                     // background pour ancrer visuellement la carte sur sa
                     // catégorie, et on affiche l'emoji par-dessus.
+                    //
+                    // Mini-session 2026-05-08 : check `isEmojiOnly` ajouté
+                    // pour éviter d'afficher la chaîne littérale (« star »
+                    // par défaut de `addNewAction`, ou autre SF Symbol
+                    // legacy) à l'intérieur de la boîte colorée. Fallback
+                    // sur le rond gris discret de `ActionIconView` —
+                    // cohérence visuelle avec les built-ins sans emoji et
+                    // avec la sidebar Actions.
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(template.category.color.opacity(0.2))
@@ -704,8 +712,14 @@ struct TemplateCard: View {
                             .fill(template.category.color.opacity(0.12))
                             .frame(width: 36, height: 36)
 
-                        Text(template.icon)
-                            .font(.system(size: 20))
+                        if template.icon.isEmojiOnly {
+                            Text(template.icon)
+                                .font(.system(size: 20))
+                        } else {
+                            Circle()
+                                .fill(Color.gray.opacity(0.25))
+                                .frame(width: 14, height: 14)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
