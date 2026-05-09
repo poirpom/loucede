@@ -2,31 +2,48 @@
 //  DocumentationView.swift
 //  loucede
 //
-//  Point 4 pre-V1 — Sous-étape B.2 (2026-05-09) : layout 2 colonnes
-//  via `NavigationSplitView` natif macOS 13+. Sidebar 280pt avec liste
-//  des tutos groupée par catégorie (Source list style), zone détail à
-//  droite affichant pour l'instant le titre du tuto sélectionné.
+//  Point 4 pre-V1 — Sous-étape B.3 (2026-05-09) : sidebar bindée aux
+//  vraies données via `DocumentationManager.shared` (fetch /notion-list
+//  côté proxy Scaleway). Mock data interne retiré.
 //
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
-//    B.2 — Layout 2 colonnes (CE FICHIER) avec données MOCKÉES
-//    B.3 — Binding au vrai DocumentationManager.shared (fetch /notion-list)
+//    B.2 ✅ — Layout 2 colonnes avec données mockées
+//    B.3 — Binding au DocumentationManager.shared (CE FICHIER)
 //    B.4 — Rendu Markdown du contenu via swift-markdown-ui
 //
+//  4 états visuels gérés par `sidebarContent` (priorité décroissante) :
+//    1. Loading : ProgressView centré (~500ms typique)
+//    2. Error : icône + message + détail localisé + bouton « Réessayer »
+//    3. Empty : sidebar naturellement vide + message zone droite
+//       (cas très rare — Faab a dépublié tous les tutos Notion)
+//    4. Loaded : List avec sections groupées par catégorie + tri par N°
+//
+//  Sélection par défaut robuste via `.onChange(of: manager.pages)` :
+//    - Init au premier remplissage : set sur la première page de la
+//      première section (categoryOrder + N° ASC).
+//    - Correction si refresh ramène un set différent où la sélection
+//      actuelle a disparu : fallback sur la première page disponible.
+//    - Sinon (sélection toujours présente après refresh) : préservée.
+//
 //  À noter : à ce stade la zone contenu n'affiche que le titre — le
-//  rendu Markdown réel viendra en B.4. Le mock data interne sera
-//  remplacé par DocumentationManager.shared.pages en B.3 (cf. marqueur
-//  « MARK: - Mock data (à retirer en B.3) » dans ce fichier).
+//  rendu Markdown réel viendra en B.4.
 //
 
 import SwiftUI
 
 struct DocumentationView: View {
     /// ID de la page actuellement sélectionnée dans la sidebar. `nil`
-    /// avant la première frame (le `.onAppear` ci-dessous initialise sur
-    /// la première page de la première section). Lié au `selection` du
-    /// `List` via le `.tag(page.id)` de chaque ligne.
+    /// avant la première arrivée de pages depuis le manager. Lié au
+    /// `selection` du `List` via le `.tag(page.id)` de chaque ligne.
+    /// Initialisé/corrigé par `.onChange(of: manager.pages)`.
     @State private var selectedPageID: String?
+
+    /// Manager de la documentation (singleton). Observé pour réagir
+    /// aux changements de `pages`, `isLoadingList`, `listError`.
+    /// Pattern `@ObservedObject` (et non `@StateObject`) car la durée
+    /// de vie du singleton est gérée par l'app, pas par cette vue.
+    @ObservedObject private var manager = DocumentationManager.shared
 
     // Note pivot UX (2026-05-09) : on n'utilise PAS de custom toolbar
     // (`ToolbarItem(.navigation)` + `@State columnVisibility` +
@@ -53,7 +70,57 @@ struct DocumentationView: View {
 
     var body: some View {
         NavigationSplitView {
-            // MARK: Sidebar
+            sidebarContent
+                .navigationSplitViewColumnWidth(280)
+        } detail: {
+            detailContent
+        }
+        .task {
+            // `.task` est lié au cycle de vie de la vue, pas à l'ouverture
+            // de fenêtre. Avec `isReleasedWhenClosed = false` côté
+            // `loucedeApp.swift:openDocumentation()`, la vue persiste entre
+            // les ouvertures (juste cachée via `orderOut`) — le `.task` ne
+            // re-fire pas typiquement. L'utilisateur a le bouton
+            // « Réessayer » côté `errorView` pour forcer un refresh, et
+            // la liste ne change pas plusieurs fois par session en
+            // pratique. Si feedback runtime montre le besoin d'un
+            // refresh systématique sur ouverture de fenêtre, on
+            // ajoutera un trigger explicite dans `openDocumentation()`.
+            await manager.loadList()
+        }
+        .onChange(of: manager.pages) { _, _ in
+            // Double rôle :
+            //   1. Init au premier remplissage (selectedPageID == nil)
+            //      → set sur la première page de la première section.
+            //   2. Correction si refresh ramène un set différent où la
+            //      sélection actuelle a disparu (page supprimée côté
+            //      Notion entre 2 fetches) → fallback sur la première
+            //      page disponible.
+            // Si la sélection est toujours présente après refresh, on
+            // ne touche à rien (pas de scroll/changement surprise).
+            let newOrdered = orderedPages
+            if selectedPageID == nil || !newOrdered.contains(where: { $0.id == selectedPageID }) {
+                selectedPageID = newOrdered.first?.id
+            }
+        }
+    }
+
+    // MARK: - Sidebar content (4 états visuels)
+
+    @ViewBuilder
+    private var sidebarContent: some View {
+        if manager.isLoadingList {
+            // État 1 : Loading — ProgressView centré, pas de message
+            // texte (l'attente est ~500ms en pratique).
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = manager.listError {
+            // État 2 : Error — vue dédiée avec bouton « Réessayer ».
+            errorView(message: error.errorDescription ?? "Erreur inconnue.")
+        } else {
+            // État 4 : Loaded (couvre aussi l'état 3 « Empty » — la
+            // List est juste vide, pas de message dans la sidebar car
+            // le message empty s'affiche dans la zone droite).
             List(selection: $selectedPageID) {
                 ForEach(orderedSections, id: \.name) { section in
                     Section(section.name) {
@@ -65,36 +132,69 @@ struct DocumentationView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(280)
-        } detail: {
-            // MARK: Content area
-            // B.2 (mock) : on affiche uniquement le titre du tuto
-            // sélectionné en grande police centrée. B.4 remplacera ce
-            // contenu par le rendu Markdown via swift-markdown-ui.
-            Group {
-                if let page = selectedPage {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(page.title)
-                            .font(.system(size: 32, weight: .bold))
-                            .padding(.horizontal, 32)
-                            .padding(.top, 32)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                } else {
-                    // Avant l'onAppear (typiquement 1 frame). Couleur
-                    // transparente plutôt qu'un placeholder explicite —
-                    // évite un flash de texte pendant le bootstrap.
-                    Color.clear
+        }
+    }
+
+    /// Vue d'erreur de la sidebar : icône + message principal +
+    /// détail localisé (`DocumentationError.errorDescription`) +
+    /// bouton « Réessayer » qui re-déclenche `loadList()`.
+    @ViewBuilder
+    private func errorView(message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary)
+            Text("Impossible de charger la documentation")
+                .font(.system(size: 14, weight: .medium))
+                .multilineTextAlignment(.center)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Réessayer") {
+                Task { await manager.loadList() }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Detail content
+
+    @ViewBuilder
+    private var detailContent: some View {
+        Group {
+            // Empty state légitime : succès du fetch mais 0 page
+            // (cas très rare — Faab a dépublié tous les tutos Notion
+            // temporairement). Message dans la zone droite, pas dans
+            // la sidebar (cohérent avec « zone détail = comprendre
+            // l'état »).
+            if !manager.isLoadingList && manager.listError == nil && manager.pages.isEmpty {
+                Text("Aucun tuto disponible pour le moment")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let page = selectedPage {
+                // B.3 (mock detail) : titre seul. B.4 remplacera par
+                // le Markdown rendu via swift-markdown-ui.
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(page.title)
+                        .font(.system(size: 32, weight: .bold))
+                        .padding(.horizontal, 32)
+                        .padding(.top, 32)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                // Pendant loading initial / avant onChange initial /
+                // pendant état error : pas de placeholder explicite
+                // pour éviter un flash de texte pendant le bootstrap.
+                Color.clear
             }
-            .background(Color(NSColor.windowBackgroundColor))
         }
-        .onAppear {
-            if selectedPageID == nil {
-                selectedPageID = orderedPages.first?.id
-            }
-        }
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     // MARK: - Sidebar row
@@ -115,27 +215,28 @@ struct DocumentationView: View {
 
     // MARK: - Computed helpers
 
-    /// Pages groupées par catégorie. Les pages dont `category` est `nil`
+    /// Pages groupées par catégorie depuis `manager.pages` (B.3 : data
+    /// réelle remplace le mock B.2). Les pages dont `category` est `nil`
     /// (cas légitime côté Notion si l'auteur a oublié) sont regroupées
     /// sous une clé vide qui ne figurera pas dans `categoryOrder` —
     /// elles seront donc filtrées par le `compactMap` ci-dessous.
     private var pagesByCategory: [String: [DocumentationPage]] {
-        Dictionary(grouping: Self.mockPages, by: { $0.category ?? "" })
+        Dictionary(grouping: manager.pages, by: { $0.category ?? "" })
     }
 
     /// Sections dans l'ordre éditorial canonique. Chaque section
     /// contient ses pages triées par `number` ASC. Les catégories sans
-    /// page sont filtrées (compactMap retourne nil pour les sections
-    /// vides). Les pages dont la catégorie n'est PAS dans
-    /// `categoryOrder` sont silencieusement omises — décision V1 mock,
-    /// à raffiner en B.3 (filtre strict ou bucket « Autres » selon
-    /// décision produit).
+    /// page sont filtrées (compactMap retourne nil). Les pages dont la
+    /// catégorie n'est PAS dans `categoryOrder` sont silencieusement
+    /// omises — décision V1 MVP (Faab contrôle totalement les
+    /// catégories Notion via la BDD ; si une nouvelle catégorie
+    /// apparaît, elle est ignorée jusqu'à mise à jour de l'array).
     private var orderedSections: [(name: String, pages: [DocumentationPage])] {
         Self.categoryOrder.compactMap { categoryName -> (name: String, pages: [DocumentationPage])? in
             guard let pages = pagesByCategory[categoryName], !pages.isEmpty else { return nil }
             // Tri par `number` ASC. Comparaison de strings — fonctionne
-            // tant que les numéros sont zero-padded ("01", "02", ...,
-            // "11"). Le proxy Scaleway garantit ce format en B.3.
+            // sur les numéros zero-padded ("01", "02", ..., "11")
+            // garantis par le proxy Scaleway côté serveur.
             let sorted = pages.sorted { ($0.number ?? "") < ($1.number ?? "") }
             return (categoryName, sorted)
         }
@@ -143,26 +244,28 @@ struct DocumentationView: View {
 
     /// Pages aplaties dans l'ordre d'affichage final (sections triées,
     /// puis pages triées par number ASC dans chaque section). Utilisée
-    /// pour déterminer la sélection initiale (.first) au premier
-    /// `.onAppear`.
+    /// par `.onChange(of: manager.pages)` pour la sélection initiale
+    /// et la correction post-refresh.
     private var orderedPages: [DocumentationPage] {
         orderedSections.flatMap { $0.pages }
     }
 
-    /// Page actuellement sélectionnée, lookupée par ID dans le mock.
-    /// `nil` avant la première sélection.
+    /// Page actuellement sélectionnée, lookupée par ID dans
+    /// `manager.pages`. `nil` avant la première sélection ou si la
+    /// page a disparu après un refresh (le `.onChange` corrigera
+    /// `selectedPageID` au prochain cycle).
     private var selectedPage: DocumentationPage? {
         guard let id = selectedPageID else { return nil }
-        return Self.mockPages.first { $0.id == id }
+        return manager.pages.first { $0.id == id }
     }
 
     // MARK: - Configuration éditoriale
 
     /// Ordre canonique des catégories de documentation, défini par Faab.
     /// Source de vérité pour le tri des sections de la sidebar. Les
-    /// catégories non listées ici sont filtrées (cf. `orderedSections`).
-    /// V1 mock — à conserver en B.3 puisque cet ordre est indépendant
-    /// du `number` global qui ordonne les pages dans une section.
+    /// catégories non listées ici sont filtrées (cf. `orderedSections`)
+    /// — V1 MVP, à enrichir si Faab ajoute de nouvelles catégories
+    /// côté Notion.
     private static let categoryOrder: [String] = [
         "🚀 Démarrer",
         "🔧 Configurer loucedé",
@@ -170,28 +273,6 @@ struct DocumentationView: View {
         "💳 Compte et licence",
         "🛠️ Résolution de problèmes",
         "📚 Ressources"
-    ]
-
-    // MARK: - Mock data (à retirer en B.3)
-
-    /// Données mockées pour valider le layout, le tri, le groupement
-    /// et l'interactivité sidebar ↔ contenu sans dépendance réseau.
-    /// Remplacées en B.3 par `DocumentationManager.shared.pages`
-    /// (fetch via `/notion-list` côté proxy Scaleway). 8 pages
-    /// réparties sur 4 catégories — couvre les cas multi-pages-par-
-    /// section, edge case 1-page (Compte) et 2 catégories vides
-    /// (Résolution + Ressources) pour vérifier le filter compactMap.
-    /// Les `id` `mock-XX` sont volontairement non-UUID — pas d'appel
-    /// réseau en B.2.
-    private static let mockPages: [DocumentationPage] = [
-        DocumentationPage(id: "mock-01", title: "Bienvenue dans loucedé", summary: nil, icon: "🤗", cover: nil, category: "🚀 Démarrer", level: nil, priority: nil, number: "01"),
-        DocumentationPage(id: "mock-02", title: "Installer loucedé", summary: nil, icon: "💻", cover: nil, category: "🚀 Démarrer", level: nil, priority: nil, number: "02"),
-        DocumentationPage(id: "mock-03", title: "Premier lancement", summary: nil, icon: "🚀", cover: nil, category: "🚀 Démarrer", level: nil, priority: nil, number: "03"),
-        DocumentationPage(id: "mock-04", title: "Obtenir une clé API", summary: nil, icon: "🗝️", cover: nil, category: "🔧 Configurer loucedé", level: nil, priority: nil, number: "04"),
-        DocumentationPage(id: "mock-05", title: "Modifier ton raccourci", summary: nil, icon: "⌨️", cover: nil, category: "🔧 Configurer loucedé", level: nil, priority: nil, number: "05"),
-        DocumentationPage(id: "mock-11", title: "Comprendre la fenêtre", summary: nil, icon: "🔲", cover: nil, category: "💡 loucedé au quotidien", level: nil, priority: nil, number: "11"),
-        DocumentationPage(id: "mock-12", title: "Créer une action", summary: nil, icon: "✨", cover: nil, category: "💡 loucedé au quotidien", level: nil, priority: nil, number: "12"),
-        DocumentationPage(id: "mock-21", title: "Activer ta licence", summary: nil, icon: "🔓", cover: nil, category: "💳 Compte et licence", level: nil, priority: nil, number: "21")
     ]
 }
 
