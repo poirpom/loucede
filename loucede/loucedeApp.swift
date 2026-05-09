@@ -767,7 +767,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     ///   `setFrameAutosaveName`).
     /// - Si la fenêtre existe (visible ou cachée par ⌘W précédent) →
     ///   la met / ramène au front.
+    /// - DANS TOUS LES CAS : déclenche un refresh de la liste de pages
+    ///   via `DocumentationManager.shared.loadList()` (cf. note ci-dessous).
     @objc func openDocumentation() {
+        // B.3 fix (2026-05-09) : force le refresh de la liste à chaque
+        // ouverture de la fenêtre doc, pas seulement à la première
+        // création. Sans ça, si l'utilisateur ferme la fenêtre puis la
+        // rouvre alors que Notion / le proxy est down entre-temps, il
+        // continuerait de voir les données stale du fetch précédent
+        // (la vue `DocumentationView` persiste avec
+        // `isReleasedWhenClosed = false`, donc le `.task` SwiftUI ne
+        // re-fire pas au re-show — d'où ce trigger côté AppKit, source
+        // de vérité unique pour le cycle de fetch). En contrepartie le
+        // `.task` côté `DocumentationView` a été retiré pour ne pas
+        // doubler les appels au premier open.
+        //
+        // Race condition acceptée V1 : si l'utilisateur ⌘D rapidement
+        // plusieurs fois de suite, plusieurs `loadList()` peuvent fire
+        // en parallèle (le proxy est hit 2-3 fois). Pas de crash, juste
+        // un gaspillage mineur. À mitiger en V1.x via
+        // `guard !isLoadingList else { return }` dans
+        // `DocumentationManager.loadList()` si feedback utilisateur.
+        Task { await DocumentationManager.shared.loadList() }
+
         if let existing = docWindow {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)

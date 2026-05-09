@@ -19,7 +19,17 @@
 //       (cas très rare — Faab a dépublié tous les tutos Notion)
 //    4. Loaded : List avec sections groupées par catégorie + tri par N°
 //
-//  Sélection par défaut robuste via `.onChange(of: manager.pages)` :
+//  Trigger du fetch : le refresh de la liste est déclenché côté
+//  AppKit dans `loucedeApp.swift:openDocumentation()` (un Task lancé à
+//  chaque ouverture de la fenêtre, pas seulement à sa création). Cette
+//  vue est intentionnellement passive — elle OBSERVE le manager via
+//  `@ObservedObject` et ne déclenche RIEN. Pattern MVVM-like : View
+//  déclarative pure, business logic dans le Manager, cycle de fetch
+//  orchestré côté AppKit.
+//
+//  Sélection par défaut robuste via `.onChange(of: manager.pages, initial: true)` :
+//    - `initial: true` couvre le cas où le Task termine AVANT que la
+//      vue soit mountée (manager.pages déjà rempli au premier render).
 //    - Init au premier remplissage : set sur la première page de la
 //      première section (categoryOrder + N° ASC).
 //    - Correction si refresh ramène un set différent où la sélection
@@ -75,24 +85,25 @@ struct DocumentationView: View {
         } detail: {
             detailContent
         }
-        .task {
-            // `.task` est lié au cycle de vie de la vue, pas à l'ouverture
-            // de fenêtre. Avec `isReleasedWhenClosed = false` côté
-            // `loucedeApp.swift:openDocumentation()`, la vue persiste entre
-            // les ouvertures (juste cachée via `orderOut`) — le `.task` ne
-            // re-fire pas typiquement. L'utilisateur a le bouton
-            // « Réessayer » côté `errorView` pour forcer un refresh, et
-            // la liste ne change pas plusieurs fois par session en
-            // pratique. Si feedback runtime montre le besoin d'un
-            // refresh systématique sur ouverture de fenêtre, on
-            // ajoutera un trigger explicite dans `openDocumentation()`.
-            await manager.loadList()
-        }
-        .onChange(of: manager.pages) { _, _ in
-            // Double rôle :
-            //   1. Init au premier remplissage (selectedPageID == nil)
-            //      → set sur la première page de la première section.
-            //   2. Correction si refresh ramène un set différent où la
+        // Le trigger du fetch a été déplacé côté AppKit dans
+        // `loucedeApp.swift:openDocumentation()` (B.3 fix 2026-05-09).
+        // Pas de `.task` ici — la vue est passive, observe le manager
+        // via `@ObservedObject` et réagit à l'arrivée de `pages`.
+        .onChange(of: manager.pages, initial: true) { _, _ in
+            // `initial: true` (macOS 14+) fait fire la closure aussi
+            // au premier render, avec la valeur courante de
+            // `manager.pages`. Couvre l'edge case où le Task lancé par
+            // `openDocumentation()` termine AVANT que la vue soit
+            // mountée — sans `initial: true`, `selectedPageID` resterait
+            // `nil` indéfiniment (pas de changement de `manager.pages`
+            // après mount donc pas de fire `.onChange`).
+            //
+            // Triple rôle :
+            //   1. Init au mount (initial: true) si manager.pages déjà
+            //      rempli → set sur la première page.
+            //   2. Init au premier remplissage async (selectedPageID
+            //      toujours nil) → idem.
+            //   3. Correction si refresh ramène un set différent où la
             //      sélection actuelle a disparu (page supprimée côté
             //      Notion entre 2 fetches) → fallback sur la première
             //      page disponible.
