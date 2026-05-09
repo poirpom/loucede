@@ -781,6 +781,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "Documentation loucedé"
+        // Pivot UX (2026-05-09) : titlebar transparente sans titre
+        // visible. Cohérent avec les fenêtres Settings et Onboarding
+        // du projet (mêmes 2 lignes plus haut dans ce fichier). Évite
+        // que le bouton de toggle sidebar `NavigationSplitView` (qui
+        // « voyage » selon l'état de la sidebar) ne chevauche le titre
+        // AppKit centré — bug observé en B.2 et qu'on n'a pas réussi
+        // à fixer côté SwiftUI via `.toolbar(removing: .sidebarToggle)`
+        // (ne fonctionne pas fiablement avec NSHostingView wrap).
+        // `window.title = "..."` est conservé pour rester visible dans
+        // le Dock, Cmd+Tab et le menu Window — c'est uniquement
+        // l'affichage dans la titlebar qui est masqué.
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
         window.minSize = NSSize(width: 600, height: 400)
         window.contentView = NSHostingView(rootView: DocumentationView())
         window.center()

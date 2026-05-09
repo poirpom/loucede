@@ -28,18 +28,31 @@ struct DocumentationView: View {
     /// `List` via le `.tag(page.id)` de chaque ligne.
     @State private var selectedPageID: String?
 
-    /// État de visibilité de la sidebar. `.all` (défaut) = sidebar
-    /// visible. `.detailOnly` = sidebar repliée, contenu en pleine
-    /// largeur. Géré explicitement (au lieu d'être laissé au défaut
-    /// SwiftUI) pour pouvoir binder un bouton de toggle CUSTOM avec
-    /// position stable — cf. fix mini-session 2026-05-09 ci-dessous.
-    /// Pas de persistance entre sessions en V1 (sidebar visible à
-    /// chaque ouverture, cohérent avec l'intention « j'ouvre la doc
-    /// pour explorer »).
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    // Note pivot UX (2026-05-09) : on n'utilise PAS de custom toolbar
+    // (`ToolbarItem(.navigation)` + `@State columnVisibility` +
+    // `.toolbar(removing: .sidebarToggle)`) pour forcer la position du
+    // bouton de toggle sidebar. Tentative initiale (commit `35e4fbc`)
+    // a échoué runtime : l'API `.toolbar(removing: .sidebarToggle)` ne
+    // supprime pas le bouton natif quand le `NavigationSplitView` est
+    // hosté dans une `NSWindow` AppKit via `NSHostingView` (probable
+    // interaction avec le NSToolbar implicite du `[.titled]` styleMask).
+    //
+    // Pivot pragmatique : on cache le titre dans la titlebar AppKit
+    // côté `loucedeApp.swift:openDocumentation()` via
+    // `titleVisibility = .hidden` + `titlebarAppearsTransparent = true`,
+    // pattern cohérent avec les fenêtres Settings et Onboarding du
+    // projet. Le bouton natif continue de « voyager » selon l'état de
+    // la sidebar, mais n'a plus rien à chevaucher. Le titre AppKit
+    // reste dans `window.title` (visible dans le Dock, Cmd+Tab et
+    // menu Window — juste plus dans la titlebar).
+    //
+    // NE PAS retenter `.toolbar(removing: .sidebarToggle)` ici sans
+    // d'abord vérifier que SwiftUI a corrigé le bug ou qu'on a basculé
+    // hors NSHostingView. L'invariant à préserver : « bouton de toggle
+    // ne tronque rien » (assuré par titlebar transparente sans titre).
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView {
             // MARK: Sidebar
             List(selection: $selectedPageID) {
                 ForEach(orderedSections, id: \.name) { section in
@@ -76,40 +89,6 @@ struct DocumentationView: View {
                 }
             }
             .background(Color(NSColor.windowBackgroundColor))
-        }
-        // Mini-fix UX (2026-05-09) : on force la position du bouton de
-        // toggle sidebar dans la titlebar via un `ToolbarItem(.navigation)`
-        // CUSTOM, après avoir supprimé le bouton dynamique défaut via
-        // `.toolbar(removing: .sidebarToggle)` (macOS 14+).
-        //
-        // Pourquoi : le bouton défaut SwiftUI « voyage » selon l'état
-        // de la sidebar — quand la sidebar est ouverte (280pt), il
-        // atterrit à ~280pt depuis la gauche, ce qui coïncide avec la
-        // zone du titre AppKit centré « Documentation loucedé » (set
-        // côté `loucedeApp.swift:openDocumentation()`) et le tronque
-        // visuellement (« Documentation lo… »). Quand sidebar fermée,
-        // le bouton se redéplace plus à droite.
-        //
-        // En forçant le bouton à `placement: .navigation` (= leading
-        // edge de la titlebar sur macOS), il garde une position stable
-        // QUEL QUE SOIT l'état de la sidebar, et le titre AppKit n'est
-        // plus chevauché.
-        //
-        // NE PAS « simplifier » en retirant ce code : sans lui, le bug
-        // visuel revient. Si refacto futur, conserver l'invariant
-        // « toggle button stable + titre lisible ».
-        .toolbar(removing: .sidebarToggle)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation {
-                        columnVisibility = (columnVisibility == .all ? .detailOnly : .all)
-                    }
-                } label: {
-                    Image(systemName: "sidebar.left")
-                }
-                .help(columnVisibility == .all ? "Masquer la sidebar" : "Afficher la sidebar")
-            }
         }
         .onAppear {
             if selectedPageID == nil {
