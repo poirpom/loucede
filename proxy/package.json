@@ -1,0 +1,16 @@
+{
+  "name": "proxy",
+  "version": "1.0.0",
+  "description": "Code source du proxy `polar-bridge` déployé sur **Scaleway Functions** (runtime Node.js 20, région `fr-par`). Ce proxy se trouve entre l'app loucedé et l'API Polar.sh : il garde le `POLAR_TOKEN` côté serveur et authentifie les requêtes de l'app via un secret partagé.",
+  "main": "handler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@notionhq/client": "^5.20.0",
+    "notion-to-md": "^3.1.9"
+  }
+}
