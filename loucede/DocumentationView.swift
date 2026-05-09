@@ -2,15 +2,16 @@
 //  DocumentationView.swift
 //  loucede
 //
-//  Point 4 pre-V1 — Sous-étape B.3 (2026-05-09) : sidebar bindée aux
-//  vraies données via `DocumentationManager.shared` (fetch /notion-list
-//  côté proxy Scaleway). Mock data interne retiré.
+//  Point 4 pre-V1 — Sous-étape B.4 (2026-05-09) : rendu Markdown du
+//  contenu sélectionné via swift-markdown-ui (`MarkdownUI`). La zone
+//  droite affiche désormais le tuto rendu en pleine page (titres, gras,
+//  listes, code blocks, etc.) au lieu du titre seul utilisé en B.3.
 //
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
 //    B.2 ✅ — Layout 2 colonnes avec données mockées
-//    B.3 — Binding au DocumentationManager.shared (CE FICHIER)
-//    B.4 — Rendu Markdown du contenu via swift-markdown-ui
+//    B.3 ✅ — Binding au DocumentationManager.shared (liste réelle)
+//    B.4 — Rendu Markdown du contenu via MarkdownUI (CE FICHIER)
 //
 //  4 états visuels gérés par `sidebarContent` (priorité décroissante) :
 //    1. Loading : ProgressView centré (~500ms typique)
@@ -19,28 +20,38 @@
 //       (cas très rare — Faab a dépublié tous les tutos Notion)
 //    4. Loaded : List avec sections groupées par catégorie + tri par N°
 //
-//  Trigger du fetch : le refresh de la liste est déclenché côté
-//  AppKit dans `loucedeApp.swift:openDocumentation()` (un Task lancé à
-//  chaque ouverture de la fenêtre, pas seulement à sa création). Cette
-//  vue est intentionnellement passive — elle OBSERVE le manager via
-//  `@ObservedObject` et ne déclenche RIEN. Pattern MVVM-like : View
-//  déclarative pure, business logic dans le Manager, cycle de fetch
-//  orchestré côté AppKit.
+//  5 états visuels gérés par `detailContent` (priorité décroissante) :
+//    1. Empty list : message « Aucun tuto disponible pour le moment »
+//    2. Bootstrap (selectedPage == nil) : Color.clear (avant init de
+//       sélection par `.onChange(of: pages, initial: true)`)
+//    3. Loading page : ProgressView centré (~500ms typique)
+//    4. Error page : errorView avec bouton « Réessayer »
+//    5. Loaded : ScrollView + Markdown(content) + padding 32px
+//    6 (fallback) : ProgressView pour le cas race rare entre 2 fetches
+//      où selectedPageID a changé mais currentPage encore stale.
+//
+//  Trigger des fetches — sources distinctes pour liste vs page :
+//    - LISTE : côté AppKit dans `loucedeApp.swift:openDocumentation()`
+//      (Task lancé à chaque ouverture de la fenêtre, B.3 fix). Cette
+//      vue est passive sur la liste — elle observe via @ObservedObject.
+//    - PAGE : côté SwiftUI via `.onChange(of: selectedPageID, initial: true)`
+//      ci-dessous. Fire au mount (initial: true, si la sélection est
+//      déjà set par la chain `pages → first.id`) et à chaque clic
+//      utilisateur sur une autre page de la sidebar.
 //
 //  Sélection par défaut robuste via `.onChange(of: manager.pages, initial: true)` :
-//    - `initial: true` couvre le cas où le Task termine AVANT que la
-//      vue soit mountée (manager.pages déjà rempli au premier render).
+//    - `initial: true` couvre le cas où le Task `loadList()` termine
+//      AVANT que la vue soit mountée (manager.pages déjà rempli au
+//      premier render).
 //    - Init au premier remplissage : set sur la première page de la
 //      première section (categoryOrder + N° ASC).
 //    - Correction si refresh ramène un set différent où la sélection
 //      actuelle a disparu : fallback sur la première page disponible.
 //    - Sinon (sélection toujours présente après refresh) : préservée.
 //
-//  À noter : à ce stade la zone contenu n'affiche que le titre — le
-//  rendu Markdown réel viendra en B.4.
-//
 
 import SwiftUI
+import MarkdownUI
 
 struct DocumentationView: View {
     /// ID de la page actuellement sélectionnée dans la sidebar. `nil`
@@ -50,9 +61,11 @@ struct DocumentationView: View {
     @State private var selectedPageID: String?
 
     /// Manager de la documentation (singleton). Observé pour réagir
-    /// aux changements de `pages`, `isLoadingList`, `listError`.
-    /// Pattern `@ObservedObject` (et non `@StateObject`) car la durée
-    /// de vie du singleton est gérée par l'app, pas par cette vue.
+    /// aux changements côté liste (`pages`, `isLoadingList`, `listError`)
+    /// ET côté page sélectionnée (`currentPage`, `isLoadingPage`,
+    /// `pageError`). Pattern `@ObservedObject` (et non `@StateObject`)
+    /// car la durée de vie du singleton est gérée par l'app, pas par
+    /// cette vue.
     @ObservedObject private var manager = DocumentationManager.shared
 
     // Note pivot UX (2026-05-09) : on n'utilise PAS de custom toolbar
@@ -114,6 +127,30 @@ struct DocumentationView: View {
                 selectedPageID = newOrdered.first?.id
             }
         }
+        // Trigger lazy du fetch de la page sélectionnée (B.4).
+        //
+        // `initial: true` (macOS 14+) : fire la closure au mount avec
+        // la valeur courante de `selectedPageID`. Couvre le cas où
+        // `.onChange(of: pages, initial: true)` ci-dessus a déjà set
+        // `selectedPageID` à la première page avant que cet observer
+        // soit armé — sans `initial: true`, on raterait ce changement
+        // initial. Quand l'utilisateur clique sur une autre page dans
+        // la sidebar, le `selection` binding du List met à jour
+        // `selectedPageID` → cet observer fire → nouveau loadPage.
+        //
+        // Race condition acceptée V1 : si l'utilisateur clique
+        // rapidement sur 2 pages, 2 Tasks `loadPage` fire en parallèle.
+        // Pas de cancellation explicite du Task précédent — le dernier
+        // fetch terminé devient `currentPage` final. Possible flicker
+        // UI bref (loading → A → loading → B) mais pas de crash. Le
+        // guard `content.id == selectedPageID` côté `detailContent`
+        // (état Loaded) protège contre l'affichage d'un contenu stale
+        // pendant la fenêtre de race. À mitiger en V1.x via task
+        // cancellation explicite si feedback utilisateur.
+        .onChange(of: selectedPageID, initial: true) { _, newID in
+            guard let id = newID else { return }
+            Task { await manager.loadPage(id: id) }
+        }
     }
 
     // MARK: - Sidebar content (4 états visuels)
@@ -127,7 +164,11 @@ struct DocumentationView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = manager.listError {
             // État 2 : Error — vue dédiée avec bouton « Réessayer ».
-            errorView(message: error.errorDescription ?? "Erreur inconnue.")
+            errorView(
+                title: "Impossible de charger la documentation",
+                message: error.errorDescription ?? "Erreur inconnue.",
+                retry: { Task { await manager.loadList() } }
+            )
         } else {
             // État 4 : Loaded (couvre aussi l'état 3 « Empty » — la
             // List est juste vide, pas de message dans la sidebar car
@@ -146,63 +187,105 @@ struct DocumentationView: View {
         }
     }
 
-    /// Vue d'erreur de la sidebar : icône + message principal +
-    /// détail localisé (`DocumentationError.errorDescription`) +
-    /// bouton « Réessayer » qui re-déclenche `loadList()`.
+    /// Vue d'erreur générique réutilisable (sidebar OU zone détail) :
+    /// icône + titre + détail localisé + bouton « Réessayer ».
+    /// Généralisée en B.4 (initialement hardcodée pour la liste, puis
+    /// étendue avec `title` + `retry: () -> Void` paramétrables pour
+    /// supporter aussi les erreurs de chargement de page côté
+    /// `detailContent`. Single helper, deux contextes d'usage.
     @ViewBuilder
-    private func errorView(message: String) -> some View {
+    private func errorView(title: String, message: String, retry: @escaping () -> Void) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary)
-            Text("Impossible de charger la documentation")
+            Text(title)
                 .font(.system(size: 14, weight: .medium))
                 .multilineTextAlignment(.center)
             Text(message)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Réessayer") {
-                Task { await manager.loadList() }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
+            Button("Réessayer", action: retry)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Detail content
+    // MARK: - Detail content (5 états visuels + fallback)
 
     @ViewBuilder
     private var detailContent: some View {
         Group {
-            // Empty state légitime : succès du fetch mais 0 page
-            // (cas très rare — Faab a dépublié tous les tutos Notion
-            // temporairement). Message dans la zone droite, pas dans
-            // la sidebar (cohérent avec « zone détail = comprendre
-            // l'état »).
             if !manager.isLoadingList && manager.listError == nil && manager.pages.isEmpty {
+                // État 1 : Empty list (succès du fetch liste mais
+                // 0 page — cas très rare où Faab a dépublié tous les
+                // tutos Notion). Message dans la zone droite, pas dans
+                // la sidebar (cohérent avec « zone détail = comprendre
+                // l'état »).
                 Text("Aucun tuto disponible pour le moment")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let page = selectedPage {
-                // B.3 (mock detail) : titre seul. B.4 remplacera par
-                // le Markdown rendu via swift-markdown-ui.
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(page.title)
-                        .font(.system(size: 32, weight: .bold))
-                        .padding(.horizontal, 32)
-                        .padding(.top, 32)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            } else {
-                // Pendant loading initial / avant onChange initial /
-                // pendant état error : pas de placeholder explicite
-                // pour éviter un flash de texte pendant le bootstrap.
+            } else if selectedPage == nil {
+                // État 2 : Bootstrap — avant que `selectedPageID` soit
+                // set par `.onChange(of: pages, initial: true)`.
+                // Color.clear pour éviter un flash de placeholder
+                // pendant le bootstrap (1 frame typiquement).
                 Color.clear
+            } else if manager.isLoadingPage {
+                // État 3 : Loading page — ProgressView centré, cohérent
+                // avec le pattern Loading sidebar.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = manager.pageError {
+                // État 4 : Error page — errorView avec bouton
+                // « Réessayer » qui re-déclenche `loadPage(id:)`.
+                errorView(
+                    title: "Impossible de charger ce tuto",
+                    message: error.errorDescription ?? "Erreur inconnue.",
+                    retry: {
+                        guard let id = selectedPageID else { return }
+                        Task { await manager.loadPage(id: id) }
+                    }
+                )
+            } else if let content = manager.currentPage, content.id == selectedPageID {
+                // État 5 : Loaded — rendu Markdown via MarkdownUI.
+                //
+                // Guard `content.id == selectedPageID` : protège contre
+                // l'affichage d'un contenu stale d'un fetch précédent
+                // pendant la fenêtre de race où l'utilisateur a déjà
+                // changé de sélection mais le nouveau loadPage n'a
+                // pas encore terminé. Si stale, on retombe sur le
+                // fallback ProgressView ci-dessous (état attendu = en
+                // cours de chargement de la nouvelle page).
+                //
+                // ScrollView vertical pour les contenus longs. Padding
+                // horizontal et vertical 32pt pour une zone de lecture
+                // confortable (~556pt utiles sur fenêtre 900pt - 280pt
+                // sidebar - 64pt padding). `.textSelection(.enabled)`
+                // permet à l'utilisateur de copier des bouts de tuto
+                // (cohérent avec PopoverView qui l'a déjà sur le rendu
+                // Markdown des résultats LLM).
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Markdown(content.markdown)
+                            .textSelection(.enabled)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 32)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            } else {
+                // Fallback : selected mais pas encore currentPage (ou
+                // currentPage stale du fetch précédent). Cas race rare
+                // entre 2 fetches successifs (clic rapide). ProgressView
+                // cohérent avec « en cours de chargement de la nouvelle
+                // page ».
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
