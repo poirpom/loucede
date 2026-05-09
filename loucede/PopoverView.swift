@@ -267,7 +267,26 @@ struct PopoverView: View {
                 // donc aucun conflit avec un slot d'action. Check placé AVANT
                 // le guard de position par défense (au cas où la table
                 // évoluerait).
+                //
+                // Mini-fix UX (2026-05-09) : ferme le popup AVANT d'ouvrir la
+                // fenêtre doc. Sans ça, la fenêtre doc ouvre derrière le
+                // popup (popoverWindow a un NSWindow level supérieur — il
+                // reste au-dessus des autres fenêtres standard tant qu'il
+                // n'est pas orderOut). L'utilisateur devait presser Esc pour
+                // révéler la fenêtre doc — friction observée pendant les
+                // tests runtime B.1.
+                //
+                // Note d'asymétrie : `settingsHandler` (⌘,) route via le
+                // callback `onOpenSettings` qui en interne fait
+                // `hidePopover() + openSettings()`. Pour ⌘D on appelle
+                // directement `globalAppDelegate?.openDocumentation()` (pas
+                // de callback `onOpenDocumentation` côté `PopoverView`) pour
+                // éviter d'introduire une 4ᵉ prop pour un seul call site —
+                // `closeHandler()` joue le rôle équivalent du « hidePopover »
+                // côté Settings. Si harmonisation des patterns souhaitée
+                // un jour, ce sera dans un refacto dédié.
                 if event.charactersIgnoringModifiers == "d" {
+                    closeHandler()
                     globalAppDelegate?.openDocumentation()
                     return nil
                 }
