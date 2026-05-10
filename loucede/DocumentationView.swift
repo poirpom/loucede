@@ -7,11 +7,19 @@
 //  droite affiche désormais le tuto rendu en pleine page (titres, gras,
 //  listes, code blocks, etc.) au lieu du titre seul utilisé en B.3.
 //
+//  Polish K+L+M (2026-05-10) : ajout du header de page (cover image
+//  bandeau 200pt, emoji 80pt centré, titre 32pt bold) au-dessus du
+//  rendu Markdown dans le case Loaded de `detailContent`. Esprit
+//  visuel Notion natif côté zone de lecture. Sources des cover/icon/title :
+//  `manager.pages` (peuplé par /notion-list) — pas d'enrichissement
+//  du proxy /notion-page nécessaire (couplage minime).
+//
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
 //    B.2 ✅ — Layout 2 colonnes avec données mockées
 //    B.3 ✅ — Binding au DocumentationManager.shared (liste réelle)
-//    B.4 — Rendu Markdown du contenu via MarkdownUI (CE FICHIER)
+//    B.4 ✅ — Rendu Markdown du contenu via MarkdownUI
+//    K+L+M  — Cover + emoji + titre dans la zone détail (CE FICHIER)
 //
 //  4 états visuels gérés par `sidebarContent` (priorité décroissante) :
 //    1. Loading : ProgressView centré (~500ms typique)
@@ -214,6 +222,87 @@ struct DocumentationView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Page header (polish K+L+M)
+
+    /// Header visuel d'une page chargée : cover image bandeau 200pt
+    /// (plein-largeur), emoji icon 80pt (centré), titre 32pt bold
+    /// (aligné gauche). Insère au-dessus du rendu Markdown dans le
+    /// case Loaded de `detailContent`.
+    ///
+    /// Chaque élément est indépendamment optionnel :
+    /// - Pas de cover → on saute directement à l'emoji ou au titre.
+    /// - Pas d'icon → on saute de la cover (ou rien) au titre.
+    /// - `metadata == nil` (race rare où la page a disparu de
+    ///   `manager.pages` entre 2 refresh) → header entièrement skippé,
+    ///   le Markdown s'affiche seul (graceful fallback).
+    ///
+    /// Source des données : `manager.pages` (peuplé par /notion-list).
+    /// Pas dans `currentPage` (réponse /notion-page) qui ne contient
+    /// que id/title/markdown — décision V1 pour ne pas enrichir le
+    /// proxy (couplage minime sidebar/detail).
+    ///
+    /// Espacements verticaux (selon brief polish K+L+M) :
+    ///   - Cover (si présente) : 200pt height, plein-largeur, .clipped()
+    ///   - Emoji top : 24pt après cover, sinon 32pt depuis haut ScrollView
+    ///   - Titre top : 16pt après emoji, 24pt après cover seule, 32pt sinon
+    ///   - Titre bottom : 24pt avant le Markdown
+    ///
+    /// AsyncImage avec phase switch — graceful fallback (Color.clear)
+    /// si URL S3 expirée. Item E du backlog V1.x prévoit un proxy
+    /// images côté Scaleway pour stabilité long-terme.
+    @ViewBuilder
+    private func pageHeader(metadata: DocumentationPage?) -> some View {
+        if let metadata {
+            let hasCover = metadata.cover != nil
+            let hasIcon = (metadata.icon?.isEmpty == false)
+
+            VStack(alignment: .leading, spacing: 0) {
+                // 1. Cover image (plein-largeur, 200pt, optional)
+                if let coverURL = metadata.cover, let url = URL(string: coverURL) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            // Placeholder pendant le fetch (~100-300ms typique)
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.1))
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            // URL S3 expirée ou erreur réseau : graceful
+                            // fallback (rien affiché, layout suit emoji+titre).
+                            Color.clear
+                        @unknown default:
+                            Color.clear
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 200)
+                    .clipped()
+                }
+
+                // 2. Emoji icon (80pt centré, optional)
+                if hasIcon, let icon = metadata.icon {
+                    Text(icon)
+                        .font(.system(size: 80))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, hasCover ? 24 : 32)
+                        .padding(.horizontal, 32)
+                }
+
+                // 3. Titre (32pt bold, aligné gauche, toujours présent
+                // côté Notion donc pas optional ici)
+                Text(metadata.title)
+                    .font(.system(size: 32, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, hasIcon ? 16 : (hasCover ? 24 : 32))
+                    .padding(.bottom, 24)
+                    .padding(.horizontal, 32)
+            }
+        }
+        // Si metadata == nil → EmptyView implicite (le Markdown s'affichera seul).
+    }
+
     // MARK: - Detail content (5 états visuels + fallback)
 
     @ViewBuilder
@@ -252,7 +341,8 @@ struct DocumentationView: View {
                     }
                 )
             } else if let content = manager.currentPage, content.id == selectedPageID {
-                // État 5 : Loaded — rendu Markdown via MarkdownUI.
+                // État 5 : Loaded — header de page (cover + emoji + titre)
+                // suivi du rendu Markdown via MarkdownUI.
                 //
                 // Guard `content.id == selectedPageID` : protège contre
                 // l'affichage d'un contenu stale d'un fetch précédent
@@ -262,20 +352,29 @@ struct DocumentationView: View {
                 // fallback ProgressView ci-dessous (état attendu = en
                 // cours de chargement de la nouvelle page).
                 //
-                // ScrollView vertical pour les contenus longs. Padding
-                // horizontal et vertical 32pt pour une zone de lecture
-                // confortable (~556pt utiles sur fenêtre 900pt - 280pt
-                // sidebar - 64pt padding). `.textSelection(.enabled)`
-                // permet à l'utilisateur de copier des bouts de tuto
-                // (cohérent avec PopoverView qui l'a déjà sur le rendu
-                // Markdown des résultats LLM).
+                // Note padding (polish K+L+M, 2026-05-10) : le padding
+                // 32pt horizontal a été DÉPLACÉ du VStack vers le
+                // Markdown lui-même. Sans ce déplacement, la cover
+                // image plein-largeur héritait du padding et laissait
+                // des bandes blanches de 32pt sur les côtés. Le
+                // `pageHeader` gère son propre padding interne (cover
+                // sans padding, emoji et titre avec padding horizontal
+                // 32pt). Le padding vertical 32pt reste sur le Markdown
+                // pour une zone de lecture confortable (au-dessus = bas
+                // du titre du header, en dessous = fin du ScrollView).
+                //
+                // ScrollView vertical pour les contenus longs.
+                // `.textSelection(.enabled)` permet à l'utilisateur de
+                // copier des bouts de tuto (cohérent avec PopoverView
+                // qui l'a déjà sur le rendu Markdown des résultats LLM).
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
+                        pageHeader(metadata: selectedPage)
                         Markdown(content.markdown)
                             .textSelection(.enabled)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 32)
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 32)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             } else {
