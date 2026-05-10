@@ -236,7 +236,7 @@ struct DocumentationView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Page header (polish K+L+M, mini-fix 2026-05-10)
+    // MARK: - Page header (polish K+L+M, mini-fix 2x 2026-05-10)
 
     /// Header visuel d'une page chargée : bloc bleu loucedé 200pt
     /// (plein-largeur, fond `#3F84F7`) avec emoji 80pt centré H+V,
@@ -257,12 +257,22 @@ struct DocumentationView: View {
     /// proxy (couplage minime sidebar/detail).
     ///
     /// Espacements verticaux finaux :
-    ///   - Bloc bleu (si emoji présent) : 200pt height, plein-largeur,
-    ///     emoji centré H+V via `.frame(..., alignment: .center)`.
-    ///   - Titre top : 24pt après bloc bleu, 32pt sinon (cas sans emoji).
+    ///   - Bloc bleu (si emoji présent) : 200pt height, plein-largeur
+    ///     contenue dans la zone detail visible, emoji centré H+V via
+    ///     `.overlay` (alignment center par défaut).
+    ///   - Titre top : 32pt constant (qu'il y ait emoji ou non).
     ///   - Titre bottom : 0 (Markdown gère l'aération via son propre
     ///     `.padding(.vertical, 32)` → écart final titre ↔ Markdown
-    ///     = 32pt, au lieu des 56pt de la version K+L+M initiale).
+    ///     = 32pt, symétrique avec le 32pt au-dessus du titre).
+    ///
+    /// Pattern `Color()` racine + `.overlay` (au lieu de `.background`
+    /// modifier sur Text) : empêche le bleu de déborder physiquement
+    /// sous la sidebar translucide du NavigationSplitView. La sidebar
+    /// macOS native a un fond vibrancy qui laisse passer les fonds
+    /// opaques du detail content quand celui-ci s'étend logiquement
+    /// sous la sidebar via `frame(maxWidth: .infinity)`. Avec `Color()`
+    /// comme view racine, le frame respecte les safe areas horizontales
+    /// du detail container (zone visible uniquement).
     ///
     /// Couleur `#3F84F7` : token design system loucedé (couleur de
     /// sélection cf. CLAUDE.md), déjà utilisée dans `PopoverView` et
@@ -275,26 +285,30 @@ struct DocumentationView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 // 1. Bloc bleu loucedé avec emoji centré H+V (200pt
-                // height, plein-largeur). `alignment: .center` sur le
-                // frame centre l'emoji dans les deux axes ; le
-                // `.background` fill l'intégralité du frame (200pt ×
-                // full width). Si pas d'emoji, pas de bloc bleu.
+                // height, plein-largeur contenue dans la zone detail).
+                // Pattern `Color()` racine + `.overlay` : la color view
+                // respecte les safe areas horizontales du parent
+                // NavigationSplitView, contrairement à un `.background`
+                // modifier qui peut bypass via `frame(maxWidth: .infinity)`.
+                // L'overlay centre l'emoji par défaut (alignment .center).
                 if hasIcon, let icon = metadata.icon {
-                    Text(icon)
-                        .font(.system(size: 80))
-                        .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 200, alignment: .center)
-                        .background(Color(hex: "3F84F7"))
+                    Color(hex: "3F84F7")
+                        .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 200)
+                        .overlay {
+                            Text(icon)
+                                .font(.system(size: 80))
+                        }
                 }
 
                 // 2. Titre (32pt bold, aligné gauche, toujours présent
                 // côté Notion donc pas optional ici).
-                // Pas de `.padding(.bottom)` : le `.padding(.vertical, 32)`
-                // du Markdown gère seul l'aération entre titre et
-                // contenu (écart final 32pt).
+                // `.padding(.top, 32)` constant : symétrique avec le
+                // `.padding(.vertical, 32)` du Markdown qui suit
+                // (écart 32pt au-dessus + 32pt en-dessous).
                 Text(metadata.title)
                     .font(.system(size: 32, weight: .bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, hasIcon ? 24 : 32)
+                    .padding(.top, 32)
                     .padding(.horizontal, 32)
             }
         }
