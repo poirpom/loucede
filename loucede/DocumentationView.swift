@@ -28,12 +28,25 @@
 //       Markdown). Retrait du `.padding(.bottom, 24)` du titre →
 //       écart final 32pt via le padding vertical du Markdown seul.
 //
+//  Polish typographie (2026-05-10) : customisation des styles MarkdownUI
+//  pour le rendu de la doc native. Élements stylisés via les modifiers
+//  `.markdownBlockStyle(\.<key>)` et `.markdownTextStyle(\.<key>)` :
+//    - Callouts (blockquote) : border 1px adaptatif + fond subtil + radius 8pt
+//    - H2 : couleur loucedé #3F84F7
+//    - HR (thematicBreak) : ligne dashed adaptative via Shape custom
+//    - Code fenced : monospace + bg + radius + padding 16pt + WRAP activé
+//      (via Text(config.content) au lieu de config.label) — supporte
+//      le détournement code block en mise en exergue de texte
+//    - Code inline : monospace + bg subtil
+//    - Liens : couleur loucedé + underline
+//
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
 //    B.2 ✅ — Layout 2 colonnes avec données mockées
 //    B.3 ✅ — Binding au DocumentationManager.shared (liste réelle)
 //    B.4 ✅ — Rendu Markdown du contenu via MarkdownUI
-//    K+L+M  — Cover + emoji + titre dans la zone détail (CE FICHIER)
+//    K+L+M ✅ — Cover + emoji + titre dans la zone détail
+//    Polish typo — Customisation styles MarkdownUI (CE FICHIER)
 //
 //  4 états visuels gérés par `sidebarContent` (priorité décroissante) :
 //    1. Loading : ProgressView centré (~500ms typique)
@@ -384,6 +397,73 @@ struct DocumentationView: View {
                         pageHeader(metadata: selectedPage)
                         Markdown(content.markdown)
                             .textSelection(.enabled)
+                            // Callouts (blockquote Notion) : border 1px
+                            // adaptatif + fond subtil + radius 8pt + padding
+                            // interne. Pas de traitement italique car
+                            // MarkdownUI n'en applique pas par défaut sur
+                            // \.blockquote. L'emoji du callout Notion est
+                            // conservé en début de blockquote (présent dans
+                            // le markdown converti).
+                            .markdownBlockStyle(\.blockquote) { config in
+                                config.label
+                                    .padding(14)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.secondary.opacity(0.05))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            // H2 : couleur loucedé #3F84F7 (cf. CLAUDE.md
+                            // design system). Taille et poids défaut MarkdownUI
+                            // conservés (probablement bold).
+                            .markdownBlockStyle(\.heading2) { config in
+                                config.label
+                                    .foregroundStyle(Color(hex: "3F84F7"))
+                            }
+                            // HR (thematicBreak) : ligne dashed 1px via
+                            // helper `DashedLine: Shape` défini en bas du
+                            // fichier. Couleur secondary adaptative
+                            // light/dark. Padding vertical 8pt pour aérer.
+                            .markdownBlockStyle(\.thematicBreak) {
+                                DashedLine()
+                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                                    .foregroundStyle(Color.secondary.opacity(0.4))
+                                    .frame(height: 1)
+                                    .padding(.vertical, 8)
+                            }
+                            // Code block (fenced) : on remplace `config.label`
+                            // (rendu MarkdownUI par défaut, avec scroll
+                            // horizontal possible) par un `Text(config.content)`
+                            // explicite. Le Text() natif SwiftUI WRAP
+                            // automatiquement sur les espaces — clé pour le
+                            // détournement « code block = mise en exergue
+                            // de texte » sans scroll horizontal indésirable.
+                            // On perd la coloration syntaxique éventuelle
+                            // (no-op : MarkdownUI n'en a pas par défaut).
+                            .markdownBlockStyle(\.codeBlock) { config in
+                                Text(config.content)
+                                    .font(.system(.body, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(16)
+                                    .background(Color.secondary.opacity(0.15))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            // Code inline (`backticks`) : monospace + fond
+                            // subtil. Pas de padding micro paramétrable côté
+                            // text style — trade-off accepté V1 (pattern
+                            // standard MarkdownUI).
+                            .markdownTextStyle(\.code) {
+                                FontFamilyVariant(.monospaced)
+                                BackgroundColor(Color.secondary.opacity(0.1))
+                            }
+                            // Liens : couleur loucedé #3F84F7 + underline
+                            // single (pattern macOS natif).
+                            .markdownTextStyle(\.link) {
+                                ForegroundColor(Color(hex: "3F84F7"))
+                                UnderlineStyle(.single)
+                            }
                             .padding(.horizontal, 32)
                             .padding(.vertical, 32)
                     }
@@ -486,4 +566,24 @@ struct DocumentationView: View {
 #Preview {
     DocumentationView()
         .frame(width: 900, height: 700)
+}
+
+// MARK: - Helper Shapes (polish typographie)
+
+/// Ligne horizontale dashed pour le rendu custom des `<hr>` Markdown.
+/// Pattern simple : Path tracé sur la largeur du rect, à mi-hauteur.
+/// Utilisé exclusivement par `.markdownBlockStyle(\.thematicBreak)` du
+/// rendu Markdown de la doc native (cf. case Loaded de `detailContent`).
+///
+/// Note scope : `fileprivate` car helper visuel local au fichier — pas
+/// besoin d'exposer ailleurs dans l'app. Si un jour on a besoin d'une
+/// `DashedLine` dans plusieurs vues, on la promeut en `internal` dans
+/// un fichier dédié `Helpers/Shapes.swift` (pas urgent V1).
+fileprivate struct DashedLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return path
+    }
 }
