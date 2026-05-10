@@ -10,9 +10,23 @@
 //  Polish K+L+M (2026-05-10) : ajout du header de page (cover image
 //  bandeau 200pt, emoji 80pt centré, titre 32pt bold) au-dessus du
 //  rendu Markdown dans le case Loaded de `detailContent`. Esprit
-//  visuel Notion natif côté zone de lecture. Sources des cover/icon/title :
+//  visuel Notion natif côté zone de lecture. Sources des icon/title :
 //  `manager.pages` (peuplé par /notion-list) — pas d'enrichissement
 //  du proxy /notion-page nécessaire (couplage minime).
+//
+//  Mini-fix UX (2026-05-10, post-K+L+M) : pivot sur 2 points suite
+//  aux observations runtime :
+//    1. Cover image remplacée par fond bleu loucedé (#3F84F7) derrière
+//       l'emoji. La cover créait une surcharge visuelle redondante
+//       avec la sidebar (qui joue déjà le rôle de navigation), et
+//       impliquait des fetchs AsyncImage + URLs S3 expirées sans
+//       bénéfice utilisateur clair. Le bloc bleu unifie l'identité
+//       visuelle loucedé (couleur de sélection design system) et
+//       élimine l'item E (proxy images V1.x) devenu obsolète.
+//    2. Padding bottom du titre retiré : l'écart cumulé titre ↔
+//       Markdown atteignait 56pt (24pt bottom titre + 32pt vertical
+//       Markdown). Retrait du `.padding(.bottom, 24)` du titre →
+//       écart final 32pt via le padding vertical du Markdown seul.
 //
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
@@ -222,16 +236,17 @@ struct DocumentationView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Page header (polish K+L+M)
+    // MARK: - Page header (polish K+L+M, mini-fix 2026-05-10)
 
-    /// Header visuel d'une page chargée : cover image bandeau 200pt
-    /// (plein-largeur), emoji icon 80pt (centré), titre 32pt bold
-    /// (aligné gauche). Insère au-dessus du rendu Markdown dans le
-    /// case Loaded de `detailContent`.
+    /// Header visuel d'une page chargée : bloc bleu loucedé 200pt
+    /// (plein-largeur, fond `#3F84F7`) avec emoji 80pt centré H+V,
+    /// suivi du titre 32pt bold (aligné gauche). Insère au-dessus du
+    /// rendu Markdown dans le case Loaded de `detailContent`.
     ///
     /// Chaque élément est indépendamment optionnel :
-    /// - Pas de cover → on saute directement à l'emoji ou au titre.
-    /// - Pas d'icon → on saute de la cover (ou rien) au titre.
+    /// - Pas d'icon → pas de bloc bleu, le titre apparaît directement
+    ///   en haut du ScrollView (cas hypothétique V1, ne devrait pas
+    ///   arriver — Faab fournit toujours un emoji par page Notion).
     /// - `metadata == nil` (race rare où la page a disparu de
     ///   `manager.pages` entre 2 refresh) → header entièrement skippé,
     ///   le Markdown s'affiche seul (graceful fallback).
@@ -241,62 +256,45 @@ struct DocumentationView: View {
     /// que id/title/markdown — décision V1 pour ne pas enrichir le
     /// proxy (couplage minime sidebar/detail).
     ///
-    /// Espacements verticaux (selon brief polish K+L+M) :
-    ///   - Cover (si présente) : 200pt height, plein-largeur, .clipped()
-    ///   - Emoji top : 24pt après cover, sinon 32pt depuis haut ScrollView
-    ///   - Titre top : 16pt après emoji, 24pt après cover seule, 32pt sinon
-    ///   - Titre bottom : 24pt avant le Markdown
+    /// Espacements verticaux finaux :
+    ///   - Bloc bleu (si emoji présent) : 200pt height, plein-largeur,
+    ///     emoji centré H+V via `.frame(..., alignment: .center)`.
+    ///   - Titre top : 24pt après bloc bleu, 32pt sinon (cas sans emoji).
+    ///   - Titre bottom : 0 (Markdown gère l'aération via son propre
+    ///     `.padding(.vertical, 32)` → écart final titre ↔ Markdown
+    ///     = 32pt, au lieu des 56pt de la version K+L+M initiale).
     ///
-    /// AsyncImage avec phase switch — graceful fallback (Color.clear)
-    /// si URL S3 expirée. Item E du backlog V1.x prévoit un proxy
-    /// images côté Scaleway pour stabilité long-terme.
+    /// Couleur `#3F84F7` : token design system loucedé (couleur de
+    /// sélection cf. CLAUDE.md), déjà utilisée dans `PopoverView` et
+    /// `LaunchAtLoginStep`. Extension `Color(hex:)` globale définie
+    /// dans `Onboarding/ColorExtension.swift`.
     @ViewBuilder
     private func pageHeader(metadata: DocumentationPage?) -> some View {
         if let metadata {
-            let hasCover = metadata.cover != nil
             let hasIcon = (metadata.icon?.isEmpty == false)
 
             VStack(alignment: .leading, spacing: 0) {
-                // 1. Cover image (plein-largeur, 200pt, optional)
-                if let coverURL = metadata.cover, let url = URL(string: coverURL) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            // Placeholder pendant le fetch (~100-300ms typique)
-                            Rectangle()
-                                .fill(Color.secondary.opacity(0.1))
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            // URL S3 expirée ou erreur réseau : graceful
-                            // fallback (rien affiché, layout suit emoji+titre).
-                            Color.clear
-                        @unknown default:
-                            Color.clear
-                        }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 200)
-                    .clipped()
-                }
-
-                // 2. Emoji icon (80pt centré, optional)
+                // 1. Bloc bleu loucedé avec emoji centré H+V (200pt
+                // height, plein-largeur). `alignment: .center` sur le
+                // frame centre l'emoji dans les deux axes ; le
+                // `.background` fill l'intégralité du frame (200pt ×
+                // full width). Si pas d'emoji, pas de bloc bleu.
                 if hasIcon, let icon = metadata.icon {
                     Text(icon)
                         .font(.system(size: 80))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, hasCover ? 24 : 32)
-                        .padding(.horizontal, 32)
+                        .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 200, alignment: .center)
+                        .background(Color(hex: "3F84F7"))
                 }
 
-                // 3. Titre (32pt bold, aligné gauche, toujours présent
-                // côté Notion donc pas optional ici)
+                // 2. Titre (32pt bold, aligné gauche, toujours présent
+                // côté Notion donc pas optional ici).
+                // Pas de `.padding(.bottom)` : le `.padding(.vertical, 32)`
+                // du Markdown gère seul l'aération entre titre et
+                // contenu (écart final 32pt).
                 Text(metadata.title)
                     .font(.system(size: 32, weight: .bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, hasIcon ? 16 : (hasCover ? 24 : 32))
-                    .padding(.bottom, 24)
+                    .padding(.top, hasIcon ? 24 : 32)
                     .padding(.horizontal, 32)
             }
         }
