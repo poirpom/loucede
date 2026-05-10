@@ -32,13 +32,21 @@
 //  pour le rendu de la doc native. Élements stylisés via les modifiers
 //  `.markdownBlockStyle(\.<key>)` et `.markdownTextStyle(\.<key>)` :
 //    - Callouts (blockquote) : border 1px adaptatif + fond subtil + radius 8pt
-//    - H2 : couleur loucedé #3F84F7
 //    - HR (thematicBreak) : ligne dashed adaptative via Shape custom
 //    - Code fenced : monospace + bg + radius + padding 16pt + WRAP activé
 //      (via Text(config.content) au lieu de config.label) — supporte
 //      le détournement code block en mise en exergue de texte
 //    - Code inline : monospace + bg subtil
 //    - Liens : couleur loucedé + underline
+//
+//  Note H2 (rollback runtime, 2026-05-10) : la customisation
+//  `.markdownBlockStyle(\.heading2)` initialement appliquée (couleur
+//  #3F84F7) écrasait la taille/poids défaut MarkdownUI, rendant H2
+//  indistinguable du paragraphe. Retrait pragmatique du modifier —
+//  défaut MarkdownUI conservé. La couleur loucedé reste présente sur
+//  le header (bloc emoji) et les liens, pas besoin de la doubler sur
+//  H2. À investiguer proprement en V1.x si la customisation devient
+//  désirable (pattern textStyle vs blockStyle pour headings).
 //
 //  Étape progressive de l'incrément B :
 //    B.1 ✅ — DocumentationModels + Service + Manager (foundation Swift)
@@ -414,13 +422,6 @@ struct DocumentationView: View {
                                             .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                                     )
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            // H2 : couleur loucedé #3F84F7 (cf. CLAUDE.md
-                            // design system). Taille et poids défaut MarkdownUI
-                            // conservés (probablement bold).
-                            .markdownBlockStyle(\.heading2) { config in
-                                config.label
-                                    .foregroundStyle(Color(hex: "3F84F7"))
                             }
                             // HR (thematicBreak) : ligne dashed 1px via
                             // helper `DashedLine: Shape` défini en bas du
