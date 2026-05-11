@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		85257E4A2F9AB3100045D5D0 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 85257E492F9AB3100045D5D0 /* MarkdownUI */; };
+		85C4DE062FB2744E001AD737 /* Documentation in Resources */ = {isa = PBXBuildFile; fileRef = 85C4DE052FB2744E001AD737 /* Documentation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 		409C5B112F23E0F90088B219 /* loucede.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = loucede.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		409C5B1E2F23E0FA0088B219 /* loucedeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = loucedeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		409C5B282F23E0FA0088B219 /* loucedeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = loucedeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		85C4DE052FB2744E001AD737 /* Documentation */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Documentation; path = loucede/Resources/Documentation; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -38,6 +40,16 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				"Resources/Documentation/images/02-installer-loucede-barre-des-menus.webp",
+				"Resources/Documentation/images/03-obtenir-et-configurer-ta-cle-api-ia-cleanshot-2026-05-10-20-10-36.png",
+				"Resources/Documentation/images/05-comprendre-la-fenetre-de-resultat-visuels-tutos-fenetre.webp",
+				Resources/Documentation/manifest.json,
+				"Resources/Documentation/tutos/01-bienvenue-dans-loucede.md",
+				"Resources/Documentation/tutos/02-installer-loucede.md",
+				"Resources/Documentation/tutos/03-obtenir-et-configurer-ta-cle-api-ia.md",
+				"Resources/Documentation/tutos/04-ouvrir-loucede.md",
+				"Resources/Documentation/tutos/05-comprendre-la-fenetre-de-resultat.md",
+				"Resources/Documentation/tutos/06-combien-coute-loucede.md",
 			);
 			target = 409C5B102F23E0F90088B219 /* loucede */;
 		};
@@ -93,6 +105,7 @@
 		409C5B082F23E0F90088B219 = {
 			isa = PBXGroup;
 			children = (
+				85C4DE052FB2744E001AD737 /* Documentation */,
 				409C5B132F23E0F90088B219 /* loucede */,
 				409C5B212F23E0FA0088B219 /* loucedeTests */,
 				409C5B2B2F23E0FA0088B219 /* loucedeUITests */,
@@ -235,6 +248,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				85C4DE062FB2744E001AD737 /* Documentation in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
