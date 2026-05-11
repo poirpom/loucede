@@ -40,6 +40,10 @@ Pods/
 .build/
 .swiftpm/
 
+# Python (scripts/)
+__pycache__/
+*.pyc
+
 # Misc
 *.ipa
 *.dSYM.zip

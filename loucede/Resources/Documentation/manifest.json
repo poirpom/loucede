@@ -1,0 +1,105 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-05-11T19:59:00Z",
+  "source_zip": "9c37b667-78d2-448f-a933-407d5d20ebb9_ExportBlock-632d8042-2032-4fd7-8aa2-58749f913b24.zip",
+  "categories": [
+    {
+      "id": "demarrer",
+      "title": "🚀 Démarrer",
+      "order": 1
+    },
+    {
+      "id": "configurer-loucede",
+      "title": "🔧 Configurer loucedé",
+      "order": 2
+    },
+    {
+      "id": "loucede-au-quotidien",
+      "title": "💡 loucedé au quotidien",
+      "order": 3
+    },
+    {
+      "id": "compte-et-licence",
+      "title": "💳 Compte et licence",
+      "order": 4
+    },
+    {
+      "id": "resolution-de-problemes",
+      "title": "🛠️ Résolution de problèmes",
+      "order": 5
+    },
+    {
+      "id": "ressources",
+      "title": "📚 Ressources",
+      "order": 6
+    }
+  ],
+  "tutos": [
+    {
+      "id": "01-bienvenue-dans-loucede",
+      "sequence": 1,
+      "notion_number": "01",
+      "title": "Bienvenue dans loucedé",
+      "emoji": "🤗",
+      "category_id": "demarrer",
+      "file": "tutos/01-bienvenue-dans-loucede.md",
+      "images": []
+    },
+    {
+      "id": "02-installer-loucede",
+      "sequence": 2,
+      "notion_number": "02",
+      "title": "Installer loucedé",
+      "emoji": "💻",
+      "category_id": "demarrer",
+      "file": "tutos/02-installer-loucede.md",
+      "images": [
+        "images/02-installer-loucede-barre-des-menus.webp"
+      ]
+    },
+    {
+      "id": "03-obtenir-et-configurer-ta-cle-api-ia",
+      "sequence": 3,
+      "notion_number": "04",
+      "title": "Obtenir et configurer ta clé API IA",
+      "emoji": "🔑",
+      "category_id": "demarrer",
+      "file": "tutos/03-obtenir-et-configurer-ta-cle-api-ia.md",
+      "images": [
+        "images/03-obtenir-et-configurer-ta-cle-api-ia-cleanshot-2026-05-10-20-10-36.png"
+      ]
+    },
+    {
+      "id": "04-ouvrir-loucede",
+      "sequence": 4,
+      "notion_number": "05",
+      "title": "Ouvrir loucedé",
+      "emoji": "🚀",
+      "category_id": "demarrer",
+      "file": "tutos/04-ouvrir-loucede.md",
+      "images": []
+    },
+    {
+      "id": "05-comprendre-la-fenetre-de-resultat",
+      "sequence": 5,
+      "notion_number": "11",
+      "title": "Comprendre la fenêtre de résultat",
+      "emoji": "🔲",
+      "category_id": "loucede-au-quotidien",
+      "file": "tutos/05-comprendre-la-fenetre-de-resultat.md",
+      "images": [
+        "images/05-comprendre-la-fenetre-de-resultat-visuels-tutos-fenetre.webp"
+      ]
+    },
+    {
+      "id": "06-combien-coute-loucede",
+      "sequence": 6,
+      "notion_number": "19",
+      "title": "Combien coûte loucedé ?",
+      "emoji": "🤑",
+      "category_id": "compte-et-licence",
+      "file": "tutos/06-combien-coute-loucede.md",
+      "images": []
+    }
+  ]
+}
