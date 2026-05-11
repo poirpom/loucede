@@ -18,7 +18,7 @@ Commiter immédiatement après chaque correctif avant de passer à autre chose.
 
 ### Plan d'actions
 Référencer le numéro de tâche en début de session (ex. "Phase 6.2").
-Mettre à jour `docs/plan.md` à la fin de chaque session ou batch de commits.
+À la fin de chaque session, exécuter `!fin` pour mettre à jour `docs/plan.md` (maintenu exclusivement par CC, format tableau — cf. section « Conventions plan.md »).
 
 ---
 
@@ -69,28 +69,52 @@ CC opère dans un worktree git isolé (`.claude/worktrees/...`). Xcode build dep
 
 ---
 
+## Conventions plan.md
+
+Format : tableau **Statut / Tâche / Commentaire / Date** par section (H3).
+
+Statuts d'exécution :
+
+| Symbole | Statut | Sémantique |
+|---|---|---|
+| ✅ | Fait | Tâche terminée, livrée |
+| 🟦 | En cours | Entamée mais non finie |
+| 🟨 | À faire | Identifiée, prévue, en attente |
+| ⚠️ | Bloqué | En attente externe / dépendance non résolue |
+| ❌ | Annulé | Abandonnée définitivement |
+| ⏭️ | Reporté en backlog | Déplacée vers `backlog_v2.md` |
+
+Maintenu **exclusivement par CC** via la commande `!fin`. Faab n'édite plus manuellement le fichier.
+
+Récap final « **État du projet — Tâches restantes (snapshot YYYY-MM-DD HH:MM)** » en bas du fichier : tableau filtré (🟨 / 🟦 / ⚠️ / ⏭️ uniquement, pas de ✅), mis à jour à chaque `!fin`.
+
+⚠️ **Ne pas confondre** avec `backlog_v2.md` (maturité d'idée 🌱 / 🌿 / 🌳). Les 2 fichiers cohabitent avec des sémantiques distinctes.
+
+Source de vérité : `~/Developer/loucede-private/plan.md` (alias `docs/plan.md` dans le workspace public).
+
+---
+
 ## État V1 — ce qui reste à faire
 
-### Tâches actives (dans l'ordre)
+Voir le tableau « **État du projet — Tâches restantes** » en bas de `docs/plan.md` pour la liste à jour (🟨 / 🟦 / ⚠️ / ⏭️ uniquement).
 
-- [ ] **Session 6 — Popup d'achat embedded Polar** — Approche A (email pour récupérer la clé) · WKWebView checkout
-- [ ] **Session 7 — Release v1.0.0** — Bump 0.9.0 → 1.0 · Notarisation · DMG · GitHub Release
+Source de vérité unique : `plan.md`. Cette section CLAUDE.md ne duplique plus l'information pour éviter la divergence.
 
 ### Phases terminées — ne pas retoucher sans raison explicite
-Phases 0 → 5, 6.1 (annulée), 6.2 → 6.18, Session 3 (Bloc 8a — mode debug + compteur X/Y + cross-device deactivate), Session 4 (bugs + cleanup) et Session 5 (refonte onboarding + palette pastel) : **toutes terminées**.
-Voir `plan.md` pour le détail complet.
+
+Voir `docs/plan.md` pour l'historique complet des phases et sessions terminées (Phases 0 → 7, Sessions 3 → 5, Pre-V1 P1-P4, Doc native incrément B, polish typo, etc.).
+
+Règle : ne pas modifier le code des phases passées sans raison explicite (régression, refactor justifié, bug critique).
 
 ---
 
 ## Hors scope V1 — ne pas implémenter
 
-Tout item du `backlog.md` est hors scope V1, notamment :
+Tout item du `backlog_v2.md` est hors scope V1, notamment :
 - i18n / String Catalog / sélecteur de langue
 - Filtrage contextuel par app (per-app context)
 - Trigger Finder sur sélection de fichier
 - Analyse multimodale (images)
-- URL scheme `loucede://`
-- Drag-and-drop réordonnancement actions
 - Audit accessibilité complet
 
 ---
@@ -120,9 +144,20 @@ Tout item du `backlog.md` est hors scope V1, notamment :
 
 Quand l'utilisateur envoie exactement l'un de ces mots-clés seuls, exécute l'action correspondante sans demander de confirmation :
 
-**!plan** → Lis `docs/plan.md` et affiche-en le contenu intégralement en Markdown rendu. Convertis ✅ → `- [x]`, ⏭️ → `- [ ]`, ❌ → `- ~~texte barré~~`. Aucune introduction.
+**!plan** → Lis `docs/plan.md` et affiche-en le contenu intégralement. Format tableau préservé (pas de conversion). Aucune introduction.
 
-**!fin** → Mets à jour `docs/plan.md` avec ce qu'on vient de faire. Affiche les tâches effectuées en `- [x]` et l'état du projet. Ne commence aucune nouvelle tâche.
+**!fin** → Clôture de session. Met à jour `docs/plan.md` (source réelle `~/Developer/loucede-private/plan.md`) au format tableau :
+
+1. Identifier les tâches accomplies dans la session (nouvelles ✅, transitions 🟨 → 🟦 → ✅, nouvelles tâches émergées).
+2. Mettre à jour les sections détaillées concernées avec statut + date + commentaire concis (hash commit, observation runtime clé, décision principale).
+3. Préserver les manifests historiques (Commit / Description) en tableau secondaire quand pertinent.
+4. Mettre à jour le récap final « **État du projet — Tâches restantes (snapshot YYYY-MM-DD HH:MM)** » :
+   - mise à jour de la date du snapshot
+   - ajout des nouvelles 🟨 / 🟦 / ⚠️ / ⏭️
+   - retrait des tâches devenues ✅ depuis le dernier `!fin`
+5. Commit local dans le repo `loucede-private` (pas de push, pas de remote) avec message `docs(plan): session [nom] — [N] tasks updated`.
+
+Ne commence aucune nouvelle tâche.
 
 **!backlog** → Lis `docs/backlog_v2.md` et affiche-en le contenu intégralement en Markdown rendu. Aucune introduction.
 
@@ -138,6 +173,6 @@ Quand l'utilisateur envoie exactement l'un de ces mots-clés seuls, exécute l'a
 
 **!proxy** → Lis et affiche le contenu de `proxy/README.md` (table des endpoints, env vars, déploiement, sécurité). Aucune introduction.
 
-**!phase [X]** → Lis `docs/plan.md` et affiche uniquement le contenu de la Phase X demandée, en Markdown rendu avec cases à cocher (✅ → `- [x]`, ⏭️ → `- [ ]`, ❌ → `- ~~texte barré~~`). Aucune introduction, aucun commentaire.
+**!phase [X]** → Lis `docs/plan.md` et affiche uniquement le contenu de la Phase X demandée. Format tableau préservé. Aucune introduction, aucun commentaire.
 
 **!commands** → Liste toutes les commandes !slash disponibles (relit la présente section « Raccourcis de session ») avec leur description courte. Format : tableau Markdown avec colonnes [Nom | Description]. Aucune introduction.
