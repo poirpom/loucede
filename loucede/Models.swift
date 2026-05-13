@@ -1179,41 +1179,53 @@ class ActionsStore: ObservableObject {
     - Réponds uniquement avec la recette structurée, sans introduction
     """
 
-    // MARK: - Seed des nouveaux utilisateurs (Phase 6.9c)
+    // MARK: - Seed des nouveaux utilisateurs (Phase B.2.c, 2026-05-13)
 
     /// 5 actions installées au premier lancement, dans l'ordre. La position
     /// dans le tableau détermine le raccourci ⌘+touche (Phase 6.8d-bis :
     /// position 0 → ⌘1, position 4 → ⌘5). Le champ `slotIndex` est conservé
     /// pour la compat Codable mais n'est plus consulté par le dispatcher.
+    ///
+    /// Phase B.2.c (2026-05-13) — refonte Top 5 V1 :
+    /// - Sortent du seed (restent au catalogue Modèles via TemplatesView) :
+    ///   « Extrais la recette de cuisine » 🍳, « Sois concis » ✂️ (→ « Raccourcis »
+    ///   en B.2.d).
+    /// - Entrent dans le seed (déjà au catalogue, montent au seed) :
+    ///   « Améliore le style » ✨, « Génère une Todo list » ✅.
+    /// - Ordre : Résume monte en ⌘1, Traduis FR descend en ⌘4.
+    ///
+    /// Reseed brutal accepté : les installs existantes conservent leur tableau
+    /// d'actions stocké en UserDefaults. Seuls les nouveaux installs (ou
+    /// `actions.isEmpty` après reset) reçoivent ce Top 5.
     static let defaultActions: [Action] = [
-        Action(
-            name: "Traduis en français",
-            icon: "🇫🇷",
-            prompt: translateFrPrompt,
-            slotIndex: 0
-        ),
         Action(
             name: "Résume ce texte",
             icon: "🤏",
             prompt: summarizePrompt,
-            slotIndex: 1
+            slotIndex: 0
         ),
         Action(
             name: "Corrige les fautes",
             icon: "✍️",
             prompt: correctPrompt,
+            slotIndex: 1
+        ),
+        Action(
+            name: "Améliore le style",
+            icon: "✨",
+            prompt: improveStylePrompt,
             slotIndex: 2
         ),
         Action(
-            name: "Extrais la recette de cuisine",
-            icon: "🍳",
-            prompt: recipeExtractionPrompt,
+            name: "Traduis en français",
+            icon: "🇫🇷",
+            prompt: translateFrPrompt,
             slotIndex: 3
         ),
         Action(
-            name: "Sois concis",
-            icon: "✂️",
-            prompt: concisePrompt,
+            name: "Génère une Todo list",
+            icon: "✅",
+            prompt: todoListPrompt,
             slotIndex: 4
         ),
     ]
