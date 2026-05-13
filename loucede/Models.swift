@@ -894,11 +894,14 @@ class ActionsStore: ObservableObject {
     - Ne rien ajouter avant ou après la traduction.
     """
 
-    /// Prompt « Résume ce texte » — Phase B.2.b (2026-05-13, version CSV).
-    /// Reseed brutal accepté : remplace la version Phase 6.9c v2. Les
-    /// utilisateurs existants ayant l'ancienne version sont migrés via
-    /// `migrateSummarizePromptV2IfNeeded` (compare avec `legacySummarizePrompt_v2`
-    /// = ex-summarizePrompt, donc continue de fonctionner).
+    /// Prompt « Résume ce texte » — Phase B.2.b-fix (2026-05-13, restauration
+    /// contraintes numériques). Conserve la structure CSV (Rôle / Tâche /
+    /// Procédure / Règles / Sortie attendue) mais réinjecte les contraintes
+    /// numériques de l'ancien prompt Phase 6.9c (10-20 mots/point, style
+    /// neutre, intro/conclusion optionnelles 10-18 mots) — la version CSV
+    /// pure produisait des résumés quasi aussi longs que le texte source
+    /// (test runtime Faab post-B.2.b). Le CSV Notion sera réaligné sur
+    /// cette version.
     /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
     static let summarizePrompt: String = """
     Rôle : expert en synthèse de texte.
@@ -912,14 +915,16 @@ class ActionsStore: ObservableObject {
 
     Règles :
     - Produire un résumé de 3 à 7 points clés sous forme de liste à puces.
-    - Chaque point doit être court, informatif et autonome.
+    - 1 idée principale par point, 10 à 20 mots maximum par point.
+    - Style neutre et informatif.
     - Préserver le sens exact des idées originales (ne pas inventer, ne pas interpréter).
     - Conserver le ton et le registre du texte (factuel, opinion, narratif, etc.).
     - Ne pas reproduire l'introduction ou la conclusion du texte original telles quelles.
+    - Si nécessaire à la compréhension, une courte introduction et une conclusion de 10 à 18 mots chacune peuvent encadrer la liste.
 
     Sortie attendue :
-    - Répondre uniquement avec le résumé en liste à puces.
-    - Ne rien ajouter avant ou après le résumé.
+    - Répondre uniquement avec le résumé (liste à puces, éventuellement encadrée d'une intro/conclusion courte conformément aux règles).
+    - Ne rien ajouter d'autre avant ou après.
     """
 
     /// Prompt « Corrige les fautes » — Phase B.2.b (2026-05-13, version CSV).
