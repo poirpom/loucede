@@ -894,66 +894,86 @@ class ActionsStore: ObservableObject {
     - Ne rien ajouter avant ou après la traduction.
     """
 
-    /// Prompt « Résume ce texte » — Phase 6.9c, mis à jour le 2026-04-28
-    /// (cap de points 5 → 7, max mots 18 → 20, intro/conclusion optionnelles
-    /// si nécessaires à la compréhension). Migration douce vers les
-    /// utilisateurs existants via `migrateSummarizePromptV2IfNeeded`.
+    /// Prompt « Résume ce texte » — Phase B.2.b (2026-05-13, version CSV).
+    /// Reseed brutal accepté : remplace la version Phase 6.9c v2. Les
+    /// utilisateurs existants ayant l'ancienne version sont migrés via
+    /// `migrateSummarizePromptV2IfNeeded` (compare avec `legacySummarizePrompt_v2`
+    /// = ex-summarizePrompt, donc continue de fonctionner).
+    /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
     static let summarizePrompt: String = """
-    Ta tâche : extraire uniquement les idées essentielles du texte.
+    Rôle : expert en synthèse de texte.
 
-    Instructions :
-    1. Identifie les concepts principaux du texte.
-    2. Supprime les exemples, anecdotes, répétitions et détails secondaires.
-    3. Reformule les idées de façon claire et concise.
+    Tâche : produire un résumé clair et fidèle du texte fourni, dans la même langue que le texte original.
 
-    Contraintes strictes :
-    - 3 à 7 points maximum
-    - 1 idée principale par point
-    - 10 à 20 mots maximum par point
-    - Style neutre et informatif
-    - Si nécessaire à la compréhension, une courte introduction et une conclusion de 10 à 18 mots chacune
+    Procédure :
+    1. Identifie les idées essentielles du texte.
+    2. Hiérarchise les informations par importance.
+    3. Reformule de manière concise et synthétique.
 
-    Format de sortie :
-    - Liste à puces uniquement
+    Règles :
+    - Produire un résumé de 3 à 7 points clés sous forme de liste à puces.
+    - Chaque point doit être court, informatif et autonome.
+    - Préserver le sens exact des idées originales (ne pas inventer, ne pas interpréter).
+    - Conserver le ton et le registre du texte (factuel, opinion, narratif, etc.).
+    - Ne pas reproduire l'introduction ou la conclusion du texte original telles quelles.
 
-    Vérification avant réponse :
-    - Chaque point doit représenter une idée essentielle du texte.
-    - Supprimer tout point redondant ou secondaire.
+    Sortie attendue :
+    - Répondre uniquement avec le résumé en liste à puces.
+    - Ne rien ajouter avant ou après le résumé.
     """
 
-    /// Prompt « Corrige les fautes » — Phase 6.9c.
+    /// Prompt « Corrige les fautes » — Phase B.2.b (2026-05-13, version CSV).
+    /// Reseed brutal accepté : remplace la version Phase 6.9c. Plus concis et
+    /// plus respectueux des choix stylistiques volontaires de l'auteur
+    /// (répétitions, néologismes, oralité).
+    /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
     static let correctPrompt: String = """
     Rôle : correcteur professionnel.
 
-    Tâche : corriger le texte fourni.
+    Tâche : corriger toutes les fautes du texte fourni sans en modifier le sens ni le style, dans la même langue que le texte original.
 
     Procédure :
-    1. Lire le texte pour en comprendre le sens global.
-    2. Corriger toutes les erreurs linguistiques.
-    3. Vérifier la cohérence et la lisibilité finale.
-
-    Types de corrections à effectuer :
-    - Orthographe
-    - Grammaire et accords
-    - Conjugaison
-    - Ponctuation
-    - Typographie française (espaces, guillemets, majuscules, etc.)
+    1. Identifier toutes les fautes d'orthographe, de grammaire, de conjugaison et de typographie.
+    2. Corriger chaque faute en préservant strictement le sens et le ton du texte.
+    3. Ne pas reformuler les tournures correctes, même si elles te paraissent imparfaites.
 
     Règles :
-    - Ne pas modifier le sens du texte.
-    - Conserver le style et le ton de l'auteur.
-    - Ne pas reformuler sauf si une phrase est grammaticalement incorrecte.
-    - Ne pas ajouter ni supprimer d'informations.
-    - Conserver les noms propres, marques, acronymes et termes techniques.
-
-    Mise en forme :
-    - Conserver strictement la mise en forme originale :
-      titres, sous-titres, paragraphes, listes, citations, sauts de ligne, etc.
-    - Conserver l'ordre des phrases.
+    - Corriger uniquement les fautes avérées (orthographe, grammaire, conjugaison, accord, typographie).
+    - Préserver le style, le ton et le registre de l'auteur.
+    - Préserver la structure du texte (paragraphes, listes, ponctuation expressive, etc.).
+    - Conserver les choix stylistiques volontaires (répétitions, phrases courtes, néologismes, oralité, etc.).
+    - Ne pas ajouter, ne pas supprimer, ne pas reformuler.
 
     Sortie attendue :
-    - Fournir uniquement le texte corrigé.
-    - Aucun commentaire, explication ou annotation.
+    - Répondre uniquement avec le texte corrigé.
+    - Pas d'introduction, pas de commentaire, pas de liste des corrections effectuées.
+    """
+
+    /// Prompt « Améliore le style » — Phase B.2.b (2026-05-13, nouvelle action
+    /// Top 5 V1). Cohabitation logique avec `correctPrompt` : correction des
+    /// fautes vs amélioration stylistique sans toucher au sens.
+    /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
+    static let improveStylePrompt: String = """
+    Rôle : éditeur littéraire.
+
+    Tâche : améliorer le style du texte fourni pour le rendre plus fluide et agréable à lire, dans la même langue que le texte original.
+
+    Procédure :
+    1. Identifier les lourdeurs, répétitions et transitions maladroites.
+    2. Reformuler ces passages avec des tournures plus élégantes.
+    3. Préserver strictement le sens, les idées et les informations du texte original.
+
+    Règles :
+    - Améliorer la fluidité des phrases et la qualité des transitions entre paragraphes.
+    - Réduire les répétitions de mots et les lourdeurs syntaxiques.
+    - Préserver le ton et le registre de l'auteur (formel, informel, technique, etc.).
+    - Préserver la structure du texte (paragraphes, listes, etc.).
+    - Ne pas modifier le sens, ne pas ajouter d'informations, ne pas supprimer d'idées.
+    - Ne pas rallonger ni raccourcir significativement le texte.
+
+    Sortie attendue :
+    - Répondre uniquement avec la version améliorée du texte.
+    - Pas d'introduction, pas de commentaire.
     """
 
     /// Prompt « Extrais la recette de cuisine » — Phase 6.9c (renomme l'ancienne
@@ -1038,6 +1058,37 @@ class ActionsStore: ObservableObject {
     Sortie :
     - Fournir uniquement le texte reformulé.
     - Ne pas ajouter d'explications ni de commentaires.
+    """
+
+    /// Prompt « Génère une Todo list » — Phase B.2.b (2026-05-13, nouvelle
+    /// action Top 5 V1). Structure des notes brutes en phases + cases à
+    /// cocher Markdown. Rentre dans la catégorie « Structurer » côté UI
+    /// catalogue, mais le seed des actions par défaut ne porte pas de
+    /// catégorie (Action n'a pas ce champ — la catégorisation est dans
+    /// `promptSuggestions` de TemplatesView.swift).
+    /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
+    static let todoListPrompt: String = """
+    Rôle : expert en gestion de projet et en organisation.
+
+    Tâche : transformer le texte fourni — qui peut être des notes brutes, désorganisées ou incomplètes — en un plan d'actions structuré et progressif, dans la même langue que le texte original.
+
+    Procédure :
+    1. Identifier les actions, tâches et objectifs mentionnés dans le texte.
+    2. Regrouper les tâches similaires en phases logiques.
+    3. Ordonner les phases dans une progression cohérente.
+    4. Formaliser le plan en Markdown avec cases à cocher.
+
+    Règles :
+    - Organiser les actions en phases logiques et séquentielles, chacune avec un titre clair en Markdown (## Phase 1 — Nom, etc.).
+    - Sous chaque phase, lister les tâches sous forme de cases à cocher Markdown (- [ ] Tâche).
+    - Si une phase comporte des risques, prérequis ou points d'attention, les ajouter sous un intitulé ⚠️ Points d'attention en liste à puces.
+    - Regrouper les tâches similaires dans la même phase, même si elles apparaissent éparpillées dans le texte.
+    - Ne supprimer aucune information utile du texte original.
+    - Si une information est ambiguë, formuler la tâche correspondante avec un ? en fin de ligne pour signaler qu'une clarification est nécessaire.
+
+    Sortie attendue :
+    - Répondre uniquement avec le plan en Markdown.
+    - Pas d'introduction, pas de commentaire.
     """
 
     // MARK: - Anciens prompts (référentiels pour la migration douce 6.9c)
