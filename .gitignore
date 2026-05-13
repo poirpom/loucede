@@ -31,7 +31,7 @@ documents-persos/
 # désormais des symlinks vers ~/Developer/loucede-private/. L'historique
 # git public d'avant cette date reste inchangé (acceptation rétroactive).
 docs/plan.md
-docs/backlog_v2.md
+docs/backlog.md
 
 # CocoaPods (if used)
 Pods/

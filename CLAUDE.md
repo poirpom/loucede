@@ -82,13 +82,13 @@ Statuts d'exécution :
 | 🟨 | À faire | Identifiée, prévue, en attente |
 | ⚠️ | Bloqué | En attente externe / dépendance non résolue |
 | ❌ | Annulé | Abandonnée définitivement |
-| ⏭️ | Reporté en backlog | Déplacée vers `backlog_v2.md` |
+| ⏭️ | Reporté en backlog | Déplacée vers `backlog.md` |
 
 Maintenu **exclusivement par CC** via la commande `!fin`. Faab n'édite plus manuellement le fichier.
 
 Récap final « **État du projet — Tâches restantes (snapshot YYYY-MM-DD HH:MM)** » en bas du fichier : tableau filtré (🟨 / 🟦 / ⚠️ / ⏭️ uniquement, pas de ✅), mis à jour à chaque `!fin`.
 
-⚠️ **Ne pas confondre** avec `backlog_v2.md` (maturité d'idée 🌱 / 🌿 / 🌳). Les 2 fichiers cohabitent avec des sémantiques distinctes.
+⚠️ **Ne pas confondre** avec `backlog.md` (maturité d'idée 🌱 / 🌿 / 🌳). Les 2 fichiers cohabitent avec des sémantiques distinctes.
 
 Source de vérité : `~/Developer/loucede-private/plan.md` (alias `docs/plan.md` dans le workspace public).
 
@@ -110,7 +110,7 @@ Règle : ne pas modifier le code des phases passées sans raison explicite (rég
 
 ## Hors scope V1 — ne pas implémenter
 
-Tout item du `backlog_v2.md` est hors scope V1, notamment :
+Tout item du `backlog.md` est hors scope V1, notamment :
 - i18n / String Catalog / sélecteur de langue
 - Filtrage contextuel par app (per-app context)
 - Trigger Finder sur sélection de fichier
@@ -132,11 +132,11 @@ Tout item du `backlog_v2.md` est hors scope V1, notamment :
 | Fichier | Contenu |
 |---|---|
 | `docs/plan.md` | Plan complet 7 phases, décisions, commits |
-| `docs/backlog_v2.md` | ~25 items post-V1 structurés par thématique |
+| `docs/backlog.md` | Items vivants organisés par thème (10 sections) · chantiers techniques détaillés dans `details/` (privé) |
 | `~/.claude/projects/…/memory/user_profile.md` | Profil et préférences utilisateur |
 | Git log | Historique immuable des actions effectuées |
 
-> `docs/plan.md` et `docs/backlog_v2.md` sont versionnés dans le repo git — source de vérité indépendante du chemin local du projet.
+> `docs/plan.md` et `docs/backlog.md` sont versionnés dans le repo git — source de vérité indépendante du chemin local du projet.
 
 ---
 
@@ -159,9 +159,9 @@ Quand l'utilisateur envoie exactement l'un de ces mots-clés seuls, exécute l'a
 
 Ne commence aucune nouvelle tâche.
 
-**!backlog** → Lis `docs/backlog_v2.md` et affiche-en le contenu intégralement en Markdown rendu. Aucune introduction.
+**!backlog** → Lis `docs/backlog.md` et affiche-en le contenu intégralement en Markdown rendu. Aucune introduction.
 
-**!add [texte]** → Note le texte dans `docs/backlog_v2.md` sans implémenter. Confirme l'ajout.
+**!add [texte]** → Note le texte dans `docs/backlog.md` sans implémenter. Confirme l'ajout.
 
 **!fix [description]** → Correctif uniquement, hors plan d'actions. Identifie le fichier, propose avant de modifier, attends validation, commite après.
 
