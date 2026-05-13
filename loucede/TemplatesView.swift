@@ -23,12 +23,17 @@ struct PromptSuggestion: Identifiable {
 
 /// Phase 6.12 (2026-04-25) : refonte complète des catégories. Anglais
 /// generic-coding → catégories français orientées texte. Ordre figé
-/// (Traduire, Analyser, Transformer, Structurer, Proposer) imposé par
-/// l'utilisateur — `CaseIterable` itère dans l'ordre de déclaration, donc
+/// (Traduire, Analyser, Extraire, Transformer, Structurer, Proposer) imposé
+/// par l'utilisateur — `CaseIterable` itère dans l'ordre de déclaration, donc
 /// l'ordre des `case` ci-dessous est la source de vérité pour la UI.
+///
+/// Phase B.2.a (2026-05-13) : ajout de `.extract` (« Extraire ») entre
+/// `.analyze` et `.transform` pour accueillir les modèles d'extraction
+/// (recette, données structurées, entités) du nouveau catalogue 25 actions.
 enum PromptCategory: String, CaseIterable {
     case translate = "Traduire"
     case analyze = "Analyser"
+    case extract = "Extraire"
     case transform = "Transformer"
     case structure = "Structurer"
     case propose = "Proposer"
@@ -43,6 +48,7 @@ enum PromptCategory: String, CaseIterable {
         switch self {
         case .translate: return "globe"
         case .analyze:   return "chart.bar.xaxis"
+        case .extract:   return "doc.text.magnifyingglass"
         case .transform: return "arrow.triangle.2.circlepath"
         case .structure: return "list.bullet.rectangle"
         case .propose:   return "lightbulb"
@@ -56,6 +62,7 @@ enum PromptCategory: String, CaseIterable {
         switch self {
         case .translate: return Color(red: 0.45, green: 0.55, blue: 0.70) // Soft slate blue
         case .analyze:   return Color(red: 0.60, green: 0.52, blue: 0.58) // Dusty rose
+        case .extract:   return Color(red: 0.65, green: 0.55, blue: 0.40) // Ambre/cuivre (Phase B.2.a, validé Faab) — distinct de transform (sage) et analyze (rose)
         case .transform: return Color(red: 0.50, green: 0.60, blue: 0.55) // Sage green
         case .structure: return Color(red: 0.55, green: 0.50, blue: 0.65) // Muted lavender
         case .propose:   return Color(red: 0.65, green: 0.55, blue: 0.50) // Warm taupe
