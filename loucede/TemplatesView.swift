@@ -71,52 +71,93 @@ enum PromptCategory: String, CaseIterable {
     }
 }
 
-// Modèles fournis par l'utilisateur (Phase 6.12, 2026-04-25).
-// Remplace les ~25 templates anglo-coding-centriques d'avant.
-// Source : `documents-persos/Privé et partagé/modèles de prompts ...csv`.
+// Modèles fournis par l'utilisateur — catalogue V1 (Phase B.2.d, 2026-05-18).
+// 25 actions / 6 catégories. L'ordre des catégories suit l'enum
+// PromptCategory : .translate / .analyze / .extract / .transform /
+// .structure / .propose (CaseIterable itère dans l'ordre de déclaration).
+// Source de vérité : actions-audit/modeles-de-prompts.csv (BDD Notion).
 //
-// Correctif 2026-04-28 : les 5 actions du seed `defaultActions` (Models.swift)
-// sont également présentes ici afin que l'utilisateur puisse les retrouver et
-// les réajouter s'il les supprime. Les prompts sont référencés via les
-// constantes statiques `ActionsStore.xxxPrompt` (single source of truth) pour
-// rester synchronisés avec le seed des actions par défaut.
+// Les 6 actions adossées au seed (Top 5 V1 + recette de cuisine)
+// référencent les constantes statiques `ActionsStore.xxxPrompt` (single
+// source of truth, synchronisées avec `defaultActions`). Les 19 autres
+// portent leur prompt en littéral inline copié du CSV.
+//
+// B.2.d : « Raccourcis ce texte » est passé en inline (le prompt CSV
+// « élagage 30-50 % » colle mieux au nom/description que concisePrompt
+// qui faisait de la reformulation) → `ActionsStore.concisePrompt`
+// devient orpheline, suppression prévue B.2.f.
 let promptSuggestions: [PromptSuggestion] = [
-    // MARK: Traduire — "Traduis en français" en tête (seed default action)
+    // MARK: Traduire (6) — "Traduis en français" en tête (seed default action)
     PromptSuggestion(
         name: "Traduis en français",
-        description: "Traduit fidèlement n'importe quelle langue source en français naturel.",
+        description: "Traduire en français naturel et idiomatique",
         prompt: ActionsStore.translateFrPrompt,
         icon: "🇫🇷",
         category: .translate
     ),
     PromptSuggestion(
+        name: "Traduis en anglais",
+        description: "Traduire en anglais naturel et idiomatique",
+        prompt: """
+        Role: professional translator.
+
+        Task: translate the provided text into English.
+
+        Procedure:
+        1. Automatically detect the source language.
+        2. Understand the overall meaning before translating.
+        3. Produce a faithful, clear and natural English translation.
+
+        Translation rules:
+        - Use natural and fluent English (avoid word-for-word translation).
+        - Preserve the exact meaning, tone and register of the original (formal, informal, technical, etc.).
+        - Preserve proper names, brands, acronyms and standard technical terms.
+        - Adapt idiomatic expressions to natural English equivalents.
+        - If no natural equivalent exists, keep the original term in quotes with a brief explanation in parentheses.
+        - Do not add or omit information.
+
+        Formatting:
+        - Strictly preserve the original structure: titles, subtitles, lists, quotations, paragraphs and line breaks.
+        - Keep the order of sentences and sections.
+
+        Filtering:
+        - If a passage is clearly out of context (advertising, external reference, isolated image caption), remove it.
+
+        Expected output:
+        - Reply only with the translation.
+        - Do not add anything before or after the translation.
+        """,
+        icon: "🇬🇧",
+        category: .translate
+    ),
+    PromptSuggestion(
         name: "Traduis en espagnol",
-        description: "Traduit en espagnol neutre international, compréhensible partout.",
+        description: "Traduire en espagnol neutre international",
         prompt: """
         Rol: traductor profesional.
-        
+
         Tarea: traducir el texto proporcionado al español neutro internacional.
-        
+
         Procedimiento:
         1. Detecta automáticamente el idioma de origen.
         2. Comprende el sentido global del texto antes de traducir.
         3. Produce una traducción fiel, clara y natural en español neutro internacional.
-        
+
         Reglas de traducción:
         - Utiliza un español neutro comprensible en todo el mundo hispanohablante.
         - Evita regionalismos propios de un país específico (España o América Latina).
         - Prioriza un vocabulario estándar ampliamente comprendido.
-        - Usa el tratamiento de “tú” por defecto, salvo que el texto original requiera un registro formal.
+        - Usa el tratamiento de "tú" por defecto, salvo que el texto original requiera un registro formal.
         - Conserva el sentido exacto, el tono y el registro del texto original (formal, informal, técnico, etc.).
         - Conserva los nombres propios, marcas, acrónimos y términos técnicos estándar.
         - Adapta las expresiones idiomáticas a un equivalente natural y universal en español.
         - Si no existe un equivalente natural, conserva el término original entre comillas con una breve explicación entre paréntesis.
         - No añadas ni elimines información.
-        
+
         Formato:
         - Conserva estrictamente la estructura original: títulos, subtítulos, listas, citas, párrafos y saltos de línea.
         - Mantén el orden de las frases y de las secciones.
-        
+
         Salida esperada:
         - Responde únicamente con la traducción.
         - No añadas nada antes ni después de la traducción.
@@ -126,17 +167,17 @@ let promptSuggestions: [PromptSuggestion] = [
     ),
     PromptSuggestion(
         name: "Traduis en portugais",
-        description: "Traduit en portugais naturel et idiomatique.",
+        description: "Traduire en portugais naturel et idiomatique",
         prompt: """
         Papel: tradutor profissional.
-        
+
         Tarefa: traduzir o texto fornecido para português.
-        
+
         Procedimento:
         1. Detecta automaticamente o idioma de origem.
         2. Compreende o sentido global antes de traduzir.
         3. Produz uma tradução fiel, natural e fluida em português.
-        
+
         Regras de tradução:
         - Usar português natural e corrente (evitar tradução literal ou excessivamente livre).
         - Manter o tom, o registo e o nível de formalidade do texto original (formal, informal, técnico, etc.).
@@ -144,12 +185,11 @@ let promptSuggestions: [PromptSuggestion] = [
         - Adaptar expressões idiomáticas para equivalentes naturais em português.
         - Se não existir equivalente natural, manter o termo original entre aspas com uma breve explicação entre parênteses.
         - Não acrescentar nem omitir informações.
-        
+
         Formatação:
-        - Manter rigorosamente a estrutura original:
-        títulos, subtítulos, listas, citações, parágrafos e quebras de linha.
+        - Manter rigorosamente a estrutura original: títulos, subtítulos, listas, citações, parágrafos e quebras de linha.
         - Respeitar a ordem do texto original.
-        
+
         Saída:
         - Responder apenas com a tradução.
         - Sem introdução, sem comentários, sem explicações.
@@ -158,295 +198,526 @@ let promptSuggestions: [PromptSuggestion] = [
         category: .translate
     ),
     PromptSuggestion(
-        name: "Traduis en anglais",
-        description: "Traduit dans un anglais naturel et idiomatique.",
+        name: "Traduis en allemand",
+        description: "Traduire en allemand naturel et idiomatique",
         prompt: """
-        Role: professional translator.
-        
-        Task: translate the provided text into English.
-        
-        Procedure:
-        1. Automatically detect the source language.
-        2. Fully understand the overall meaning of the text before translating.
-        3. Produce an accurate, natural, and fluent English translation.
-        
-        Translation rules:
-        - Use natural, idiomatic English (avoid literal, word-for-word translation).
-        - Preserve the exact meaning, tone, and register of the original text (formal, informal, technical, etc.).
-        - Maintain consistency in terminology throughout the text.
-        - Keep proper names, brands, acronyms, and standard technical terms unchanged.
-        - Adapt idiomatic expressions into natural English equivalents.
-        - If no natural equivalent exists, keep the original term in quotation marks with a brief explanation in parentheses.
-        - Do not add, remove, or alter information.
-        
-        Formatting:
-        - Strictly preserve the original structure: titles, subtitles, lists, quotes, paragraphs, and line breaks.
-        - Maintain the original order of sentences and sections.
-        
-        Output:
-        - Respond only with the translated text.
-        - Do not add any introduction, explanation, or comment before or after the translation.
+        Rolle: professioneller Übersetzer.
+
+        Aufgabe: den bereitgestellten Text ins Deutsche übersetzen.
+
+        Vorgehen:
+        1. Erkenne automatisch die Ausgangssprache.
+        2. Verstehe den Gesamtsinn, bevor du übersetzt.
+        3. Erstelle eine treue, klare und natürliche deutsche Übersetzung.
+
+        Übersetzungsregeln:
+        - Verwende natürliches und flüssiges Deutsch (vermeide Wort-für-Wort-Übersetzungen).
+        - Bewahre den genauen Sinn, den Ton und das Register des Originals (formell, informell, technisch, etc.).
+        - Bewahre Eigennamen, Marken, Akronyme und gängige Fachbegriffe.
+        - Passe idiomatische Ausdrücke an ihre natürlichen deutschen Entsprechungen an.
+        - Wenn keine natürliche Entsprechung existiert, behalte den Originalbegriff in Anführungszeichen mit einer kurzen Erklärung in Klammern.
+        - Füge nichts hinzu, lasse nichts aus.
+
+        Formatierung:
+        - Bewahre strikt die ursprüngliche Struktur: Titel, Untertitel, Listen, Zitate, Absätze und Zeilenumbrüche.
+        - Behalte die Reihenfolge der Sätze und Abschnitte bei.
+
+        Ausgabe:
+        - Antworte nur mit der Übersetzung.
+        - Füge nichts vor oder nach der Übersetzung hinzu.
         """,
-        icon: "🇬🇧",
+        icon: "🇩🇪",
         category: .translate
     ),
     PromptSuggestion(
-        name: "Traduis en emojis",
-        description: "Traduit n'importe quel texte en une suite d'emojis.",
+        name: "Traduis en italien",
+        description: "Traduire en italien naturel et idiomatique",
         prompt: """
-        Tu es un traducteur multilingue → emoji.
-        RÈGLES DE TRADUCTION
-        1. Tu reçois un texte dans une langue quelconque (détecte-la automatiquement, sans la mentionner). Tu réponds uniquement par une suite d'emojis et de signes de ponctuation autorisés (voir plus bas), sans aucun mot ni explication.
-        2. Une « phrase » du texte source = un « bloc » d'emojis. Sépare les blocs par un espace simple, sauf indication contraire imposée par la ponctuation conservée.
-        3. Privilégie le sens et l'intention sur la traduction littérale mot-à-mot. Cherche à transmettre : le sujet (qui/quoi), l'action ou l'état (verbe principal), le ton (tendre, ironique, sec, joyeux, triste…).
-        4. Utilise 2 à 6 emojis par phrase en moyenne. Ne sur-décore pas : chaque emoji doit porter de l'information. Une phrase très courte ou expressive peut tenir en un seul emoji.
-        5. Pour les expressions idiomatiques, traduis l'idée, pas les mots. Attention aux idiomes propres à chaque langue (« to kick the bucket » → ⚰️, pas 🦵🪣).
-        6. Pour les noms propres, utilise un emoji évocateur (drapeau, symbole, métier) plutôt que d'épeler.
-        7. Les nuances grammaticales (négation, futur, conditionnel, question, politesse) peuvent être rendues par des emojis dédiés si c'est utile au sens : ❌ pour la négation, ⏳ ou ➡️ pour le futur, 🙏 pour une formule de politesse marquée. Sinon, ignore-les.
-        8. N'essaie pas de transcrire l'écriture ou la phonétique de la langue source : seul le sens compte. Le résultat doit être compréhensible par un lecteur qui ne connaît pas la langue d'origine.
-        9. Si le texte est ambigu, choisis l'interprétation la plus probable sans demander de précision.
-        STRUCTURE & PONCTUATION
-        10. Conserve à l'identique la macro-structure du texte : sauts de ligne, paragraphes, listes (puces ou numérotation), guillemets, tirets de dialogue.
-        11. Conserve la ponctuation de fin de phrase : le point . est conservé à la fin de chaque phrase déclarative (collé au dernier emoji du bloc, suivi d'un espace avant le bloc suivant). Le ? et le ! sont préservés tels quels en fin de phrase (collés au dernier emoji). Les points de suspension … sont conservés tels quels.
-        12. Supprime la ponctuation interne qui ne porte pas de sens illocutoire : , ; :. La séparation par espace entre blocs d'emojis suffit à structurer la lecture.
-        13. Ne réintroduis jamais de ponctuation absente du texte source.
-        FORMAT DE RÉPONSE
-        Uniquement des emojis et la ponctuation autorisée ci-dessus. Aucun préambule, aucun commentaire, aucune mention de la langue détectée, aucune traduction inverse.
+        Ruolo: traduttore professionale.
+
+        Compito: tradurre il testo fornito in italiano.
+
+        Procedura:
+        1. Rileva automaticamente la lingua di origine.
+        2. Comprendi il senso globale prima di tradurre.
+        3. Produci una traduzione fedele, chiara e naturale in italiano.
+
+        Regole di traduzione:
+        - Usa un italiano naturale e fluente (evita la traduzione parola per parola).
+        - Mantieni il senso esatto, il tono e il registro dell'originale (formale, informale, tecnico, ecc.).
+        - Conserva i nomi propri, marchi, acronimi e termini tecnici standard.
+        - Adatta le espressioni idiomatiche a equivalenti naturali in italiano.
+        - Se non esiste un equivalente naturale, mantieni il termine originale tra virgolette con una breve spiegazione tra parentesi.
+        - Non aggiungere né omettere informazioni.
+
+        Formattazione:
+        - Mantieni rigorosamente la struttura originale: titoli, sottotitoli, elenchi, citazioni, paragrafi e a capo.
+        - Rispetta l'ordine delle frasi e delle sezioni.
+
+        Uscita:
+        - Rispondi solo con la traduzione.
+        - Senza introduzione, commenti o spiegazioni.
         """,
-        icon: "😶",
+        icon: "🇮🇹",
         category: .translate
     ),
-    PromptSuggestion(
-        name: "Détecte les incohérences",
-        description: "Liste les contradictions, ambiguïtés et infos manquantes du texte.",
-        prompt: """
-        Analyse le texte suivant et identifie les incohérences, contradictions, ambiguïtés ou informations manquantes, dans la même langue que le texte original.
-        Règles :
-        - Présente chaque problème détecté sous forme de liste numérotée en Markdown
-        - Pour chaque problème : cite brièvement le passage concerné entre guillemets, puis explique l'incohérence en une phrase
-        - Si aucun problème n'est détecté, réponds uniquement : "Aucune incohérence détectée."
-        - Réponds uniquement avec la liste, sans introduction ni commentaire
-        """,
-        icon: "⚠️",
-        category: .analyze
-    ),
-    PromptSuggestion(
-        name: "Extrais les arguments",
-        description: "Identifie thèse, arguments, preuves et contre-arguments du texte.",
-        prompt: """
-        Tu es un expert en analyse argumentative. Analyse le texte suivant et identifie ses composantes argumentatives, dans la même langue que le texte original.
-        Règles :
-        - Présente les éléments dans cet ordre en Markdown :
-          **Thèse principale** : l'idée centrale défendue
-          **Arguments majeurs** : liste numérotée des arguments principaux
-          **Preuves et exemples** : liste des éléments factuels ou illustratifs utilisés
-          **Contre-arguments** : objections mentionnées ou implicites, le cas échéant
-        - Si le texte n'est pas argumentatif, réponds uniquement : "Ce texte n'a pas de structure argumentative identifiable."
-        - Réponds uniquement avec l'analyse structurée, sans commentaire
-        """,
-        icon: "⚖️",
-        category: .analyze
-    ),
-    PromptSuggestion(
-        name: "Analyse les biais",
-        description: "Repère les biais cognitifs, présupposés et angles implicites.",
-        prompt: """
-        Tu es un expert en pensée critique et rhétorique. Analyse le texte suivant et identifie les biais cognitifs, présupposés, positions idéologiques ou angles implicites présents, dans la même langue que le texte original.
-        Règles :
-        - Présente chaque biais détecté sous forme de liste en Markdown
-        - Pour chaque biais : indique son **nom** en gras, cite brièvement le passage concerné entre guillemets, puis explique en une phrase en quoi il constitue un biais
-        - Si aucun biais n'est détecté, réponds uniquement : "Aucun biais identifiable dans ce texte."
-        - Réponds uniquement avec l'analyse, sans introduction ni commentaire
-        """,
-        icon: "🧭",
-        category: .analyze
-    ),
-    PromptSuggestion(
-        name: "Génère des questions",
-        description: "Crée 3 à 10 questions : compréhension, approfondissement, débat.",
-        prompt: """
-        Lis le texte suivant et génère une liste de questions pertinentes, dans la même langue que le texte original.
-        Règles :
-        - Propose entre 3 et 10 questions selon la richesse du texte, réparties en trois catégories présentées en Markdown :
-          **Compréhension** : questions pour vérifier la bonne lecture du texte
-          **Approfondissement** : questions pour aller plus loin sur les idées abordées
-          **Réflexion critique** : questions pour challenger les positions ou ouvrir le débat
-        - Chaque question doit être précise et ancrée dans le contenu du texte — n'invente pas de questions hors sujet
-        - Réponds uniquement avec la liste structurée en Markdown, sans introduction ni commentaire
-        """,
-        icon: "❓",
-        category: .analyze
-    ),
-    // MARK: Transformer — "Résume", "Corrige les fautes", "Sois concis" en tête (seed default actions)
+    // MARK: Analyser (3) — "Résume ce texte" en tête (seed default action)
     PromptSuggestion(
         name: "Résume ce texte",
-        description: "Extrait les idées essentielles en 3 à 7 points clés.",
+        description: "Extraire les idées essentielles en quelques points clés",
         prompt: ActionsStore.summarizePrompt,
         icon: "🤏",
-        category: .transform
+        category: .analyze
     ),
     PromptSuggestion(
+        name: "Identifie l'idée principale",
+        description: "Identifier la thèse centrale en 1 à 2 phrases",
+        prompt: """
+        Rôle : analyste de texte.
+
+        Tâche : identifier l'idée principale du texte fourni et l'exprimer en 1 ou 2 phrases claires, dans la même langue que le texte original.
+
+        Procédure :
+        1. Lis le texte intégralement pour en saisir le sens global.
+        2. Distingue l'idée centrale des idées secondaires et illustratives.
+        3. Reformule l'idée principale en une à deux phrases denses.
+
+        Règles :
+        - L'idée principale est la thèse, le message ou le propos central du texte.
+        - Si le texte est argumentatif : énonce la thèse défendue.
+        - Si le texte est narratif : énonce le sujet principal ou la situation centrale.
+        - Si le texte est informatif : énonce l'information clé.
+        - Ne pas inclure d'exemples, d'illustrations ou de détails secondaires.
+        - Ne pas reproduire la phrase d'ouverture du texte telle quelle.
+
+        Sortie attendue :
+        - Répondre uniquement avec l'idée principale, en 1 ou 2 phrases.
+        - Pas d'introduction, pas de commentaire, pas de liste.
+        """,
+        icon: "🎯",
+        category: .analyze
+    ),
+    PromptSuggestion(
+        name: "Explique simplement",
+        description: "Vulgariser le texte pour un lecteur non-spécialiste",
+        prompt: """
+        Rôle : vulgarisateur expérimenté.
+
+        Tâche : expliquer simplement le texte fourni pour un lecteur non-spécialiste, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifie les concepts complexes ou techniques du texte.
+        2. Reformule-les avec des mots courants et des phrases courtes.
+        3. Préserve les idées essentielles, élimine les détails accessoires.
+
+        Règles :
+        - Remplacer le vocabulaire technique ou complexe par des mots courants.
+        - Raccourcir les phrases longues, simplifier les structures grammaticales.
+        - Supprimer le jargon sans valeur ajoutée.
+        - Utiliser des comparaisons ou analogies du quotidien si elles aident à comprendre.
+        - Conserver toutes les idées essentielles sans les dénaturer.
+        - Conserver la structure du texte (paragraphes, listes, etc.).
+
+        Sortie attendue :
+        - Répondre uniquement avec la version vulgarisée du texte.
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "🧩",
+        category: .analyze
+    ),
+    // MARK: Extraire (3) — "Extrais la recette de cuisine" en tête (seed default action)
+    PromptSuggestion(
+        name: "Extrais la recette de cuisine",
+        description: "Extraire et reformater une recette en système métrique",
+        prompt: ActionsStore.recipeExtractionPrompt,
+        icon: "🍳",
+        category: .extract
+    ),
+    PromptSuggestion(
+        name: "Extrais les noms propres",
+        description: "Lister les personnes lieux et organisations mentionnés",
+        prompt: """
+        Rôle : expert en extraction d'entités nommées.
+
+        Tâche : extraire tous les noms propres du texte fourni et les regrouper par type, dans la même langue que le texte original.
+
+        Procédure :
+        1. Repère tous les noms propres : personnes, lieux, organisations.
+        2. Classe chaque nom dans sa catégorie.
+        3. Présente les résultats sous forme de liste structurée par type.
+
+        Règles d'extraction :
+        - **Personnes** : prénoms, noms de famille, personnages, fonctions nommées (le président Macron, etc.).
+        - **Lieux** : villes, pays, régions, lieux-dits, monuments, adresses.
+        - **Organisations** : entreprises, institutions, associations, marques, partis politiques.
+        - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
+        - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
+
+        Format de sortie (Markdown) :
+
+        ## Personnes
+        - Nom 1
+        - Nom 2
+
+        ## Lieux
+        - Lieu 1
+        - Lieu 2
+
+        ## Organisations
+        - Organisation 1
+        - Organisation 2
+
+        Cas particuliers :
+        - Si une catégorie est vide, l'omettre du résultat.
+        - Si aucun nom propre n'est trouvé, répondre uniquement : "Aucun nom propre identifié dans le texte."
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste structurée par catégorie.
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "🏷️",
+        category: .extract
+    ),
+    PromptSuggestion(
+        name: "Extrais les dates",
+        description: "Lister toutes les dates mentionnées avec leur contexte",
+        prompt: """
+        Rôle : expert en extraction d'information.
+
+        Tâche : extraire toutes les dates mentionnées dans le texte fourni avec leur contexte, dans la même langue que le texte original.
+
+        Procédure :
+        1. Repère toutes les références temporelles précises du texte (dates, mois, années, périodes).
+        2. Pour chaque date, identifie l'événement ou le contexte associé.
+        3. Présente les résultats sous forme de liste structurée.
+
+        Règles d'extraction :
+        - Inclure les dates explicites (15 mars 2024, mars 2024, 2024).
+        - Inclure les dates relatives explicites (la semaine dernière, dans 3 mois) si le texte donne une date de référence.
+        - Ignorer les références temporelles vagues sans valeur informative (un jour, parfois, autrefois).
+        - Présenter les dates au format le plus précis disponible.
+
+        Format de sortie (Markdown) :
+        - Liste à puces, une ligne par date.
+        - Format : **[date]** — [contexte ou événement associé].
+        - Ordre chronologique ascendant si possible.
+
+        Cas particulier :
+        - Si aucune date n'est trouvée dans le texte, répondre uniquement : "Aucune date identifiée dans le texte."
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste des dates et leur contexte.
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "📅",
+        category: .extract
+    ),
+    // MARK: Transformer (7) — "Corrige les fautes", "Améliore le style", "Raccourcis" adossés au seed
+    PromptSuggestion(
         name: "Corrige les fautes",
-        description: "Corrige orthographe, grammaire, conjugaison et typographie française.",
+        description: "Corriger orthographe grammaire et typographie",
         prompt: ActionsStore.correctPrompt,
         icon: "✍️",
         category: .transform
     ),
     PromptSuggestion(
-        name: "Sois concis",
-        description: "Réduit la longueur du texte de 20 à 40 % sans perdre d'idée.",
-        prompt: ActionsStore.concisePrompt,
-        icon: "✂️",
-        category: .transform
-    ),
-    PromptSuggestion(
-        name: "Simplifie",
-        description: "Vulgarise le texte pour un lecteur non-spécialiste.",
-        prompt: """
-        Tu es un expert en vulgarisation. Simplifie le texte suivant pour le rendre accessible à un lecteur non spécialiste, dans la même langue que le texte original.
-        Règles :
-        - Remplace le vocabulaire technique ou complexe par des mots courants
-        - Raccourcis les phrases longues
-        - Supprime le jargon sans valeur ajoutée
-        - Conserve toutes les idées essentielles sans en dénaturer le sens
-        - Conserve la structure du texte original (paragraphes, listes, etc.)
-        - Réponds uniquement avec la version simplifiée, sans commentaire
-        """,
-        icon: "🧩",
-        category: .transform
-    ),
-    PromptSuggestion(
         name: "Améliore le style",
-        description: "Lisse lourdeurs, répétitions et transitions sans toucher au sens.",
-        prompt: """
-        Tu es un éditeur expérimenté. Améliore la qualité stylistique et la fluidité du texte suivant, dans la même langue que le texte original.
-        Règles :
-        - Corrige les lourdeurs, répétitions et maladresses de style
-        - Améliore les transitions entre les phrases et les paragraphes
-        - Varie le vocabulaire sans trahir le sens original
-        - Conserve strictement le contenu, le sens et la structure du texte
-        - Conserve la mise en forme originale (paragraphes, listes, etc.)
-        - Réponds uniquement avec la version améliorée, sans commentaire
-        """,
+        description: "Améliorer la fluidité sans changer le sens",
+        prompt: ActionsStore.improveStylePrompt,
         icon: "✨",
         category: .transform
     ),
     PromptSuggestion(
-        name: "Optimise pour le SEO",
-        description: "Restructure pour le web : titres, paragraphes courts, mots-clés.",
+        name: "Reformule",
+        description: "Paraphraser en préservant le sens et le registre",
         prompt: """
-        Tu es un expert en rédaction web et SEO. Réécris le texte suivant pour améliorer sa lisibilité web et son référencement naturel, dans la même langue que le texte original.
+        Rôle : éditeur expérimenté.
+
+        Tâche : reformuler le texte fourni avec des tournures différentes en préservant strictement son sens, dans la même langue que le texte original.
+
+        Procédure :
+        1. Comprendre le sens exact de chaque phrase du texte.
+        2. Reformuler chaque idée avec un vocabulaire et une syntaxe différents.
+        3. Préserver le ton, le registre et la longueur globale.
+
         Règles :
-        - Structure le contenu avec des titres et sous-titres hiérarchiques si pertinent (H1, H2, H3)
-        - Rédige des paragraphes courts et aérés
-        - Privilégie les phrases actives et directes
-        - Intègre naturellement les mots-clés présents dans le texte original
-        - Conserve toutes les informations originales sans en ajouter de nouvelles
-        - Utilise le format Markdown pour la mise en forme
-        - Réponds uniquement avec la version optimisée, sans commentaire
+        - Modifier les tournures de phrases, le vocabulaire et l'ordre des éléments.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver le ton et le registre (formel, informel, technique, neutre, etc.).
+        - Conserver une longueur équivalente (±10 %).
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas ajouter d'idées, ne pas supprimer d'informations.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version reformulée.
+        - Pas d'introduction, pas de commentaire.
         """,
-        icon: "🔍",
+        icon: "🔄",
         category: .transform
     ),
     PromptSuggestion(
-        name: "Adopte un ton professionnel",
-        description: "Réécrit dans un registre formel, soigné et bienveillant.",
+        name: "Rends plus formel",
+        description: "Réécrire dans un registre formel et soigné",
         prompt: """
-        Role: Tu es un éditeur professionnel.
-        Task: Réécris le texte suivant avec un ton professionnel, dans la même langue que le texte original.
+        Rôle : éditeur professionnel.
+
+        Tâche : réécrire le texte fourni dans un registre formel et soigné, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les tournures familières, relâchées ou ambiguës.
+        2. Les remplacer par des formulations soutenues et précises.
+        3. Préserver strictement le sens et les informations du texte.
+
         Règles :
-        • Adopte un registre formel, soigné et bienveillant
-        • Remplace les tournures familières, relâchées ou ambiguës
-        • Conserve strictement le sens et les informations du texte original
-        • Conserve la structure du texte (paragraphes, listes, etc.)
-        • Réponds uniquement avec la version réécrite, sans commentaire
+        - Adopter un registre formel, soigné et bienveillant.
+        - Remplacer les tournures familières, l'argot, les contractions et les expressions relâchées.
+        - Préférer les formulations complètes et précises aux raccourcis.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas alourdir inutilement le texte (formel ≠ pompeux).
+
+        Sortie attendue :
+        - Répondre uniquement avec la version réécrite.
+        - Pas d'introduction, pas de commentaire.
         """,
         icon: "🕴️",
         category: .transform
     ),
-    // MARK: Structurer — "Extrais la recette de cuisine" en tête (seed default action)
     PromptSuggestion(
-        name: "Extrais la recette de cuisine",
-        description: "Extrait, traduit et reformate une recette en système métrique.",
-        prompt: ActionsStore.recipeExtractionPrompt,
-        icon: "🍳",
-        category: .structure
+        name: "Rends plus convivial",
+        description: "Réécrire dans un registre chaleureux et accessible",
+        prompt: """
+        Rôle : rédacteur conversationnel.
+
+        Tâche : réécrire le texte fourni dans un registre chaleureux et accessible, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les tournures rigides, formelles ou distantes.
+        2. Les remplacer par des formulations naturelles et engageantes.
+        3. Préserver strictement le sens et les informations du texte.
+
+        Règles :
+        - Adopter un ton chaleureux, accessible et engageant.
+        - Utiliser le tutoiement si pertinent dans la langue cible.
+        - Remplacer les tournures rigides ou jargonnantes par des formulations simples.
+        - Privilégier les phrases courtes et directes.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas tomber dans le familier excessif ou l'oralité forcée.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version réécrite.
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "😊",
+        category: .transform
     ),
     PromptSuggestion(
-        name: "Réorganise la logique",
-        description: "Regroupe et ordonne les idées sans rien supprimer ni reformuler.",
+        name: "Raccourcis ce texte",
+        description: "Réduire la longueur en préservant l'essentiel",
         prompt: """
-        Tu es un éditeur expérimenté. Réorganise le texte suivant pour améliorer sa structure logique et la progression des idées, dans la même langue que le texte original.
+        Rôle : éditeur synthétique.
+
+        Tâche : raccourcir le texte fourni en préservant les informations essentielles, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les informations centrales du texte.
+        2. Repérer les passages redondants, illustratifs ou accessoires.
+        3. Reformuler de manière condensée en éliminant le superflu.
+
         Règles :
-        - Regroupe les idées et paragraphes similaires
-        - Ordonne les éléments du général au particulier, ou selon une progression naturelle
-        - Conserve intégralement toutes les phrases et informations du texte original — ne supprime rien, ne reformule rien
-        - Conserve la mise en forme originale (listes, titres, etc.)
-        - Réponds uniquement avec le texte réorganisé, sans commentaire
+        - Réduire la longueur du texte d'environ 30 à 50 %.
+        - Préserver toutes les idées essentielles et informations clés.
+        - Éliminer les redondances, les exemples illustratifs non critiques, les digressions.
+        - Préserver le ton et le registre du texte (formel, informel, technique, etc.).
+        - Préserver la structure du texte (paragraphes, listes, etc.) en l'adaptant si nécessaire.
+        - Ne pas dénaturer le sens, ne pas inventer.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version raccourcie du texte.
+        - Pas d'introduction, pas de commentaire, pas d'indication de longueur.
         """,
-        icon: "🧠",
+        icon: "✂️",
+        category: .transform
+    ),
+    PromptSuggestion(
+        name: "Réponds à cet email",
+        description: "Rédiger une réponse adaptée au contenu reçu",
+        prompt: """
+        Rôle : assistant de rédaction professionnelle.
+
+        Tâche : rédiger une réponse appropriée à l'email fourni, dans la même langue que l'email original.
+
+        Procédure :
+        1. Identifie le ton, le registre et l'objet de l'email reçu.
+        2. Détermine les points qui appellent une réponse (questions, demandes, propositions).
+        3. Rédige une réponse cohérente, structurée et adaptée au contexte.
+
+        Règles :
+        - Adopter le même registre que l'email reçu (formel, informel, professionnel, amical).
+        - Répondre point par point aux questions ou demandes explicites.
+        - Structurer la réponse : salutation, corps, formule de politesse adaptée.
+        - Rester concis et clair, éviter les longueurs inutiles.
+        - Si certains points nécessitent une information manquante, formuler une question de clarification.
+        - Préserver la langue de l'email original.
+
+        Cas particuliers :
+        - Si l'email contient des informations sensibles ou ambiguës, signaler les points à clarifier sans inventer de réponse.
+        - Si le ton est conflictuel, adopter une réponse mesurée et professionnelle.
+
+        Sortie attendue :
+        - Répondre uniquement avec le texte de l'email de réponse complet (salutation incluse, formule de politesse incluse).
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "📧",
+        category: .transform
+    ),
+    // MARK: Structurer (3) — "Génère une Todo list" en tête (seed default action)
+    PromptSuggestion(
+        name: "Génère une Todo list",
+        description: "Structurer des notes brutes en plan d'actions",
+        prompt: ActionsStore.todoListPrompt,
+        icon: "✅",
         category: .structure
     ),
     PromptSuggestion(
         name: "Convertis en tableau",
-        description: "Transforme les informations en tableau Markdown structuré.",
+        description: "Transformer les informations en tableau Markdown",
         prompt: """
-        Analyse le texte suivant et transforme ses informations en tableau structuré en Markdown, dans la même langue que le texte original.
+        Rôle : expert en structuration de données.
+
+        Tâche : transformer les informations du texte fourni en tableau Markdown structuré, dans la même langue que le texte original.
+
+        Procédure :
+        1. Analyser le contenu pour identifier les éléments comparables.
+        2. Déterminer les colonnes les plus pertinentes selon le contenu.
+        3. Construire le tableau Markdown avec ces colonnes et les données extraites.
+
         Règles :
-        - Détermine les colonnes les plus pertinentes selon le contenu (ex. Concept / Description / Exemple, ou Critère / Avantages / Inconvénients, etc.)
-        - Chaque ligne du tableau correspond à un élément, une idée ou une entrée distincte
-        - Conserve toutes les informations importantes du texte original
-        - Si le texte ne se prête pas à un tableau, réponds uniquement : "Ce texte ne peut pas être converti en tableau de manière pertinente."
-        - Réponds uniquement avec le tableau en Markdown, sans commentaire
+        - Déterminer les colonnes les plus pertinentes selon le contenu (ex. Concept / Description / Exemple, ou Critère / Avantages / Inconvénients, etc.).
+        - Chaque ligne du tableau correspond à un élément, une idée ou une entrée distincte.
+        - Conserver toutes les informations importantes du texte original.
+        - Privilégier des en-têtes de colonnes courts et explicites.
+        - Si une cellule serait vide, indiquer "—" (tiret cadratin).
+
+        Cas particulier :
+        - Si le texte ne se prête pas à un tableau, répondre uniquement : "Ce texte ne peut pas être converti en tableau de manière pertinente."
+
+        Sortie attendue :
+        - Répondre uniquement avec le tableau en Markdown.
+        - Pas d'introduction, pas de commentaire.
         """,
         icon: "📊",
         category: .structure
     ),
     PromptSuggestion(
-        name: "Génère une Todo list",
-        description: "Structure des notes brutes en plan d'actions avec cases à cocher.",
+        name: "Propose un plan structuré",
+        description: "Transformer le texte en plan hiérarchique numéroté",
         prompt: """
-        Tu es un expert en gestion de projet et en organisation. À partir du texte suivant — qui peut être des notes brutes, désorganisées ou incomplètes — génère un plan d'actions structuré et progressif, dans la même langue que le texte original.
+        Rôle : expert en structuration de contenu.
+
+        Tâche : transformer le texte fourni en plan hiérarchique numéroté, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les grandes idées du texte (parties principales).
+        2. Identifier les idées secondaires associées à chaque grande idée.
+        3. Construire un plan hiérarchique I / A / 1 / a en Markdown.
+
         Règles :
-        • Organise les actions en phases logiques et séquentielles, chacune avec un titre clair en Markdown (## Phase 1 — Nom, etc.)
-        • Sous chaque phase, liste les tâches à effectuer sous forme de cases à cocher Markdown (- [ ] Tâche)
-        • Si une phase comporte des risques, prérequis ou points d'attention, ajoute-les sous un intitulé ⚠️ Points d'attention en liste à puces
-        • Regroupe les tâches similaires dans la même phase, même si elles apparaissent éparpillées dans le texte
-        • Ne supprime aucune information utile du texte original
-        • Si une information est ambiguë, formule la tâche correspondante avec un ? en fin de ligne pour signaler qu'une clarification est nécessaire
-        • Réponds uniquement avec le plan en Markdown, sans introduction ni commentaire
+        - Utiliser une numérotation hiérarchique claire : I / II / III pour les parties, A / B / C pour les sous-parties, 1 / 2 / 3 pour les sous-sous-parties, a / b / c pour les détails.
+        - Regrouper les idées similaires sous des parties cohérentes.
+        - Les intitulés doivent être courts et explicites (5 à 10 mots maximum).
+        - N'inclure que les intitulés du plan, pas le contenu détaillé du texte.
+        - Utiliser le format Markdown pour la mise en forme (listes imbriquées ou numérotation manuelle).
+        - Maximum 4 niveaux hiérarchiques.
+
+        Sortie attendue :
+        - Répondre uniquement avec le plan hiérarchique.
+        - Pas d'introduction, pas de commentaire.
         """,
-        icon: "✅",
+        icon: "🗂️",
         category: .structure
     ),
+    // MARK: Proposer (3)
     PromptSuggestion(
         name: "Propose des titres",
-        description: "Propose 5 titres accrocheurs avec angles variés.",
+        description: "Proposer plusieurs titres accrocheurs aux angles variés",
         prompt: """
-        Analyse le texte suivant et propose 5 titres pertinents et accrocheurs, dans la même langue que le texte original.
+        Rôle : rédacteur en chef.
+
+        Tâche : proposer 5 titres pertinents et accrocheurs pour le texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier le sujet central et l'angle dominant du texte.
+        2. Imaginer plusieurs façons de présenter ce sujet avec des angles variés.
+        3. Formuler 5 propositions distinctes.
+
         Règles :
-        - Chaque titre doit être court, clair et refléter fidèlement le contenu
-        - Varie les approches : informatif, intrigant, direct, questions, etc.
-        - Présente les titres sous forme de liste numérotée en Markdown
-        - Réponds uniquement avec la liste, sans commentaire
+        - Chaque titre doit être court (5 à 12 mots), clair et accrocheur.
+        - Refléter fidèlement le contenu du texte (pas de clickbait trompeur).
+        - Varier les approches : informatif, intrigant, direct, question, accroche émotionnelle, etc.
+        - Numéroter les titres de 1 à 5.
+        - Les titres doivent être distincts et non redondants entre eux.
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste numérotée des 5 titres.
+        - Pas d'introduction, pas de commentaire, pas d'explication des choix.
         """,
         icon: "📰",
         category: .propose
     ),
     PromptSuggestion(
-        name: "Propose un plan structuré",
-        description: "Transforme le texte en plan hiérarchique numéroté I/A/1/a.",
+        name: "Propose des questions",
+        description: "Proposer des questions pour approfondir ou ouvrir le débat",
         prompt: """
-        Analyse le texte suivant et transforme-le en plan hiérarchique, dans la même langue que le texte original.
+        Rôle : facilitateur de réflexion.
+
+        Tâche : proposer une liste de questions pertinentes à partir du texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les zones d'ombre, les hypothèses implicites et les points discutables du texte.
+        2. Formuler des questions qui permettent d'approfondir la compréhension ou d'ouvrir le débat.
+        3. Varier les types de questions (compréhension, approfondissement, critique).
+
         Règles :
-        - Utilise une numérotation claire : I / A / 1 / a
-        - Regroupe les idées similaires sous des parties cohérentes
-        - Les intitulés doivent être courts et explicites
-        - N'inclus pas le contenu du texte, uniquement les intitulés du plan
-        - Utilise le format Markdown pour la mise en forme
-        - Réponds uniquement avec le plan, sans commentaire
+        - Proposer entre 3 et 10 questions selon la richesse du texte.
+        - Varier les types : questions de compréhension (que dit le texte ?), d'approfondissement (pourquoi ? comment ?), critiques (et si ? quelles limites ?).
+        - Chaque question doit être claire, ouverte (pas oui/non) et appeler une réflexion.
+        - Présenter les questions sous forme de liste numérotée en Markdown.
+        - Les questions doivent être distinctes et non redondantes.
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste numérotée des questions.
+        - Pas d'introduction, pas de commentaire.
         """,
-        icon: "🗂️",
+        icon: "❓",
+        category: .propose
+    ),
+    PromptSuggestion(
+        name: "Propose des angles différents",
+        description: "Proposer plusieurs perspectives alternatives sur le sujet",
+        prompt: """
+        Rôle : penseur multi-perspectives.
+
+        Tâche : proposer 3 angles ou perspectives alternatives sur le sujet du texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier le sujet central et l'angle dominant adopté par le texte.
+        2. Imaginer d'autres façons d'aborder ce même sujet (autres disciplines, autres parties prenantes, autres échelles temporelles, etc.).
+        3. Formuler 3 angles distincts qui enrichissent ou contrastent avec l'angle initial.
+
+        Règles :
+        - Proposer exactement 3 angles distincts.
+        - Chaque angle doit ouvrir une perspective réellement différente (pas une simple variation de formulation).
+        - Sources possibles d'angles alternatifs : autre discipline (économique vs sociologique, technique vs humain), autre échelle (individuel vs collectif, court terme vs long terme), autre partie prenante (utilisateur vs producteur, expert vs novice).
+        - Présenter chaque angle avec un titre court (## Angle 1 — Nom) suivi d'un paragraphe de 2 à 4 phrases expliquant la perspective.
+        - Les angles ne sont pas des opinions à défendre, ce sont des points de vue à expliciter.
+
+        Sortie attendue :
+        - Répondre uniquement avec les 3 angles structurés en Markdown.
+        - Pas d'introduction, pas de commentaire.
+        """,
+        icon: "🔍",
         category: .propose
     ),
 ]
