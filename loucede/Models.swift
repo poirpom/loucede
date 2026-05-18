@@ -409,16 +409,12 @@ class ActionsStore: ObservableObject {
             }
         }
 
-        // Ajout « Sois concis » si absente et qu'il reste de la place.
-        let conciseAlreadyPresent = actions.contains { $0.name == "Sois concis" }
-        if !conciseAlreadyPresent && actions.count < ActionsStore.maxActions {
-            actions.append(Action(
-                name: "Sois concis",
-                icon: "✂️",
-                prompt: Self.concisePrompt
-            ))
-            changed = true
-        }
+        // B.2.d-fix-1 (2026-05-18) : le bloc qui injectait « Sois concis »
+        // (constante `concisePrompt`) a été retiré. L'action a été supprimée
+        // du catalogue (test runtime décevant, redondante avec « Résume ce
+        // texte ») — plus aucune raison de l'injecter chez les installs
+        // antérieures à 6.9c. Le reste de la migration (renames + reprompt
+        // des 4 actions historiques) reste actif et inchangé.
 
         if changed {
             saveActions()
@@ -1032,38 +1028,10 @@ class ActionsStore: ObservableObject {
     - Répondre uniquement avec la recette structurée
     """
 
-    /// Prompt « Sois concis » — nouvelle action Phase 6.9c.
-    static let concisePrompt: String = """
-    Rôle : éditeur professionnel spécialisé dans la reformulation et la synthèse.
-
-    Tâche : reformuler le texte fourni pour le rendre plus clair et plus concis.
-
-    Procédure :
-    1. Comprendre le sens global du texte.
-    2. Identifier les idées essentielles.
-    3. Supprimer les répétitions, lourdeurs et formulations inutiles.
-    4. Reformuler avec des phrases plus courtes et plus directes.
-
-    Règles :
-    - Conserver strictement le sens original.
-    - Ne pas ajouter d'informations nouvelles.
-    - Réduire la longueur du texte tout en gardant toutes les idées importantes.
-    - Privilégier un style clair, fluide et direct.
-    - Remplacer les tournures longues par des formulations simples.
-
-    Contraintes :
-    - Réduire la longueur du texte d'environ 20 à 40 % si possible.
-    - Éviter les répétitions et mots inutiles.
-    - Conserver le ton et le registre du texte original.
-
-    Mise en forme :
-    - Conserver la structure originale : paragraphes, listes, titres, etc.
-    - Respecter l'ordre des idées.
-
-    Sortie :
-    - Fournir uniquement le texte reformulé.
-    - Ne pas ajouter d'explications ni de commentaires.
-    """
+    // Prompt « Sois concis » (constante `concisePrompt`) supprimé en
+    // B.2.d-fix-1 (2026-05-18) : action retirée du catalogue (test runtime
+    // décevant, redondante avec « Résume ce texte »). Le bloc de migration
+    // 6.9c qui l'injectait a aussi été retiré (cf. migrateSeed69cIfNeeded).
 
     /// Prompt « Génère une Todo list » — Phase B.2.b (2026-05-13, nouvelle
     /// action Top 5 V1). Structure des notes brutes en phases + cases à

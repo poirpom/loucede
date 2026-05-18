@@ -72,20 +72,23 @@ enum PromptCategory: String, CaseIterable {
 }
 
 // Modèles fournis par l'utilisateur — catalogue V1 (Phase B.2.d, 2026-05-18).
-// 25 actions / 6 catégories. L'ordre des catégories suit l'enum
-// PromptCategory : .translate / .analyze / .extract / .transform /
-// .structure / .propose (CaseIterable itère dans l'ordre de déclaration).
+// 24 actions / 6 catégories (Traduire 6 / Analyser 3 / Extraire 3 /
+// Transformer 6 / Structurer 3 / Proposer 3). L'ordre des catégories
+// suit l'enum PromptCategory : .translate / .analyze / .extract /
+// .transform / .structure / .propose (CaseIterable itère dans l'ordre
+// de déclaration).
 // Source de vérité : actions-audit/modeles-de-prompts.csv (BDD Notion).
 //
 // Les 6 actions adossées au seed (Top 5 V1 + recette de cuisine)
 // référencent les constantes statiques `ActionsStore.xxxPrompt` (single
-// source of truth, synchronisées avec `defaultActions`). Les 19 autres
+// source of truth, synchronisées avec `defaultActions`). Les 18 autres
 // portent leur prompt en littéral inline copié du CSV.
 //
-// B.2.d : « Raccourcis ce texte » est passé en inline (le prompt CSV
-// « élagage 30-50 % » colle mieux au nom/description que concisePrompt
-// qui faisait de la reformulation) → `ActionsStore.concisePrompt`
-// devient orpheline, suppression prévue B.2.f.
+// B.2.d-fix-1 : l'action « Raccourcis ce texte » (ex-« Sois concis »)
+// a été supprimée du catalogue (test runtime décevant, redondante avec
+// « Résume ce texte »). La constante `ActionsStore.concisePrompt` et le
+// bloc de migration 6.9c qui injectait « Sois concis » ont été retirés
+// en conséquence (cf. Models.swift).
 let promptSuggestions: [PromptSuggestion] = [
     // MARK: Traduire (6) — "Traduis en français" en tête (seed default action)
     PromptSuggestion(
@@ -510,34 +513,6 @@ let promptSuggestions: [PromptSuggestion] = [
         - Pas d'introduction, pas de commentaire.
         """,
         icon: "😊",
-        category: .transform
-    ),
-    PromptSuggestion(
-        name: "Raccourcis ce texte",
-        description: "Réduire la longueur en préservant l'essentiel",
-        prompt: """
-        Rôle : éditeur synthétique.
-
-        Tâche : raccourcir le texte fourni en préservant les informations essentielles, dans la même langue que le texte original.
-
-        Procédure :
-        1. Identifier les informations centrales du texte.
-        2. Repérer les passages redondants, illustratifs ou accessoires.
-        3. Reformuler de manière condensée en éliminant le superflu.
-
-        Règles :
-        - Réduire la longueur du texte d'environ 30 à 50 %.
-        - Préserver toutes les idées essentielles et informations clés.
-        - Éliminer les redondances, les exemples illustratifs non critiques, les digressions.
-        - Préserver le ton et le registre du texte (formel, informel, technique, etc.).
-        - Préserver la structure du texte (paragraphes, listes, etc.) en l'adaptant si nécessaire.
-        - Ne pas dénaturer le sens, ne pas inventer.
-
-        Sortie attendue :
-        - Répondre uniquement avec la version raccourcie du texte.
-        - Pas d'introduction, pas de commentaire, pas d'indication de longueur.
-        """,
-        icon: "✂️",
         category: .transform
     ),
     PromptSuggestion(
