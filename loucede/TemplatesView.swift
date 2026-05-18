@@ -292,6 +292,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Si le texte est informatif : énonce l'information clé.
         - Ne pas inclure d'exemples, d'illustrations ou de détails secondaires.
         - Ne pas reproduire la phrase d'ouverture du texte telle quelle.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec l'idée principale, en 1 ou 2 phrases.
@@ -320,6 +321,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Utiliser des comparaisons ou analogies du quotidien si elles aident à comprendre.
         - Conserver toutes les idées essentielles sans les dénaturer.
         - Conserver la structure du texte (paragraphes, listes, etc.).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la version vulgarisée du texte.
@@ -355,6 +357,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - **Organisations** : entreprises, institutions, associations, marques, partis politiques.
         - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
         - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Format de sortie (Markdown) :
 
@@ -399,6 +402,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Inclure les dates relatives explicites (la semaine dernière, dans 3 mois) si le texte donne une date de référence.
         - Ignorer les références temporelles vagues sans valeur informative (un jour, parfois, autrefois).
         - Présenter les dates au format le plus précis disponible.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Format de sortie (Markdown) :
         - Liste à puces, une ligne par date.
@@ -450,6 +454,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Conserver une longueur équivalente (±10 %).
         - Préserver la structure du texte (paragraphes, listes, etc.).
         - Ne pas ajouter d'idées, ne pas supprimer d'informations.
+        - Conserver la langue d'origine du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la version reformulée.
@@ -478,6 +483,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Préserver intégralement le sens et les informations du texte.
         - Préserver la structure du texte (paragraphes, listes, etc.).
         - Ne pas alourdir inutilement le texte (formel ≠ pompeux).
+        - Conserver la langue d'origine du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la version réécrite.
@@ -507,6 +513,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Préserver intégralement le sens et les informations du texte.
         - Préserver la structure du texte (paragraphes, listes, etc.).
         - Ne pas tomber dans le familier excessif ou l'oralité forcée.
+        - Conserver la langue d'origine du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la version réécrite.
@@ -535,6 +542,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Rester concis et clair, éviter les longueurs inutiles.
         - Si certains points nécessitent une information manquante, formuler une question de clarification.
         - Préserver la langue de l'email original.
+        - Conserver la langue d'origine du texte source.
 
         Cas particuliers :
         - Si l'email contient des informations sensibles ou ambiguës, signaler les points à clarifier sans inventer de réponse.
@@ -574,12 +582,15 @@ let promptSuggestions: [PromptSuggestion] = [
         - Conserver toutes les informations importantes du texte original.
         - Privilégier des en-têtes de colonnes courts et explicites.
         - Si une cellule serait vide, indiquer "—" (tiret cadratin).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Cas particulier :
         - Si le texte ne se prête pas à un tableau, répondre uniquement : "Ce texte ne peut pas être converti en tableau de manière pertinente."
 
         Sortie attendue :
         - Répondre uniquement avec le tableau en Markdown.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
         icon: "📊",
@@ -605,9 +616,12 @@ let promptSuggestions: [PromptSuggestion] = [
         - N'inclure que les intitulés du plan, pas le contenu détaillé du texte.
         - Utiliser le format Markdown pour la mise en forme (listes imbriquées ou numérotation manuelle).
         - Maximum 4 niveaux hiérarchiques.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Sortie attendue :
         - Répondre uniquement avec le plan hiérarchique.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
         icon: "🗂️",
@@ -633,6 +647,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Varier les approches : informatif, intrigant, direct, question, accroche émotionnelle, etc.
         - Numéroter les titres de 1 à 5.
         - Les titres doivent être distincts et non redondants entre eux.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la liste numérotée des 5 titres.
@@ -660,6 +675,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Chaque question doit être claire, ouverte (pas oui/non) et appeler une réflexion.
         - Présenter les questions sous forme de liste numérotée en Markdown.
         - Les questions doivent être distinctes et non redondantes.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec la liste numérotée des questions.
@@ -687,6 +703,7 @@ let promptSuggestions: [PromptSuggestion] = [
         - Sources possibles d'angles alternatifs : autre discipline (économique vs sociologique, technique vs humain), autre échelle (individuel vs collectif, court terme vs long terme), autre partie prenante (utilisateur vs producteur, expert vs novice).
         - Présenter chaque angle avec un titre court (## Angle 1 — Nom) suivi d'un paragraphe de 2 à 4 phrases expliquant la perspective.
         - Les angles ne sont pas des opinions à défendre, ce sont des points de vue à expliciter.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
 
         Sortie attendue :
         - Répondre uniquement avec les 3 angles structurés en Markdown.

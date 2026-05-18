@@ -898,11 +898,17 @@ class ActionsStore: ObservableObject {
     /// pure produisait des résumés quasi aussi longs que le texte source
     /// (test runtime Faab post-B.2.b). Le CSV Notion sera réaligné sur
     /// cette version.
+    ///
+    /// B.2.d-fix-2 (2026-05-18) : bascule « langue source » → « français ».
+    /// Le résumé est une action de PRODUCTION (nouveau livrable) → suit la
+    /// règle V1 francophone « production = français par défaut » (cf.
+    /// decisions.md). Tout le reste du prompt B.2.b-fix est préservé
+    /// (structure + 10-20 mots/point + intro/conclusion 10-18 mots).
     /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
     static let summarizePrompt: String = """
     Rôle : expert en synthèse de texte.
 
-    Tâche : produire un résumé clair et fidèle du texte fourni, dans la même langue que le texte original.
+    Tâche : produire un résumé clair et fidèle du texte fourni, rédigé en français.
 
     Procédure :
     1. Identifie les idées essentielles du texte.
@@ -917,6 +923,7 @@ class ActionsStore: ObservableObject {
     - Conserver le ton et le registre du texte (factuel, opinion, narratif, etc.).
     - Ne pas reproduire l'introduction ou la conclusion du texte original telles quelles.
     - Si nécessaire à la compréhension, une courte introduction et une conclusion de 10 à 18 mots chacune peuvent encadrer la liste.
+    - Rédiger le résumé en français, quelle que soit la langue du texte source.
 
     Sortie attendue :
     - Répondre uniquement avec le résumé (liste à puces, éventuellement encadrée d'une intro/conclusion courte conformément aux règles).
@@ -1039,11 +1046,16 @@ class ActionsStore: ObservableObject {
     /// catalogue, mais le seed des actions par défaut ne porte pas de
     /// catégorie (Action n'a pas ce champ — la catégorisation est dans
     /// `promptSuggestions` de TemplatesView.swift).
+    ///
+    /// B.2.d-fix-2 (2026-05-18) : bascule « langue source » → « français »
+    /// (action de PRODUCTION, règle V1 francophone — cf. decisions.md) +
+    /// clauses anti-backticks (le modèle encapsulait la sortie dans un
+    /// bloc de code ```...``` au lieu d'un rendu Markdown direct).
     /// Source : `actions-audit/modèles de prompts*.csv` (Notion → CSV).
     static let todoListPrompt: String = """
     Rôle : expert en gestion de projet et en organisation.
 
-    Tâche : transformer le texte fourni — qui peut être des notes brutes, désorganisées ou incomplètes — en un plan d'actions structuré et progressif, dans la même langue que le texte original.
+    Tâche : transformer le texte fourni — qui peut être des notes brutes, désorganisées ou incomplètes — en un plan d'actions structuré et progressif, rédigé en français.
 
     Procédure :
     1. Identifier les actions, tâches et objectifs mentionnés dans le texte.
@@ -1058,9 +1070,12 @@ class ActionsStore: ObservableObject {
     - Regrouper les tâches similaires dans la même phase, même si elles apparaissent éparpillées dans le texte.
     - Ne supprimer aucune information utile du texte original.
     - Si une information est ambiguë, formuler la tâche correspondante avec un ? en fin de ligne pour signaler qu'une clarification est nécessaire.
+    - Rédiger la sortie en français, quelle que soit la langue du texte source.
+    - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
     Sortie attendue :
     - Répondre uniquement avec le plan en Markdown.
+    - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
     - Pas d'introduction, pas de commentaire.
     """
 
