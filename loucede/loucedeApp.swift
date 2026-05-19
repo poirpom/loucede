@@ -44,7 +44,6 @@ class CapturedTextManager: ObservableObject {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var popoverWindow: NSWindow?
-    var quickPromptWindow: NSWindow?
     var settingsWindow: NSWindow?
     var onboardingWindow: NSWindow?
     /// Fenêtre dédiée à la documentation (Point 4 pre-V1, 2026-05-08).
@@ -576,38 +575,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func showQuickPrompt() {
-        let quickPromptView = QuickPromptView(onClose: { [weak self] in
-            self?.quickPromptWindow?.orderOut(nil)
-        })
-
-        let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.level = .floating
-        panel.contentView = NSHostingView(rootView: quickPromptView)
-        panel.hasShadow = false
-        panel.isFloatingPanel = true
-        panel.becomesKeyOnlyIfNeeded = false
-
-        // Center on screen
-        if let screen = NSScreen.main {
-            let screenRect = screen.visibleFrame
-            let x = (screenRect.width - 420) / 2 + screenRect.minX
-            let y = (screenRect.height - 300) / 2 + screenRect.minY
-            panel.setFrame(NSRect(x: x, y: y, width: 420, height: 300), display: true)
-        }
-
-        quickPromptWindow = panel
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
+    // K.0 : `showQuickPrompt()` + `QuickPromptView` supprimés — feature
+    // morte héritée de TextAd (jamais appelée au runtime : aucun hotkey,
+    // menu ou bouton ne l'ouvrait).
 
     func hidePopover() {
         // Annule tout stream LLM en cours (le résultat ne sera plus visible)

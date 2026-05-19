@@ -61,116 +61,114 @@ struct ActionsSettingsView: View {
             // Sidebar - Actions list
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
-                    // Phase 6.8d-bis (2026-04-25) : 15 slots fixes affichés.
-                    // Les positions occupées rendent un ActionListRow standard
-                    // (tap pour sélectionner). Les positions vides rendent un
-                    // EmptySlotRow grisé qui affiche déjà le raccourci ⌘+touche
-                    // qu'aura la future action — l'utilisateur sait à l'avance
-                    // ce qu'il va obtenir. Le premier slot vide (= prochain
-                    // index libre) est tappable pour créer une nouvelle action,
-                    // ce qui remplace l'ancien CTA « Nouvelle action » fixe.
+                    // K.0 (refonte fondations) : la liste affiche les actions
+                    // réelles (plus de « 15 slots fixes » Phase 6.8d-bis, les
+                    // raccourcis ⌘1-⌘N positionnels ayant été supprimés). Un
+                    // CTA « Nouvelle action » suit la liste tant que le cap
+                    // `maxActions` n'est pas atteint (décision F). Le
+                    // drag-and-drop de réordonnancement (Point 3 pre-V1) est
+                    // préservé : il ne sert plus qu'à l'ordre d'affichage.
                     VStack(spacing: 2) {
-                        ForEach(0..<ActionsStore.maxActions, id: \.self) { position in
-                            if position < store.actions.count {
-                                let action = store.actions[position]
-                                ActionListRow(
-                                    action: action,
-                                    position: position,
-                                    isSelected: selectedAction?.id == action.id
-                                )
-                                .onTapGesture {
-                                    selectedAction = action
+                        ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
+                            ActionListRow(
+                                action: action,
+                                isSelected: selectedAction?.id == action.id
+                            )
+                            .onTapGesture {
+                                selectedAction = action
+                            }
+                            // Chaque row est une zone de drop. Drop sur la row
+                            // d'index N → moveAction(to: N) (sémantique « drop
+                            // BEFORE target », cf. doc-string de `moveAction`).
+                            .overlay(alignment: .top) {
+                                if dropTargetIndex == index {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 2)
                                 }
-                                // Mini-session Point 3 pre-V1 (2026-05-08) :
-                                // chaque ActionListRow remplie est une zone
-                                // de drop. Quand un autre `action.id` est
-                                // déposé ici, on appelle `moveAction` avec
-                                // l'index courant comme destination
-                                // (sémantique « drop BEFORE target », cf.
-                                // doc-string de `moveAction`).
-                                // Les `EmptySlotRow` non-next-available ne
-                                // câblent PAS `.dropDestination` → bounce-
-                                // back natif SwiftUI. Seul le slot
-                                // immédiatement après la dernière action
-                                // (`position == store.actions.count`) est
-                                // une zone de drop pour permettre le
-                                // « drop at end ».
-                                .overlay(alignment: .top) {
-                                    if dropTargetIndex == position {
-                                        Rectangle()
-                                            .fill(Color.accentColor)
-                                            .frame(height: 2)
-                                    }
+                            }
+                            .dropDestination(for: String.self) { items, _ in
+                                defer { dropTargetIndex = nil }
+                                guard let droppedIDStr = items.first,
+                                      let droppedID = UUID(uuidString: droppedIDStr),
+                                      let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID }),
+                                      fromIndex != index
+                                else { return false }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    store.moveAction(from: fromIndex, to: index)
                                 }
-                                .dropDestination(for: String.self) { items, _ in
-                                    defer { dropTargetIndex = nil }
-                                    guard let droppedIDStr = items.first,
-                                          let droppedID = UUID(uuidString: droppedIDStr),
-                                          let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID }),
-                                          fromIndex != position
-                                    else { return false }
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        store.moveAction(from: fromIndex, to: position)
-                                    }
-                                    return true
-                                } isTargeted: { isTargeted in
-                                    if isTargeted {
-                                        dropTargetIndex = position
-                                    } else if dropTargetIndex == position {
-                                        // Garde-fou contre les races : on ne
-                                        // nile que si on était la row targeted
-                                        // (sinon une autre row vient d'être
-                                        // entrée et on effacerait son indicator).
-                                        dropTargetIndex = nil
-                                    }
+                                return true
+                            } isTargeted: { isTargeted in
+                                if isTargeted {
+                                    dropTargetIndex = index
+                                } else if dropTargetIndex == index {
+                                    // Garde-fou races : on ne nile que si on
+                                    // était la row targeted.
+                                    dropTargetIndex = nil
                                 }
-                            } else if position == store.actions.count {
-                                // Slot immédiatement après la dernière action :
-                                // tappable (création) ET drop zone (drop at end).
-                                // L'indicateur s'affiche au top edge — visuellement
-                                // « below last filled row ».
-                                EmptySlotRow(position: position, isNextAvailable: true)
-                                    .onTapGesture { addNewAction() }
-                                    .overlay(alignment: .top) {
-                                        if dropTargetIndex == position {
-                                            Rectangle()
-                                                .fill(Color.accentColor)
-                                                .frame(height: 2)
-                                        }
-                                    }
-                                    .dropDestination(for: String.self) { items, _ in
-                                        defer { dropTargetIndex = nil }
-                                        guard let droppedIDStr = items.first,
-                                              let droppedID = UUID(uuidString: droppedIDStr),
-                                              let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID })
-                                        else { return false }
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            // Destination = actions.count → moveAction
-                                            // clampe et place l'item à la fin post-removal.
-                                            store.moveAction(from: fromIndex, to: store.actions.count)
-                                        }
-                                        return true
-                                    } isTargeted: { isTargeted in
-                                        if isTargeted {
-                                            dropTargetIndex = position
-                                        } else if dropTargetIndex == position {
-                                            dropTargetIndex = nil
-                                        }
-                                    }
-                            } else {
-                                // Slots ultérieurs : informatifs uniquement
-                                // (preview du raccourci à venir). Pas tappable,
-                                // pas droppable.
-                                EmptySlotRow(position: position, isNextAvailable: false)
                             }
                         }
+
+                        // CTA « Nouvelle action » + zone de drop « at end ».
+                        // Visible tant que le cap n'est pas atteint. Remplace
+                        // l'ancien EmptySlotRow « next available ».
+                        if store.actions.count < ActionsStore.maxActions {
+                            let endIndex = store.actions.count
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color(red: 0.0, green: 0.584, blue: 1.0).opacity(0.5),
+                                                style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
+                                }
+                                .frame(width: 24, height: 24)
+                                Text("Nouvelle action")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 10)
+                            .contentShape(Rectangle())
+                            .onTapGesture { addNewAction() }
+                            .overlay(alignment: .top) {
+                                if dropTargetIndex == endIndex {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 2)
+                                }
+                            }
+                            .dropDestination(for: String.self) { items, _ in
+                                defer { dropTargetIndex = nil }
+                                guard let droppedIDStr = items.first,
+                                      let droppedID = UUID(uuidString: droppedIDStr),
+                                      let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID })
+                                else { return false }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    store.moveAction(from: fromIndex, to: store.actions.count)
+                                }
+                                return true
+                            } isTargeted: { isTargeted in
+                                if isTargeted {
+                                    dropTargetIndex = endIndex
+                                } else if dropTargetIndex == endIndex {
+                                    dropTargetIndex = nil
+                                }
+                            }
+                        }
+
+                        // Compteur discret du cap (décision F, S6-A).
+                        Text("\(store.actions.count) / \(ActionsStore.maxActions) actions")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 8)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 8)
-                    // Suivi Point 3 pre-V1 (2026-05-08) : animation rapide
-                    // de l'indicateur de drop. easeInOut 0.1s suit le
-                    // mouvement souris sans lag perceptible. Pas spring
-                    // (perçu trop bouncy pour un indicator de drop).
                     .animation(.easeInOut(duration: 0.1), value: dropTargetIndex)
                 }
                 .scrollIndicators(.hidden)
@@ -318,11 +316,9 @@ struct ActionsSettingsView: View {
     }
 
     func addNewAction() {
-        // Phase 6.8d-bis : cap dur à 15 actions. La table `positionShortcuts`
-        // ne contient que 15 entrées (⌘1-⌘0 + ⌘A/Z/E/R/T) ; au-delà il n'y a
-        // plus de raccourci unique disponible. La UI empêche déjà d'arriver
-        // jusqu'ici (les slots vides au-dessus du prochain libre ne sont
-        // pas tappables), mais on garde la garde côté store par sécurité.
+        // Cap dur à `maxActions` (décision K.0-F : conservé pour le
+        // dimensionnement popup). La UI masque le CTA « Nouvelle action »
+        // au-delà ; garde côté store par sécurité.
         guard store.actions.count < ActionsStore.maxActions else { return }
         let newAction = Action(
             name: "",
@@ -435,10 +431,6 @@ struct ActionsSettingsView: View {
 struct ActionListRow: View {
     @Environment(\.colorScheme) var colorScheme
     let action: Action
-    /// Phase 6.8d-bis : position de l'action dans `store.actions`. Détermine
-    /// le raccourci clavier ⌘+touche affiché à droite (table de référence
-    /// dans `ActionsStore.positionShortcuts`).
-    let position: Int
     let isSelected: Bool
 
     // Selected background color: #f1f1ef for light mode, accentColor opacity for dark mode
@@ -516,14 +508,8 @@ struct ActionListRow: View {
                 .lineLimit(1)
 
             Spacer()
-
-            // Phase 6.8d-bis : raccourci clavier déterminé par la position
-            // dans la liste (plus de slotIndex stocké). Même rendu que dans
-            // la popup, pour aider l'utilisateur à repérer visuellement ses
-            // actions sans ouvrir chaque éditeur.
-            if let s = ActionsStore.shortcut(forPosition: position) {
-                KeyboardKey("⌘\(s.label)")
-            }
+            // K.0 : badge raccourci ⌘+touche retiré (raccourcis ⌘1-⌘N
+            // positionnels supprimés — navigation flèches + ↵).
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -531,64 +517,6 @@ struct ActionListRow: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(selectedBackgroundColor)
         )
-        .contentShape(Rectangle())
-    }
-}
-
-// MARK: - Empty Slot Row (Phase 6.8d-bis)
-
-/// Slot vide affiché dans la sidebar des Réglages. Montre déjà le raccourci
-/// ⌘+touche qui sera attribué à la future action à cette position. Le slot
-/// `isNextAvailable` (= immédiatement après la dernière action existante)
-/// affiche un libellé « Nouvelle action » en bleu accent et est tappable
-/// pour créer ; les autres slots ultérieurs sont neutres et non interactifs.
-struct EmptySlotRow: View {
-    @Environment(\.colorScheme) var colorScheme
-    let position: Int
-    let isNextAvailable: Bool
-
-    var textColor: Color {
-        if isNextAvailable {
-            return Color(red: 0.0, green: 0.584, blue: 1.0)
-        }
-        return colorScheme == .light
-            ? Color(white: 0.55)
-            : Color(white: 0.45)
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            // Boîte vide alignée sur l'icône d'une action remplie (24×24)
-            // pour préserver l'alignement vertical de la liste.
-            if isNextAvailable {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(textColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(textColor)
-                }
-                .frame(width: 24, height: 24)
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(textColor.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-                    .frame(width: 24, height: 24)
-            }
-
-            Text(isNextAvailable ? "Nouvelle action" : "Slot disponible")
-                .font(.system(size: 14, weight: isNextAvailable ? .bold : .medium))
-                .foregroundColor(textColor)
-                .lineLimit(1)
-
-            Spacer()
-
-            if let s = ActionsStore.shortcut(forPosition: position) {
-                KeyboardKey("⌘\(s.label)")
-                    .opacity(isNextAvailable ? 1 : 0.5)
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
         .contentShape(Rectangle())
     }
 }
@@ -601,9 +529,8 @@ struct ActionEditorView: View {
     var onSave: (Action) -> Void
     var onDelete: () -> Void
 
-    /// Observation du store pour que le badge « Raccourci clavier ⌘X »
-    /// (Phase 6.8d-bis) refresh si la position de l'action change suite à
-    /// une suppression / un import. Singleton partagé : `@ObservedObject`
+    /// Observation du store pour l'aperçu de test du prompt (provider /
+    /// modèle / clé API courants). Singleton partagé : `@ObservedObject`
     /// est sûr ici (pas de cycle d'init multiple).
     @ObservedObject private var store = ActionsStore.shared
 
@@ -682,29 +609,9 @@ struct ActionEditorView: View {
                             Spacer()
                         }
 
-                    // Phase 6.8d-bis (2026-04-25) : raccourci clavier en
-                    // lecture seule, déterminé par la position de l'action
-                    // dans la liste. Plus de Picker manuel — l'utilisateur
-                    // change le raccourci en réordonnant les actions (V1 :
-                    // pas de drag-reorder, mais supprimer + recréer suffit).
-                    if let position = store.position(of: action),
-                       let shortcut = ActionsStore.shortcut(forPosition: position) {
-                        HStack {
-                            Text("Raccourci clavier")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            KeyboardKey("⌘\(shortcut.label)")
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(inputBackgroundColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                        )
-                    }
+                    // K.0 : bloc « Raccourci clavier » (lecture seule,
+                    // Phase 6.8d-bis) retiré — les raccourcis ⌘1-⌘N
+                    // positionnels ont été supprimés (navigation flèches + ↵).
 
                     // Bloc « Ajouter aux Modèles » (correctif 2026-04-28)
                     // Toggle pour publier l'action dans le catalogue Modèles

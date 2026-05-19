@@ -42,10 +42,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     var name: String
     var icon: String
     var prompt: String
-    /// Position du raccourci clavier dans le popup : 0 = touche 1/&, 1 = touche 2/é, …, 9 = touche 0/à.
-    /// `nil` = l'action n'a pas de raccourci rapide (accessible seulement via ↑↓↵ ou clic).
-    /// La sélection se fait par keycode physique (18-29) — fonctionne en AZERTY et QWERTY.
-    var slotIndex: Int?
     var actionType: ActionType
     /// Description courte (≤80 signes) éditée par l'utilisateur pour l'affichage
     /// dans le catalogue Modèles si l'action est publiée (`isInTemplates == true`).
@@ -66,12 +62,11 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     /// pour les actions créées avant le 2026-05-08 (mini-session catalogue).
     var originTemplateName: String?
 
-    init(id: UUID = UUID(), name: String, icon: String, prompt: String, slotIndex: Int? = nil, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false, originTemplateName: String? = nil) {
+    init(id: UUID = UUID(), name: String, icon: String, prompt: String, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false, originTemplateName: String? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
         self.prompt = prompt
-        self.slotIndex = slotIndex
         self.actionType = actionType
         self.shortDescription = shortDescription
         self.isInTemplates = isInTemplates
@@ -79,7 +74,10 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, icon, prompt, slotIndex, actionType, shortDescription, isInTemplates, originTemplateName
+        // `slotIndex` retiré en K.0 (legacy raccourcis ⌘1-⌘N supprimés).
+        // Les actions déjà sérialisées avec une clé `slotIndex` se décodent
+        // sans erreur : la clé orpheline est ignorée (CodingKeys restreint).
+        case id, name, icon, prompt, actionType, shortDescription, isInTemplates, originTemplateName
     }
 
     init(from decoder: Decoder) throws {
@@ -88,7 +86,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         name = try container.decode(String.self, forKey: .name)
         icon = try container.decode(String.self, forKey: .icon)
         prompt = try container.decode(String.self, forKey: .prompt)
-        slotIndex = try container.decodeIfPresent(Int.self, forKey: .slotIndex)
         actionType = try container.decodeIfPresent(ActionType.self, forKey: .actionType) ?? .ai
         shortDescription = try container.decodeIfPresent(String.self, forKey: .shortDescription)
         isInTemplates = try container.decodeIfPresent(Bool.self, forKey: .isInTemplates) ?? false
@@ -101,7 +98,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encode(name, forKey: .name)
         try container.encode(icon, forKey: .icon)
         try container.encode(prompt, forKey: .prompt)
-        try container.encodeIfPresent(slotIndex, forKey: .slotIndex)
         try container.encode(actionType, forKey: .actionType)
         try container.encodeIfPresent(shortDescription, forKey: .shortDescription)
         try container.encode(isInTemplates, forKey: .isInTemplates)
@@ -164,42 +160,15 @@ class ActionsStore: ObservableObject {
         "fork.knife": "🍳",
     ]
 
-    // MARK: - Raccourcis par position (Phase 6.8d-bis, 2026-04-25)
+    // MARK: - Cap du nombre d'actions
 
-    /// Nombre maximum d'actions qu'un utilisateur peut créer. Au-delà, il
-    /// n'y a plus de touche libre dans la table `positionShortcuts` ci-dessous
-    /// pour assigner un raccourci ⌘+touche unique. Cap appliqué dans
-    /// `addAction` et dans la UI Réglages.
+    /// Nombre maximum d'actions qu'un utilisateur peut créer. Cap conservé
+    /// en K.0 (décision F) pour rester cohérent avec le dimensionnement
+    /// actuel de la popup (≈ 740 pt pour 15 lignes sans scroll). À
+    /// rediscuter en V1.x si besoin. Les raccourcis ⌘1-⌘N positionnels
+    /// (ex-`positionShortcuts`, Phase 6.8d-bis) ont été supprimés en K.0 :
+    /// navigation flèches + ↵ uniquement.
     static let maxActions = 15
-
-    /// Mapping position dans la liste → (keycode physique Carbon, label
-    /// affiché). Les 10 premiers slots utilisent la rangée de chiffres
-    /// (1/& à 0/à) ; les 5 suivants la rangée des lettres AZERTY (A, Z,
-    /// E, R, T).
-    ///
-    /// Les keycodes sont stables AZERTY ↔ QWERTY (position physique de la
-    /// touche). Les labels sont AZERTY-first : sur QWERTY US, les positions
-    /// 10 et 11 sont en réalité Q et W — choix volontaire, loucedé est
-    /// French-first (cohérent avec le raccourci principal ⌘^⌥W qui suit
-    /// déjà ce pattern).
-    static let positionShortcuts: [(keyCode: UInt16, label: String)] = [
-        (18, "1"), (19, "2"), (20, "3"), (21, "4"), (23, "5"),
-        (22, "6"), (26, "7"), (28, "8"), (25, "9"), (29, "0"),
-        (12, "A"), (13, "Z"), (14, "E"), (15, "R"), (17, "T"),
-    ]
-
-    /// Raccourci pour la position donnée dans la liste, ou nil si hors
-    /// limites (>= 15).
-    static func shortcut(forPosition position: Int) -> (keyCode: UInt16, label: String)? {
-        guard positionShortcuts.indices.contains(position) else { return nil }
-        return positionShortcuts[position]
-    }
-
-    /// Position d'une action dans la liste — sa position détermine son
-    /// raccourci ⌘+touche. nil si l'action n'est pas (plus) dans le store.
-    func position(of action: Action) -> Int? {
-        actions.firstIndex { $0.id == action.id }
-    }
 
     static let shared = ActionsStore()
 
@@ -263,7 +232,6 @@ class ActionsStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([Action].self, from: data),
            !decoded.isEmpty {
             actions = decoded
-            migrateLegacySeedIfNeeded()
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
             migrateSeed69cIfNeeded()
@@ -284,22 +252,6 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
             UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
         }
-    }
-
-    /// Migration one-shot (Phase 2, 2026-04-22) : si l'utilisateur n'a que
-    /// l'ancien seed unique "Corriger les fautes" (version sans slotIndex),
-    /// remplace-le par les 5 nouveaux prompts FR. Très restrictif pour ne pas
-    /// toucher à une config custom d'un utilisateur qui aurait *vraiment* créé
-    /// un prompt de ce nom.
-    private func migrateLegacySeedIfNeeded() {
-        guard actions.count == 1,
-              let only = actions.first,
-              only.name == "Corriger les fautes",
-              only.slotIndex == nil else {
-            return
-        }
-        actions = Self.defaultActions
-        saveActions()
     }
 
     /// Migration one-shot (Phase 2.6, 2026-04-23) : pour les utilisateurs
@@ -699,9 +651,8 @@ class ActionsStore: ObservableObject {
     ///
     /// L'ordre étant intrinsèque à l'array Swift, l'autosave dans
     /// UserDefaults persiste le nouvel ordre sans clé supplémentaire.
-    /// Les raccourcis ⌘1-⌘0 / ⌘A/Z/E/R/T sont réattribués automatiquement
-    /// puisqu'ils sont calculés dynamiquement depuis l'index dans
-    /// `actions` (cf. `ActionsStore.shortcut(forPosition:)`).
+    /// (K.0 : les raccourcis ⌘1-⌘N positionnels ont été supprimés —
+    /// `moveAction` ne sert plus qu'à l'ordre d'affichage de la liste.)
     /// Point 3 pre-V1 (2026-05-08, ajusté en suivi pour cohérence
     /// indicateur ↔ moveAction).
     func moveAction(from sourceIndex: Int, to destinationIndex: Int) {
@@ -833,10 +784,8 @@ class ActionsStore: ObservableObject {
             let icon = action.icon.isEmojiOnly ? "\(action.icon) " : ""
             md += "## \(index + 1). \(icon)\(action.name)\n\n"
 
-            // Raccourci ⌘+touche dérivé de la position (Phase 6.8d-bis).
-            if let shortcut = Self.shortcut(forPosition: index) {
-                md += "**Raccourci** : ⌘\(shortcut.label)\n\n"
-            }
+            // K.0 : ligne « Raccourci ⌘+touche » retirée de l'export
+            // (raccourcis positionnels supprimés — navigation flèches + ↵).
 
             // Le prompt brut, ligne par ligne. Pas de bloc code (```) car
             // les prompts contiennent souvent eux-mêmes du Markdown qu'on
@@ -1170,9 +1119,9 @@ class ActionsStore: ObservableObject {
     // MARK: - Seed des nouveaux utilisateurs (Phase B.2.c, 2026-05-13)
 
     /// 5 actions installées au premier lancement, dans l'ordre. La position
-    /// dans le tableau détermine le raccourci ⌘+touche (Phase 6.8d-bis :
-    /// position 0 → ⌘1, position 4 → ⌘5). Le champ `slotIndex` est conservé
-    /// pour la compat Codable mais n'est plus consulté par le dispatcher.
+    /// dans le tableau = ordre d'affichage dans la popup. (K.0 : les
+    /// raccourcis ⌘1-⌘N positionnels et le champ `slotIndex` ont été
+    /// supprimés — navigation flèches + ↵ uniquement.)
     ///
     /// Phase B.2.c (2026-05-13) — refonte Top 5 V1 :
     /// - Sortent du seed (restent au catalogue Modèles via TemplatesView) :
@@ -1189,32 +1138,27 @@ class ActionsStore: ObservableObject {
         Action(
             name: "Résume ce texte",
             icon: "🤏",
-            prompt: summarizePrompt,
-            slotIndex: 0
+            prompt: summarizePrompt
         ),
         Action(
             name: "Corrige les fautes",
             icon: "✍️",
-            prompt: correctPrompt,
-            slotIndex: 1
+            prompt: correctPrompt
         ),
         Action(
             name: "Améliore le style",
             icon: "✨",
-            prompt: improveStylePrompt,
-            slotIndex: 2
+            prompt: improveStylePrompt
         ),
         Action(
             name: "Traduis en français",
             icon: "🇫🇷",
-            prompt: translateFrPrompt,
-            slotIndex: 3
+            prompt: translateFrPrompt
         ),
         Action(
             name: "Génère une Todo list",
             icon: "✅",
-            prompt: todoListPrompt,
-            slotIndex: 4
+            prompt: todoListPrompt
         ),
     ]
 }

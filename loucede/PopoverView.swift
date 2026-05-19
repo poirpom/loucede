@@ -49,10 +49,10 @@ struct PopoverView: View {
     // .onAppear — NSEvent.addLocalMonitor ne matche que les events de cette app, donc
     // il ne se déclenche que quand le popup est key window (pas de conflit hors popup).
     @State private var slotMonitor: Any?
-    // Curseur clignotant du champ de recherche. Toggle via un Timer.publish
-    // pour signaler visuellement que le champ est actif (la saisie clavier est
-    // captée en permanence par .onKeyPress — le focus SwiftUI est toujours sur .main).
-    @State private var cursorVisible: Bool = true
+    // K.0 : focus du vrai TextField de recherche (remplace le hack
+    // Text + Rectangle clignotant + capture .onKeyPress). Forcé à
+    // l'ouverture en mode liste (NSWindow préchargée → focus à re-armer).
+    @FocusState private var isSearchFocused: Bool
     // Phase 1.4b : état « fenêtre résultat agrandie » (touche F).
     // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
     // du popup), pour que chaque nouvelle action reparte en format compact.
@@ -73,15 +73,9 @@ struct PopoverView: View {
     // sémantiques NSColor (windowBackgroundColor / controlBackgroundColor)
     // qui s'adaptent automatiquement à light et dark.
 
-    /// Phase 6.8d-bis (2026-04-25) : la table de mapping est désormais
-    /// centralisée dans `ActionsStore.positionShortcuts` (15 entrées :
-    /// 10 chiffres + AZERT). On résout ici keycode → position dans cette
-    /// table, et l'action déclenchée est `store.actions[position]` (la
-    /// position dans la liste détermine le raccourci, plus de `slotIndex`
-    /// stocké manuellement).
-    private static func position(forPhysicalKeyCode keyCode: UInt16) -> Int? {
-        ActionsStore.positionShortcuts.firstIndex { $0.keyCode == keyCode }
-    }
+    // K.0 : `position(forPhysicalKeyCode:)` + table `positionShortcuts`
+    // supprimés — les raccourcis ⌘1-⌘N positionnels n'existent plus
+    // (navigation flèches + ↵ uniquement, gérée par le monitor NSEvent).
 
     var body: some View {
         VStack(spacing: 0) {
@@ -119,9 +113,14 @@ struct PopoverView: View {
         .animation(.easeInOut(duration: 0.2), value: state.showTrialExpiredModal)
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
-        // focus stale et .onKeyPress ne reçoit plus rien sur mainView.
+        // focus stale. K.0 : en mode liste, le focus va au TextField de
+        // recherche (`isSearchFocused`) ; en mode résultat, au conteneur
+        // `.result`. Async pour fiabiliser sur NSWindow préchargée.
         .onChange(of: state.openCounter) { _, _ in
             focus = state.activeAction == nil ? .main : .result
+            if state.activeAction == nil {
+                DispatchQueue.main.async { isSearchFocused = true }
+            }
             confirmation = nil
             // Reset : showPopover remet déjà la fenêtre à 400×500, on n'a
             // qu'à synchroniser l'état local.
@@ -130,11 +129,19 @@ struct PopoverView: View {
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
             focus = state.activeAction == nil ? .main : .result
+            if state.activeAction == nil {
+                DispatchQueue.main.async { isSearchFocused = true }
+            }
             installSlotMonitorIfNeeded()
         }
         // Bascule aussi le focus quand on passe de liste → résultat ou retour.
         .onChange(of: state.activeAction) { _, newValue in
             focus = newValue == nil ? .main : .result
+            if newValue == nil {
+                DispatchQueue.main.async { isSearchFocused = true }
+            } else {
+                isSearchFocused = false
+            }
             confirmation = nil
             // Phase 6.9b (2026-04-25) : la fenêtre est désormais dimensionnée
             // dynamiquement selon le mode. Sans resize au passage liste→résultat,
@@ -191,19 +198,14 @@ struct PopoverView: View {
         slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-            // Phase 6.15 (2026-04-26) : Esc ferme le popup dans TOUS les
-            // contextes (vue liste comme vue résultat). Avant, Esc en vue
-            // résultat était délégué à SwiftUI via .onKeyPress(.escape) qui
-            // est peu fiable sur macOS — le système l'interceptait souvent
-            // et le comportement était imprévisible. On centralise ici dans
-            // le NSEvent monitor (= capture fiable des touches physiques).
-            // Convention macOS standard : Esc ferme le popup d'action,
-            // comme Spotlight, Raycast, Alfred. Pour relancer une autre
-            // action, on rouvre via le raccourci global.
+            // Esc — ferme le popup dans TOUS les contextes (liste comme
+            // résultat). Capture centralisée ici (NSEvent fiable, vs
+            // .onKeyPress(.escape) peu fiable sur macOS). Convention macOS
+            // (Spotlight/Raycast/Alfred). K.0 : avec un vrai TextField,
+            // Esc reste géré ici pour le comportement « clear puis close ».
             if mods.isEmpty && event.keyCode == 53 {
-                // Sauf : si une recherche est active en vue liste, le 1er
-                // Esc clear la recherche (geste familier macOS), un 2e
-                // Esc fermera le popup.
+                // 1er Esc en vue liste avec recherche active → clear ;
+                // 2e Esc (ou recherche vide) → ferme.
                 if state.activeAction == nil && !state.searchQuery.isEmpty {
                     state.searchQuery = ""
                     return nil
@@ -213,89 +215,69 @@ struct PopoverView: View {
                 return nil
             }
 
-            // Le reste de la logique du monitor (slots ⌘+touche, Backspace
-            // de recherche, ⌘, Réglages…) ne s'applique qu'en vue liste.
+            // Le reste (navigation liste, ⌘,, ⌘D) ne s'applique qu'en
+            // vue liste. En vue résultat → laisser passer à SwiftUI.
             guard state.activeAction == nil else { return event }
 
-            // 2026-05-07 : empty state — neutralise toutes les shortcuts
-            // de liste (slots ⌘1-0, Backspace de search) qui n'ont pas de
-            // sens et déclencheraient des actions cassées (LLM appelé
-            // sans clé API). Seul ⌘, (Réglages) reste fonctionnel pour
-            // rester aligné avec le standard macOS.
+            // Empty state (pas de provider utilisable) : ↵ et ⌘, ouvrent
+            // les Réglages, le reste passe au TextField (qui est masqué
+            // en empty state de toute façon).
             if !store.hasUsableProvider {
-                if mods == [.command] && event.charactersIgnoringModifiers == "," {
+                if (mods == [.command] && event.charactersIgnoringModifiers == ",")
+                    || (mods.isEmpty && event.keyCode == 36) {
                     settingsHandler()
                     return nil
                 }
                 return event
             }
 
-            // --- Sans modifier : Backspace géré ici, le reste passe à SwiftUI.
-            // Raison : .onKeyPress(.delete) est peu fiable sur macOS (le
-            // système intercepte souvent avant SwiftUI), alors que le
-            // NSEvent monitor voit toutes les touches physiques sans ambigüité.
+            // --- Sans modifier : navigation liste (↑/↓/↵). Le reste
+            // (chars, ⌫, ←/→, ⌘A/C/V, IME) passe nativement au TextField
+            // de recherche — K.0 : plus de capture de saisie ici.
             if mods.isEmpty {
+                // Liste filtrée recalculée inline (mêmes règles que
+                // `filteredActions`) pour ne pas retenir `self`.
+                let q = state.searchQuery.trimmingCharacters(in: .whitespaces)
+                let visible = q.isEmpty
+                    ? store.actions
+                    : store.actions.filter { $0.name.range(of: q, options: .caseInsensitive) != nil }
+
                 switch event.keyCode {
-                case 51: // ⌫ Backspace
-                    if !state.searchQuery.isEmpty {
-                        state.searchQuery.removeLast()
-                        return nil
+                case 126: // ↑
+                    state.selectedIndex = max(0, state.selectedIndex - 1)
+                    return nil
+                case 125: // ↓
+                    guard !visible.isEmpty else { return nil }
+                    state.selectedIndex = min(visible.count - 1, state.selectedIndex + 1)
+                    return nil
+                case 36, 76: // ↵ Return / Enter pavé numérique
+                    if visible.indices.contains(state.selectedIndex) {
+                        state.runAction(visible[state.selectedIndex])
                     }
-                    return event
+                    return nil
                 default:
-                    return event // chiffres, lettres, ponctuation → SwiftUI onKeyPress
+                    return event // → TextField (saisie, ⌫, curseur, IME)
                 }
             }
 
-            // --- ⌘ seul : slots d'actions (Option B, Phase 1.4g) + ⌘, Réglages
-            // + ⌘D Doc (Point 2 pre-V1, 2026-05-07).
-            // On passe les slots derrière ⌘ pour libérer les frappes nues (chiffres
-            // inclus) au profit du champ de recherche libre de la liste.
+            // --- ⌘ seul : ⌘, Réglages + ⌘D Doc. K.0 : les slots ⌘1-⌘N
+            // ont été supprimés. charactersIgnoringModifiers pour
+            // indépendance layout clavier (AZERTY/QWERTY).
             if mods == [.command] {
-                // ⌘, — raccourci standard macOS pour ouvrir les Réglages (Phase 6.7).
-                // charactersIgnoringModifiers pour être indépendant du layout clavier
-                // (la virgule n'est pas à la même position physique en AZERTY / QWERTY).
                 if event.charactersIgnoringModifiers == "," {
                     settingsHandler()
                     return nil
                 }
-                // ⌘D — ouvre la doc Notion publique dans une fenêtre webview
-                // interne loucedé (Point 4 pre-V1, 2026-05-08). Si la fenêtre
-                // existe déjà, elle est mise au front et reload l'URL
-                // d'accueil. Cf. `AppDelegate.openDocumentation()`.
-                // La touche D (keycode 2) n'est pas dans `positionShortcuts`
-                // donc aucun conflit avec un slot d'action. Check placé AVANT
-                // le guard de position par défense (au cas où la table
-                // évoluerait).
-                //
-                // Mini-fix UX (2026-05-09) : ferme le popup AVANT d'ouvrir la
-                // fenêtre doc. Sans ça, la fenêtre doc ouvre derrière le
-                // popup (popoverWindow a un NSWindow level supérieur — il
-                // reste au-dessus des autres fenêtres standard tant qu'il
-                // n'est pas orderOut). L'utilisateur devait presser Esc pour
-                // révéler la fenêtre doc — friction observée pendant les
-                // tests runtime B.1.
-                //
-                // Note d'asymétrie : `settingsHandler` (⌘,) route via le
-                // callback `onOpenSettings` qui en interne fait
-                // `hidePopover() + openSettings()`. Pour ⌘D on appelle
-                // directement `globalAppDelegate?.openDocumentation()` (pas
-                // de callback `onOpenDocumentation` côté `PopoverView`) pour
-                // éviter d'introduire une 4ᵉ prop pour un seul call site —
-                // `closeHandler()` joue le rôle équivalent du « hidePopover »
-                // côté Settings. Si harmonisation des patterns souhaitée
-                // un jour, ce sera dans un refacto dédié.
+                // ⌘D — ouvre la doc embarquée. Ferme le popup AVANT
+                // (sinon la fenêtre doc ouvre derrière, popoverWindow
+                // ayant un NSWindow level supérieur). `closeHandler()`
+                // joue le rôle du « hidePopover » côté Settings.
                 if event.charactersIgnoringModifiers == "d" {
                     closeHandler()
                     globalAppDelegate?.openDocumentation()
                     return nil
                 }
-                guard let position = Self.position(forPhysicalKeyCode: event.keyCode),
-                      store.actions.indices.contains(position) else {
-                    return event
-                }
-                state.runAction(store.actions[position])
-                return nil
+                return event
             }
 
             return event
@@ -414,56 +396,11 @@ struct PopoverView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .main)
-        // Handler clavier SwiftUI pour flèches + Entrée + saisie de recherche.
-        // Backspace (⌫) et Esc (⎋) sont gérés par le monitor NSEvent
-        // (cf. installSlotMonitorIfNeeded) car .onKeyPress(.delete/.escape) est
-        // peu fiable sur macOS quand la fenêtre est préchargée (NSHostingView) —
-        // le système intercepte souvent avant que SwiftUI ne reçoive l'event.
-        .onKeyPress(phases: .down) { press in
-            // 2026-05-07 : empty state — ↵ ouvre Réglages, le reste est ignoré
-            // (Esc géré par le NSEvent monitor, indépendant de l'état).
-            if !store.hasUsableProvider {
-                if press.key == .return {
-                    onOpenSettings()
-                    return .handled
-                }
-                return .ignored
-            }
-
-            switch press.key {
-            case .upArrow:
-                state.selectedIndex = max(0, state.selectedIndex - 1)
-                return .handled
-            case .downArrow:
-                // Point 2 pre-V1 (2026-05-07) : retrait du settings row,
-                // borne haute = filteredActions.count - 1. Guard liste vide :
-                // si pas d'action visible (recherche sans match), no-op.
-                // Auto-scroll inutile en V1 : la popup est dimensionnée pour
-                // afficher toutes les actions sans scroll (limite V1 = 15
-                // actions, popup max ≈ 740pt). Si la limite augmente en V1.x,
-                // ajouter un ScrollViewReader + pulse keyboard (cf. backlog).
-                guard !filteredActions.isEmpty else { return .handled }
-                state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
-                return .handled
-            case .return:
-                // Point 2 pre-V1 (2026-05-07) : retrait du settings row, ↵ ne
-                // déclenche plus que les actions. Réglages désormais via ⌘,
-                // dans le footer ligne 2.
-                if filteredActions.indices.contains(state.selectedIndex) {
-                    state.runAction(filteredActions[state.selectedIndex])
-                }
-                return .handled
-            default:
-                // Phase 1.4g : tout caractère imprimable mono-char alimente
-                // la recherche (lettres, accents, chiffres, espace, ponctuation).
-                if press.characters.count == 1, let ch = press.characters.first,
-                   ch.isLetter || ch.isNumber || ch.isPunctuation || ch == " " {
-                    state.searchQuery.append(ch)
-                    return .handled
-                }
-                return .ignored
-            }
-        }
+        // K.0 : `.onKeyPress(phases:.down)` retiré. La saisie de recherche
+        // est gérée nativement par le vrai TextField (cf. actionsListView) ;
+        // la navigation ↑/↓/↵, Esc et ⌘,/⌘D sont centralisées dans le
+        // monitor NSEvent (cf. installSlotMonitorIfNeeded) — capture fiable
+        // indépendante du focus, y compris quand le TextField est focalisé.
         // Reset l'index sélectionné quand la liste filtrée change, sinon on peut
         // pointer hors-bornes après filtrage.
         // Point 2 pre-V1 (2026-05-08) : redimensionne aussi la popup pour
@@ -498,47 +435,19 @@ struct PopoverView: View {
         // Phase 1.4i : zone basse de la popup (liste + footer nav) en
         // controlBackgroundColor, légèrement distincte du chrome supérieur.
         VStack(spacing: 0) {
-            // Phase 1.4g : bandeau de recherche toujours visible, avec
-            // placeholder « Rechercher » pour signaler la fonction à
-            // l'utilisateur. Alimenté par la frappe directe (onKeyPress
-            // ci-dessous), backspace supprime le dernier char.
-            // Curseur clignotant : feedback visuel « champ actif » — le popup
-            // reçoit la saisie en permanence via onKeyPress, donc il n'y a pas
-            // de vrai @FocusState sur un TextField à refléter. On affiche
-            // simplement un curseur qui clignote pour que l'utilisateur
-            // comprenne qu'il peut taper directement.
+            // K.0 : vrai TextField (remplace le hack Text + Rectangle
+            // clignotant + capture .onKeyPress). Le curseur, la sélection,
+            // ⌘C/V/A, ←/→, ⌫ et l'IME sont gérés nativement. Le focus est
+            // re-armé à chaque ouverture en mode liste (NSWindow préchargée)
+            // via `isSearchFocused` (cf. onAppear / onChange openCounter).
             HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    if state.searchQuery.isEmpty {
-                        // Empty : curseur à gauche + placeholder grisé à droite
-                        // (convention macOS : Spotlight, champ de recherche Finder…).
-                        Rectangle()
-                            .fill(Color.primary)
-                            .frame(width: 1.5, height: 14)
-                            .opacity(cursorVisible ? 1 : 0)
-                        Text("Rechercher")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        // Non-empty : saisie + curseur à la fin (position d'insertion).
-                        HStack(spacing: 1) {
-                            Text(state.searchQuery)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.primary)
-                            Rectangle()
-                                .fill(Color.primary)
-                                .frame(width: 1.5, height: 14)
-                                .opacity(cursorVisible ? 1 : 0)
-                        }
-                    }
-                    Spacer()
-                    if !state.searchQuery.isEmpty {
-                        Text("⌫")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
+                    TextField("Rechercher", text: $state.searchQuery)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .focused($isSearchFocused)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -548,13 +457,6 @@ struct PopoverView: View {
                 )
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .contentShape(Rectangle())
-                .onTapGesture { focus = .main }
-                // Timer de clignotement ~530 ms (rythme caret macOS). Auto-démarré
-                // via autoconnect, s'arrête naturellement quand la vue disparaît.
-                .onReceive(Timer.publish(every: 0.53, on: .main, in: .common).autoconnect()) { _ in
-                    cursorVisible.toggle()
-                }
                 Divider()
 
                 // Point 2 pre-V1 (2026-05-07) : popup à hauteur dynamique
@@ -716,15 +618,8 @@ struct PopoverView: View {
             Text(action.name)
                 .font(.system(size: 13))
             Spacer()
-            // Badge de raccourci : ⌘ + (1…0 puis A,Z,E,R,T) selon la position
-            // de l'action dans `store.actions`. Les chiffres nus alimentent
-            // le champ de recherche, d'où le préfixe ⌘ obligatoire. Phase
-            // 6.8d-bis : position = ordre dans la liste (plus de slotIndex
-            // manuel), table de référence dans `ActionsStore.positionShortcuts`.
-            if let pos = store.position(of: action),
-               let s = ActionsStore.shortcut(forPosition: pos) {
-                KeyboardKey("⌘\(s.label)")
-            }
+            // K.0 : badge raccourci ⌘+touche retiré (raccourcis ⌘1-⌘N
+            // positionnels supprimés — navigation flèches + ↵).
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -929,7 +824,7 @@ struct PopoverView: View {
     }
 }
 
-// MARK: - Keyboard Key (also used by QuickPromptView)
+// MARK: - Keyboard Key
 
 struct KeyboardKey: View {
     let text: String
