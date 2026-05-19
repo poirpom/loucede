@@ -198,30 +198,30 @@ struct PopoverView: View {
         slotMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-            // Esc — ferme le popup dans TOUS les contextes (liste comme
-            // résultat). Capture centralisée ici (NSEvent fiable, vs
-            // .onKeyPress(.escape) peu fiable sur macOS). Convention macOS
-            // (Spotlight/Raycast/Alfred). K.0 : avec un vrai TextField,
-            // Esc reste géré ici pour le comportement « clear puis close ».
+            // Esc — K.0-fix-1 : la gestion dépend du contexte.
+            // • Vue liste (TextField focalisé) : on LAISSE PASSER à
+            //   SwiftUI (`return event`). Le `.onKeyPress(.escape)` du
+            //   TextField gère le 2-temps (clear puis close) en lisant
+            //   directement la valeur SwiftUI — pas de staleness
+            //   inter-couche (cause de la régression K.0).
+            // • Vue résultat / empty state (pas de TextField focalisé) :
+            //   le monitor ferme ici (couche fiable sans field editor).
             if mods.isEmpty && event.keyCode == 53 {
-                // 1er Esc en vue liste avec recherche active → clear ;
-                // 2e Esc (ou recherche vide) → ferme.
-                if state.activeAction == nil && !state.searchQuery.isEmpty {
-                    state.searchQuery = ""
-                    return nil
+                if state.activeAction == nil && store.hasUsableProvider {
+                    return event // → SwiftUI .onKeyPress(.escape) du TextField
                 }
                 state.endStream()
                 closeHandler()
                 return nil
             }
 
-            // Le reste (navigation liste, ⌘,, ⌘D) ne s'applique qu'en
-            // vue liste. En vue résultat → laisser passer à SwiftUI.
+            // Le reste (⌘,, ⌘D) ne s'applique qu'en vue liste.
+            // En vue résultat → laisser passer à SwiftUI.
             guard state.activeAction == nil else { return event }
 
-            // Empty state (pas de provider utilisable) : ↵ et ⌘, ouvrent
-            // les Réglages, le reste passe au TextField (qui est masqué
-            // en empty state de toute façon).
+            // Empty state (pas de provider utilisable, pas de TextField) :
+            // ↵ et ⌘, ouvrent les Réglages. Reste géré ici car aucun
+            // TextField focalisé pour relayer en SwiftUI.
             if !store.hasUsableProvider {
                 if (mods == [.command] && event.charactersIgnoringModifiers == ",")
                     || (mods.isEmpty && event.keyCode == 36) {
@@ -231,33 +231,13 @@ struct PopoverView: View {
                 return event
             }
 
-            // --- Sans modifier : navigation liste (↑/↓/↵). Le reste
-            // (chars, ⌫, ←/→, ⌘A/C/V, IME) passe nativement au TextField
-            // de recherche — K.0 : plus de capture de saisie ici.
+            // K.0-fix-1 : ↑/↓/↵ ne sont plus captés ici. Avec un
+            // TextField focalisé, la navigation liste est gérée par
+            // `.onKeyPress(.upArrow/.downArrow/.return)` posés sur le
+            // TextField (couche fiable sur vue focalisée). Tout le
+            // sans-modifier passe nativement au TextField.
             if mods.isEmpty {
-                // Liste filtrée recalculée inline (mêmes règles que
-                // `filteredActions`) pour ne pas retenir `self`.
-                let q = state.searchQuery.trimmingCharacters(in: .whitespaces)
-                let visible = q.isEmpty
-                    ? store.actions
-                    : store.actions.filter { $0.name.range(of: q, options: .caseInsensitive) != nil }
-
-                switch event.keyCode {
-                case 126: // ↑
-                    state.selectedIndex = max(0, state.selectedIndex - 1)
-                    return nil
-                case 125: // ↓
-                    guard !visible.isEmpty else { return nil }
-                    state.selectedIndex = min(visible.count - 1, state.selectedIndex + 1)
-                    return nil
-                case 36, 76: // ↵ Return / Enter pavé numérique
-                    if visible.indices.contains(state.selectedIndex) {
-                        state.runAction(visible[state.selectedIndex])
-                    }
-                    return nil
-                default:
-                    return event // → TextField (saisie, ⌫, curseur, IME)
-                }
+                return event
             }
 
             // --- ⌘ seul : ⌘, Réglages + ⌘D Doc. K.0 : les slots ⌘1-⌘N
@@ -448,6 +428,40 @@ struct PopoverView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .focused($isSearchFocused)
+                        // K.0-fix-1 : navigation liste + Esc 2-temps gérés
+                        // ici (vue focalisée → couche SwiftUI fiable, vs
+                        // NSEvent monitor inadapté avec field editor actif).
+                        // ↑/↓ : déplacent la sélection sans bouger le focus
+                        // (le TextField mono-ligne n'a pas d'usage propre
+                        // pour ↑/↓). ↵ : lance l'action sélectionnée.
+                        .onKeyPress(.upArrow) {
+                            state.selectedIndex = max(0, state.selectedIndex - 1)
+                            return .handled
+                        }
+                        .onKeyPress(.downArrow) {
+                            guard !filteredActions.isEmpty else { return .handled }
+                            state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
+                            return .handled
+                        }
+                        .onKeyPress(.return) {
+                            if filteredActions.indices.contains(state.selectedIndex) {
+                                state.runAction(filteredActions[state.selectedIndex])
+                            }
+                            return .handled
+                        }
+                        // Esc 2-temps : 1er = clear la recherche (geste
+                        // familier macOS) ; 2e (recherche vide) = ferme le
+                        // popup. `.handled` dans les deux cas pour empêcher
+                        // le field editor de traiter Esc (cancelOperation).
+                        .onKeyPress(.escape) {
+                            if !state.searchQuery.isEmpty {
+                                state.searchQuery = ""
+                            } else {
+                                state.endStream()
+                                onClose()
+                            }
+                            return .handled
+                        }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
