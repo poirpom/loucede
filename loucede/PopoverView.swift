@@ -159,7 +159,7 @@ struct PopoverView: View {
                 // Point 2 pre-V1 (2026-05-08) : passe le compte filtré pour
                 // que la popup retrouve sa taille dynamique (cohérent avec
                 // l'éventuelle search active à ce moment).
-                globalAppDelegate?.resizePopover(to: .list, actionCount: filteredActions.count)
+                globalAppDelegate?.resizePopover(to: .list, actionCount: popupItems.count)
                 // Phase 6.14-fix-2 : set instantané, pas de withAnimation
                 // (cf. `toggleResultExpanded` pour l'analyse complète).
                 if resultExpanded {
@@ -314,14 +314,83 @@ struct PopoverView: View {
 
     // MARK: - Main
 
-    /// Liste d'actions filtrée par `state.searchQuery` (Phase 1.4g).
-    /// Recherche case-insensitive sur le nom, trim des espaces en bord.
-    /// Vide → renvoie toutes les actions (pas de filtrage).
-    private var filteredActions: [Action] {
+    /// K.1 — liste unifiée 3 sections de la popup.
+    ///
+    /// • Recherche vide : statu quo — section MES ACTIONS + toutes les
+    ///   actions custom (pas de MODÈLES, pas de GÉNÉRATEUR).
+    /// • Recherche active : 3 sections toujours affichées (en-têtes
+    ///   empilés = signal contextuel même si une section est vide) —
+    ///   MES ACTIONS (top 5 fuzzy), MODÈLES (top 5 fuzzy hors
+    ///   déjà-custom via `originTemplateName`), GÉNÉRATEUR (placeholder).
+    private var popupItems: [PopupItem] {
         let q = state.searchQuery.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return store.actions }
-        return store.actions.filter {
-            $0.name.range(of: q, options: .caseInsensitive) != nil
+
+        if q.isEmpty {
+            guard !store.actions.isEmpty else { return [] }
+            return [.sectionHeader(.myActions)] + store.actions.map { .myAction($0) }
+        }
+
+        var items: [PopupItem] = []
+
+        // MES ACTIONS — top 5 par score décroissant.
+        items.append(.sectionHeader(.myActions))
+        let topActions = store.actions
+            .map { ($0, ActionSearch.score(query: q, against: $0.name)) }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .map { $0.0 }
+        items += topActions.map { .myAction($0) }
+
+        // MODÈLES — top 5, hors modèles déjà ajoutés en custom.
+        items.append(.sectionHeader(.models))
+        let alreadyCustom = Set(store.actions.compactMap { $0.originTemplateName })
+        let topModels = promptSuggestions
+            .filter { !alreadyCustom.contains($0.name) }
+            .map { ($0, ActionSearch.score(query: q, against: $0.name)) }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .map { $0.0 }
+        items += topModels.map { .modelSuggestion($0) }
+
+        // GÉNÉRATEUR — toujours visible quand une recherche est active
+        // (placeholder K.1 ; câblage IA en K.2).
+        items.append(.sectionHeader(.generator))
+        items.append(.generator)
+
+        return items
+    }
+
+    /// Items navigables au clavier (en-têtes de section exclus).
+    /// `state.selectedIndex` indexe CE tableau.
+    private var selectableItems: [PopupItem] {
+        popupItems.filter { $0.isSelectable }
+    }
+
+    /// Exécute l'item activé (↵ ou clic). K.1 : `.generator` est un
+    /// placeholder (toast) — le câblage IA arrive en K.2.
+    private func activate(_ item: PopupItem) {
+        switch item {
+        case .sectionHeader:
+            break // non sélectionnable, n'arrive jamais
+        case .myAction(let action):
+            state.runAction(action)
+        case .modelSuggestion(let suggestion):
+            // Convertit le modèle en action custom (lien d'origine via
+            // `originTemplateName`, cohérent avec `addTemplateToActions`),
+            // l'ajoute au store, puis la lance sur le texte sélectionné.
+            let newAction = Action(
+                name: suggestion.name,
+                icon: suggestion.icon,
+                prompt: suggestion.prompt,
+                actionType: .ai,
+                originTemplateName: suggestion.name
+            )
+            store.addAction(newAction)
+            state.runAction(newAction)
+        case .generator:
+            showConfirmation("✨ Générateur — à venir en K.2")
         }
     }
 
@@ -389,7 +458,7 @@ struct PopoverView: View {
         // search → popup retrouve sa pleine hauteur).
         .onChange(of: state.searchQuery) { _, _ in
             state.selectedIndex = 0
-            globalAppDelegate?.resizePopover(to: .list, actionCount: filteredActions.count)
+            globalAppDelegate?.resizePopover(to: .list, actionCount: popupItems.count)
         }
         // 2026-05-07 : recalcule la taille de la fenêtre quand le provider
         // bascule de « pas utilisable » à « utilisable » (ou inverse) sans
@@ -434,18 +503,23 @@ struct PopoverView: View {
                         // ↑/↓ : déplacent la sélection sans bouger le focus
                         // (le TextField mono-ligne n'a pas d'usage propre
                         // pour ↑/↓). ↵ : lance l'action sélectionnée.
+                        // K.1 : navigation sur `selectableItems` (les
+                        // en-têtes de section sont sautés automatiquement
+                        // — ils ne sont pas dans `selectableItems`).
                         .onKeyPress(.upArrow) {
                             state.selectedIndex = max(0, state.selectedIndex - 1)
                             return .handled
                         }
                         .onKeyPress(.downArrow) {
-                            guard !filteredActions.isEmpty else { return .handled }
-                            state.selectedIndex = min(filteredActions.count - 1, state.selectedIndex + 1)
+                            let count = selectableItems.count
+                            guard count > 0 else { return .handled }
+                            state.selectedIndex = min(count - 1, state.selectedIndex + 1)
                             return .handled
                         }
                         .onKeyPress(.return) {
-                            if filteredActions.indices.contains(state.selectedIndex) {
-                                state.runAction(filteredActions[state.selectedIndex])
+                            let sel = selectableItems
+                            if sel.indices.contains(state.selectedIndex) {
+                                activate(sel[state.selectedIndex])
                             }
                             return .handled
                         }
@@ -482,16 +556,19 @@ struct PopoverView: View {
                 // dépasse le cap (V1.x avec >15 actions), SwiftUI active
                 // naturellement le scroll dans l'espace restant.
                 ScrollView {
-                    if filteredActions.isEmpty {
-                        Text("Aucune action trouvée")
+                    let rows = renderedRows
+                    if rows.isEmpty {
+                        // Cas rare : recherche vide ET aucune action custom
+                        // (l'utilisateur a tout supprimé).
+                        Text("Aucune action")
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 24)
                             .frame(maxWidth: .infinity)
                     } else {
                         VStack(alignment: .leading, spacing: 2) {
-                            ForEach(Array(filteredActions.enumerated()), id: \.element.id) { index, action in
-                                actionRow(action: action, index: index)
+                            ForEach(rows) { row in
+                                popupRow(row)
                             }
                         }
                         .padding(.horizontal, 8)
@@ -623,28 +700,87 @@ struct PopoverView: View {
         .pointerCursor()
     }
 
-    private func actionRow(action: Action, index: Int) -> some View {
-        let isSelected = state.selectedIndex == index
+    // MARK: - K.1 : rendu de la liste unifiée 3 sections
+
+    /// Ligne rendue = item + son index de sélection (nil pour les
+    /// en-têtes, non navigables). Identifiable pour `ForEach`.
+    private struct RenderedRow: Identifiable {
+        let id: String
+        let item: PopupItem
+        let selIndex: Int?
+    }
+
+    /// Mappe `popupItems` → lignes rendues, en attribuant un index de
+    /// sélection croissant aux seuls items sélectionnables (les
+    /// en-têtes reçoivent `nil` → sautés par ↑/↓).
+    private var renderedRows: [RenderedRow] {
+        var out: [RenderedRow] = []
+        var sel = 0
+        for item in popupItems {
+            if item.isSelectable {
+                out.append(RenderedRow(id: item.id, item: item, selIndex: sel))
+                sel += 1
+            } else {
+                out.append(RenderedRow(id: item.id, item: item, selIndex: nil))
+            }
+        }
+        return out
+    }
+
+    @ViewBuilder
+    private func popupRow(_ row: RenderedRow) -> some View {
+        switch row.item {
+        case .sectionHeader(let title):
+            sectionHeaderRow(title)
+        case .myAction(let action):
+            selectableItemRow(icon: action.icon, name: action.name,
+                              selIndex: row.selIndex, item: row.item)
+        case .modelSuggestion(let suggestion):
+            selectableItemRow(icon: suggestion.icon, name: suggestion.name,
+                              selIndex: row.selIndex, item: row.item)
+        case .generator:
+            selectableItemRow(icon: "✨", name: "Générer cette action",
+                              selIndex: row.selIndex, item: row.item)
+        }
+    }
+
+    /// K.1.4 — en-tête de section. Note : la sidebar doc utilise les
+    /// `Section()` natives de `List` (non réutilisables dans ce
+    /// `ScrollView` custom). Style aligné sur les conventions loucedé :
+    /// petit, majuscules, gris secondaire, discret.
+    private func sectionHeaderRow(_ title: SectionTitle) -> some View {
+        Text(title.rawValue)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+    }
+
+    /// Ligne sélectionnable unifiée (action custom / modèle /
+    /// générateur). Conserve le style historique de la liste
+    /// (emoji + nom + surbrillance #3F84F7).
+    private func selectableItemRow(icon: String, name: String,
+                                   selIndex: Int?, item: PopupItem) -> some View {
+        let isSelected = selIndex != nil && selIndex == state.selectedIndex
         return HStack(spacing: 10) {
-            // Phase 6.4 : emoji via ActionIconView (fallback placeholder
-            // gris pour les SF legacy). Boîte fixe pour aligner la liste.
-            ActionIconView(icon: action.icon, boxSize: 20, fontSize: 14)
-            Text(action.name)
+            ActionIconView(icon: icon, boxSize: 20, fontSize: 14)
+            Text(name)
                 .font(.system(size: 13))
             Spacer()
-            // K.0 : badge raccourci ⌘+touche retiré (raccourcis ⌘1-⌘N
-            // positionnels supprimés — navigation flèches + ↵).
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        // Phase 1.4j : couleur de sélection #3F84F7 dans la liste d'actions,
-        // texte forcé blanc pour contraste sur le bleu.
+        // Phase 1.4j : sélection #3F84F7, texte blanc pour contraste.
         .foregroundStyle(isSelected ? Color.white : Color.primary)
         .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
-        .onTapGesture { state.runAction(action) }
-        .onHover { hovering in if hovering { state.selectedIndex = index } }
+        .onTapGesture { activate(item) }
+        .onHover { hovering in
+            if hovering, let s = selIndex { state.selectedIndex = s }
+        }
     }
 
     /// Ligne « Mise à jour disponible » (Phase 6.3). Visible uniquement quand
