@@ -277,40 +277,12 @@ struct ActionsSettingsView: View {
                                         }
                                     }
 
-                                // K.unify.2-fix-1 : zone fantôme drop-en-tête.
-                                // 6pt invisible entre header et 1ère row qui
-                                // capture les drops "au-dessus" du 1er item
-                                // (sinon consommés par le header FAVORIS →
-                                // place en fin). Réutilise `handleDrop` avec
-                                // la 1ère row comme cible : le drop devient
-                                // le nouveau 1er, le décalage `displayOrder`
-                                // est géré par le handler existant. Le
-                                // surlignage visuel utilise `dropTargetActionID
-                                // = first.id` (cohérent avec « drop AVANT 1er »).
-                                if let first = section.actions.first {
-                                    Color.clear
-                                        .frame(height: 6)
-                                        .contentShape(Rectangle())
-                                        .dropDestination(for: String.self) { items, _ in
-                                            defer { dropTargetActionID = nil }
-                                            guard let s = items.first,
-                                                  let id = UUID(uuidString: s),
-                                                  id != first.id
-                                            else { return false }
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                handleDrop(droppedID: id,
-                                                           ontoActionID: first.id,
-                                                           inFavoritesSection: section.isFavoritesSection)
-                                            }
-                                            return true
-                                        } isTargeted: { targeted in
-                                            if targeted {
-                                                dropTargetActionID = first.id
-                                            } else if dropTargetActionID == first.id {
-                                                dropTargetActionID = nil
-                                            }
-                                        }
-                                }
+                                // K.unify.2-fix-2 : zone fantôme drop-en-tête
+                                // retirée — comportement drag-n-drop favoris
+                                // reste défaillant en tête de liste (régressé
+                                // en fix-1 puis revert). Dette technique
+                                // acceptée pour V1, à traiter post-V1
+                                // (cf. backlog).
 
                                 // Rows de la section.
                                 ForEach(section.actions) { action in
