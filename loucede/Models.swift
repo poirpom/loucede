@@ -6,6 +6,7 @@
 import Foundation
 import Combine
 import Carbon.HIToolbox
+import SwiftUI  // K.unify.1 : PromptCategory utilise Color (déplacé depuis TemplatesView)
 
 // MARK: - String emoji detection (Phase 6.4, 2026-04-23)
 
@@ -35,6 +36,61 @@ enum ActionType: String, Codable, CaseIterable {
     case ai = "ai"
 }
 
+// MARK: - PromptCategory (K.unify.1 — déplacé depuis TemplatesView.swift)
+
+/// Phase 6.12 (2026-04-25) : refonte complète des catégories. Anglais
+/// generic-coding → catégories français orientées texte. Ordre figé
+/// (Traduire, Analyser, Extraire, Transformer, Structurer, Proposer) imposé
+/// par l'utilisateur — `CaseIterable` itère dans l'ordre de déclaration, donc
+/// l'ordre des `case` ci-dessous est la source de vérité pour la UI.
+///
+/// Phase B.2.a (2026-05-13) : ajout de `.extract` (« Extraire ») entre
+/// `.analyze` et `.transform` pour accueillir les modèles d'extraction
+/// (recette, données structurées, entités) du nouveau catalogue 25 actions.
+///
+/// K.unify.1 (2026-05-20) : enum déplacé de `TemplatesView.swift` vers
+/// `Models.swift` car `Action` l'utilise désormais (`category` field).
+enum PromptCategory: String, CaseIterable, Codable {
+    case translate = "Traduire"
+    case analyze = "Analyser"
+    case extract = "Extraire"
+    case transform = "Transformer"
+    case structure = "Structurer"
+    case propose = "Proposer"
+    /// Catégorie ajoutée pour les modèles publiés par l'utilisateur via
+    /// l'éditeur d'action (toggle « Ajouter aux Modèles »). Correctif 2026-04-28.
+    case custom = "Mes modèles"
+
+    /// Icône SF Symbol associée — pas affichée dans `TemplateCard` (qui
+    /// montre désormais l'emoji du modèle Phase 6.12), mais conservée pour
+    /// future use éventuel (ex. pill avec icône, navigation latérale).
+    var icon: String {
+        switch self {
+        case .translate: return "globe"
+        case .analyze:   return "chart.bar.xaxis"
+        case .extract:   return "doc.text.magnifyingglass"
+        case .transform: return "arrow.triangle.2.circlepath"
+        case .structure: return "list.bullet.rectangle"
+        case .propose:   return "lightbulb"
+        case .custom:    return "person.crop.circle"
+        }
+    }
+
+    /// Couleur d'accent par catégorie. Palette douce, mappée 1-pour-1 sur
+    /// les anciennes couleurs pour ne pas tout chambouler visuellement.
+    var color: Color {
+        switch self {
+        case .translate: return Color(red: 0.45, green: 0.55, blue: 0.70) // Soft slate blue
+        case .analyze:   return Color(red: 0.60, green: 0.52, blue: 0.58) // Dusty rose
+        case .extract:   return Color(red: 0.65, green: 0.55, blue: 0.40) // Ambre/cuivre (Phase B.2.a, validé Faab) — distinct de transform (sage) et analyze (rose)
+        case .transform: return Color(red: 0.50, green: 0.60, blue: 0.55) // Sage green
+        case .structure: return Color(red: 0.55, green: 0.50, blue: 0.65) // Muted lavender
+        case .propose:   return Color(red: 0.65, green: 0.55, blue: 0.50) // Warm taupe
+        case .custom:    return Color(red: 0.40, green: 0.45, blue: 0.55) // Cool charcoal — neutre, distinct des 5 catégories
+        }
+    }
+}
+
 // MARK: - Action
 
 struct Action: Identifiable, Codable, Equatable, Hashable {
@@ -62,7 +118,38 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     /// pour les actions créées avant le 2026-05-08 (mini-session catalogue).
     var originTemplateName: String?
 
-    init(id: UUID = UUID(), name: String, icon: String, prompt: String, actionType: ActionType = .ai, shortDescription: String? = nil, isInTemplates: Bool = false, originTemplateName: String? = nil) {
+    // MARK: - K.unify.1 (2026-05-20) — modèle unifié Actions/Modèles/Favoris
+
+    /// Action mise en avant en haut de la popup principale. Les 5 actions
+    /// du Top V1 sont `isFavorite = true` dans `defaultActions`. Champ
+    /// piloté par l'utilisateur (drag-n-drop favoris en K.unify.2).
+    var isFavorite: Bool
+    /// Action masquée de la popup principale. Reste visible dans Réglages
+    /// (filtre « Masquées ») pour réactivation. Toggle par l'utilisateur
+    /// en K.unify.2.
+    var isHidden: Bool
+    /// Ordre d'affichage personnalisé (drag-n-drop K.unify.2). Initialisé
+    /// à l'index dans `defaultActions` pour les seeds ; les actions
+    /// custom existantes décodées sans `displayOrder` reçoivent `0` par
+    /// défaut (le tri courant `actions.firstIndex` reste équivalent).
+    var displayOrder: Int
+    /// Catégorie sémantique (héritée de `PromptSuggestion`). `nil` pour
+    /// les actions custom non catégorisées (créées par l'utilisateur sans
+    /// classification). Les 24 seeds ont tous une catégorie.
+    var category: PromptCategory?
+
+    init(id: UUID = UUID(),
+         name: String,
+         icon: String,
+         prompt: String,
+         actionType: ActionType = .ai,
+         shortDescription: String? = nil,
+         isInTemplates: Bool = false,
+         originTemplateName: String? = nil,
+         isFavorite: Bool = false,
+         isHidden: Bool = false,
+         displayOrder: Int = 0,
+         category: PromptCategory? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -71,13 +158,19 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         self.shortDescription = shortDescription
         self.isInTemplates = isInTemplates
         self.originTemplateName = originTemplateName
+        self.isFavorite = isFavorite
+        self.isHidden = isHidden
+        self.displayOrder = displayOrder
+        self.category = category
     }
 
     private enum CodingKeys: String, CodingKey {
-        // `slotIndex` retiré en K.0 (legacy raccourcis ⌘1-⌘N supprimés).
-        // Les actions déjà sérialisées avec une clé `slotIndex` se décodent
-        // sans erreur : la clé orpheline est ignorée (CodingKeys restreint).
+        // K.0 : `slotIndex` retiré (legacy raccourcis ⌘1-⌘N).
+        // K.unify.1 : ajout de `isFavorite/isHidden/displayOrder/category`.
+        // Les actions déjà sérialisées sans ces clés se décodent sans
+        // erreur via `decodeIfPresent` + valeurs par défaut.
         case id, name, icon, prompt, actionType, shortDescription, isInTemplates, originTemplateName
+        case isFavorite, isHidden, displayOrder, category
     }
 
     init(from decoder: Decoder) throws {
@@ -90,6 +183,11 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         shortDescription = try container.decodeIfPresent(String.self, forKey: .shortDescription)
         isInTemplates = try container.decodeIfPresent(Bool.self, forKey: .isInTemplates) ?? false
         originTemplateName = try container.decodeIfPresent(String.self, forKey: .originTemplateName)
+        // K.unify.1 : migration graceful des installs antérieures.
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        isHidden = try container.decodeIfPresent(Bool.self, forKey: .isHidden) ?? false
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder) ?? 0
+        category = try container.decodeIfPresent(PromptCategory.self, forKey: .category)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -102,6 +200,10 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encodeIfPresent(shortDescription, forKey: .shortDescription)
         try container.encode(isInTemplates, forKey: .isInTemplates)
         try container.encodeIfPresent(originTemplateName, forKey: .originTemplateName)
+        try container.encode(isFavorite, forKey: .isFavorite)
+        try container.encode(isHidden, forKey: .isHidden)
+        try container.encode(displayOrder, forKey: .displayOrder)
+        try container.encodeIfPresent(category, forKey: .category)
     }
 }
 
@@ -1116,49 +1218,719 @@ class ActionsStore: ObservableObject {
     - Réponds uniquement avec la recette structurée, sans introduction
     """
 
-    // MARK: - Seed des nouveaux utilisateurs (Phase B.2.c, 2026-05-13)
+    // MARK: - Seed des nouveaux utilisateurs (K.unify.1, 2026-05-20)
 
-    /// 5 actions installées au premier lancement, dans l'ordre. La position
-    /// dans le tableau = ordre d'affichage dans la popup. (K.0 : les
-    /// raccourcis ⌘1-⌘N positionnels et le champ `slotIndex` ont été
-    /// supprimés — navigation flèches + ↵ uniquement.)
+    /// 24 actions installées au premier lancement (les 5 Top V1 + les 19
+    /// modèles du catalogue). K.unify.1 unifie ce qui était auparavant
+    /// `defaultActions` (5 Top V1) + `promptSuggestions` (19 autres) en
+    /// une source de vérité unique.
     ///
-    /// Phase B.2.c (2026-05-13) — refonte Top 5 V1 :
-    /// - Sortent du seed (restent au catalogue Modèles via TemplatesView) :
-    ///   « Extrais la recette de cuisine » 🍳, « Sois concis » ✂️ (→ « Raccourcis »
-    ///   en B.2.d).
-    /// - Entrent dans le seed (déjà au catalogue, montent au seed) :
-    ///   « Améliore le style » ✨, « Génère une Todo list » ✅.
-    /// - Ordre : Résume monte en ⌘1, Traduis FR descend en ⌘4.
+    /// Champs structurants K.unify.1 :
+    /// - `isFavorite` : `true` pour les 5 Top V1 (afficher en tête de
+    ///   popup en K.unify.3) ; `false` pour les 19 autres.
+    /// - `displayOrder` : 0-4 pour les Top 5 (ordre Résume / Corrige /
+    ///   Améliore / Traduis FR / Génère Todo), puis 5-23 pour les 19
+    ///   autres groupés par catégorie dans l'ordre de l'enum
+    ///   `PromptCategory` (translate / analyze / extract / transform /
+    ///   structure / propose).
+    /// - `category` : héritée du `PromptSuggestion` d'origine, toujours
+    ///   non-nil pour les seeds.
+    /// - `shortDescription` : description courte (≤80 signes) reprise
+    ///   du `PromptSuggestion` d'origine (champ analogue, fusionné).
     ///
-    /// Reseed brutal accepté : les installs existantes conservent leur tableau
-    /// d'actions stocké en UserDefaults. Seuls les nouveaux installs (ou
-    /// `actions.isEmpty` après reset) reçoivent ce Top 5.
+    /// Reseed brutal accepté : les installs existantes conservent leur
+    /// tableau d'actions stocké en UserDefaults (décodage graceful via
+    /// `decodeIfPresent` sur les 4 nouveaux champs). Seuls les nouveaux
+    /// installs (ou `actions.isEmpty` après reset) reçoivent ces 24
+    /// seeds.
     static let defaultActions: [Action] = [
         Action(
             name: "Résume ce texte",
             icon: "🤏",
-            prompt: summarizePrompt
+            prompt: ActionsStore.summarizePrompt,
+            actionType: .ai,
+            shortDescription: "Extraire les idées essentielles en quelques points clés",
+            isFavorite: true,
+            displayOrder: 0,
+            category: .analyze
         ),
         Action(
             name: "Corrige les fautes",
             icon: "✍️",
-            prompt: correctPrompt
+            prompt: ActionsStore.correctPrompt,
+            actionType: .ai,
+            shortDescription: "Corriger orthographe grammaire et typographie",
+            isFavorite: true,
+            displayOrder: 1,
+            category: .transform
         ),
         Action(
             name: "Améliore le style",
             icon: "✨",
-            prompt: improveStylePrompt
+            prompt: ActionsStore.improveStylePrompt,
+            actionType: .ai,
+            shortDescription: "Améliorer la fluidité sans changer le sens",
+            isFavorite: true,
+            displayOrder: 2,
+            category: .transform
         ),
         Action(
             name: "Traduis en français",
             icon: "🇫🇷",
-            prompt: translateFrPrompt
+            prompt: ActionsStore.translateFrPrompt,
+            actionType: .ai,
+            shortDescription: "Traduire en français naturel et idiomatique",
+            isFavorite: true,
+            displayOrder: 3,
+            category: .translate
         ),
         Action(
             name: "Génère une Todo list",
             icon: "✅",
-            prompt: todoListPrompt
+            prompt: ActionsStore.todoListPrompt,
+            actionType: .ai,
+            shortDescription: "Structurer des notes brutes en plan d'actions",
+            isFavorite: true,
+            displayOrder: 4,
+            category: .structure
+        ),
+        Action(
+            name: "Traduis en anglais",
+            icon: "🇬🇧",
+            prompt: """
+        Role: professional translator.
+
+        Task: translate the provided text into English.
+
+        Procedure:
+        1. Automatically detect the source language.
+        2. Understand the overall meaning before translating.
+        3. Produce a faithful, clear and natural English translation.
+
+        Translation rules:
+        - Use natural and fluent English (avoid word-for-word translation).
+        - Preserve the exact meaning, tone and register of the original (formal, informal, technical, etc.).
+        - Preserve proper names, brands, acronyms and standard technical terms.
+        - Adapt idiomatic expressions to natural English equivalents.
+        - If no natural equivalent exists, keep the original term in quotes with a brief explanation in parentheses.
+        - Do not add or omit information.
+
+        Formatting:
+        - Strictly preserve the original structure: titles, subtitles, lists, quotations, paragraphs and line breaks.
+        - Keep the order of sentences and sections.
+
+        Filtering:
+        - If a passage is clearly out of context (advertising, external reference, isolated image caption), remove it.
+
+        Expected output:
+        - Reply only with the translation.
+        - Do not add anything before or after the translation.
+        """,
+            actionType: .ai,
+            shortDescription: "Traduire en anglais naturel et idiomatique",
+            isFavorite: false,
+            displayOrder: 5,
+            category: .translate
+        ),
+        Action(
+            name: "Traduis en espagnol",
+            icon: "🇪🇸",
+            prompt: """
+        Rol: traductor profesional.
+
+        Tarea: traducir el texto proporcionado al español neutro internacional.
+
+        Procedimiento:
+        1. Detecta automáticamente el idioma de origen.
+        2. Comprende el sentido global del texto antes de traducir.
+        3. Produce una traducción fiel, clara y natural en español neutro internacional.
+
+        Reglas de traducción:
+        - Utiliza un español neutro comprensible en todo el mundo hispanohablante.
+        - Evita regionalismos propios de un país específico (España o América Latina).
+        - Prioriza un vocabulario estándar ampliamente comprendido.
+        - Usa el tratamiento de "tú" por defecto, salvo que el texto original requiera un registro formal.
+        - Conserva el sentido exacto, el tono y el registro del texto original (formal, informal, técnico, etc.).
+        - Conserva los nombres propios, marcas, acrónimos y términos técnicos estándar.
+        - Adapta las expresiones idiomáticas a un equivalente natural y universal en español.
+        - Si no existe un equivalente natural, conserva el término original entre comillas con una breve explicación entre paréntesis.
+        - No añadas ni elimines información.
+
+        Formato:
+        - Conserva estrictamente la estructura original: títulos, subtítulos, listas, citas, párrafos y saltos de línea.
+        - Mantén el orden de las frases y de las secciones.
+
+        Salida esperada:
+        - Responde únicamente con la traducción.
+        - No añadas nada antes ni después de la traducción.
+        """,
+            actionType: .ai,
+            shortDescription: "Traduire en espagnol neutre international",
+            isFavorite: false,
+            displayOrder: 6,
+            category: .translate
+        ),
+        Action(
+            name: "Traduis en portugais",
+            icon: "🇵🇹",
+            prompt: """
+        Papel: tradutor profissional.
+
+        Tarefa: traduzir o texto fornecido para português.
+
+        Procedimento:
+        1. Detecta automaticamente o idioma de origem.
+        2. Compreende o sentido global antes de traduzir.
+        3. Produz uma tradução fiel, natural e fluida em português.
+
+        Regras de tradução:
+        - Usar português natural e corrente (evitar tradução literal ou excessivamente livre).
+        - Manter o tom, o registo e o nível de formalidade do texto original (formal, informal, técnico, etc.).
+        - Preservar nomes próprios, marcas e acrónimos sem alteração.
+        - Adaptar expressões idiomáticas para equivalentes naturais em português.
+        - Se não existir equivalente natural, manter o termo original entre aspas com uma breve explicação entre parênteses.
+        - Não acrescentar nem omitir informações.
+
+        Formatação:
+        - Manter rigorosamente a estrutura original: títulos, subtítulos, listas, citações, parágrafos e quebras de linha.
+        - Respeitar a ordem do texto original.
+
+        Saída:
+        - Responder apenas com a tradução.
+        - Sem introdução, sem comentários, sem explicações.
+        """,
+            actionType: .ai,
+            shortDescription: "Traduire en portugais naturel et idiomatique",
+            isFavorite: false,
+            displayOrder: 7,
+            category: .translate
+        ),
+        Action(
+            name: "Traduis en allemand",
+            icon: "🇩🇪",
+            prompt: """
+        Rolle: professioneller Übersetzer.
+
+        Aufgabe: den bereitgestellten Text ins Deutsche übersetzen.
+
+        Vorgehen:
+        1. Erkenne automatisch die Ausgangssprache.
+        2. Verstehe den Gesamtsinn, bevor du übersetzt.
+        3. Erstelle eine treue, klare und natürliche deutsche Übersetzung.
+
+        Übersetzungsregeln:
+        - Verwende natürliches und flüssiges Deutsch (vermeide Wort-für-Wort-Übersetzungen).
+        - Bewahre den genauen Sinn, den Ton und das Register des Originals (formell, informell, technisch, etc.).
+        - Bewahre Eigennamen, Marken, Akronyme und gängige Fachbegriffe.
+        - Passe idiomatische Ausdrücke an ihre natürlichen deutschen Entsprechungen an.
+        - Wenn keine natürliche Entsprechung existiert, behalte den Originalbegriff in Anführungszeichen mit einer kurzen Erklärung in Klammern.
+        - Füge nichts hinzu, lasse nichts aus.
+
+        Formatierung:
+        - Bewahre strikt die ursprüngliche Struktur: Titel, Untertitel, Listen, Zitate, Absätze und Zeilenumbrüche.
+        - Behalte die Reihenfolge der Sätze und Abschnitte bei.
+
+        Ausgabe:
+        - Antworte nur mit der Übersetzung.
+        - Füge nichts vor oder nach der Übersetzung hinzu.
+        """,
+            actionType: .ai,
+            shortDescription: "Traduire en allemand naturel et idiomatique",
+            isFavorite: false,
+            displayOrder: 8,
+            category: .translate
+        ),
+        Action(
+            name: "Traduis en italien",
+            icon: "🇮🇹",
+            prompt: """
+        Ruolo: traduttore professionale.
+
+        Compito: tradurre il testo fornito in italiano.
+
+        Procedura:
+        1. Rileva automaticamente la lingua di origine.
+        2. Comprendi il senso globale prima di tradurre.
+        3. Produci una traduzione fedele, chiara e naturale in italiano.
+
+        Regole di traduzione:
+        - Usa un italiano naturale e fluente (evita la traduzione parola per parola).
+        - Mantieni il senso esatto, il tono e il registro dell'originale (formale, informale, tecnico, ecc.).
+        - Conserva i nomi propri, marchi, acronimi e termini tecnici standard.
+        - Adatta le espressioni idiomatiche a equivalenti naturali in italiano.
+        - Se non esiste un equivalente naturale, mantieni il termine originale tra virgolette con una breve spiegazione tra parentesi.
+        - Non aggiungere né omettere informazioni.
+
+        Formattazione:
+        - Mantieni rigorosamente la struttura originale: titoli, sottotitoli, elenchi, citazioni, paragrafi e a capo.
+        - Rispetta l'ordine delle frasi e delle sezioni.
+
+        Uscita:
+        - Rispondi solo con la traduzione.
+        - Senza introduzione, commenti o spiegazioni.
+        """,
+            actionType: .ai,
+            shortDescription: "Traduire en italien naturel et idiomatique",
+            isFavorite: false,
+            displayOrder: 9,
+            category: .translate
+        ),
+        Action(
+            name: "Identifie l'idée principale",
+            icon: "🎯",
+            prompt: """
+        Rôle : analyste de texte.
+
+        Tâche : identifier l'idée principale du texte fourni et l'exprimer en 1 ou 2 phrases claires, dans la même langue que le texte original.
+
+        Procédure :
+        1. Lis le texte intégralement pour en saisir le sens global.
+        2. Distingue l'idée centrale des idées secondaires et illustratives.
+        3. Reformule l'idée principale en une à deux phrases denses.
+
+        Règles :
+        - L'idée principale est la thèse, le message ou le propos central du texte.
+        - Si le texte est argumentatif : énonce la thèse défendue.
+        - Si le texte est narratif : énonce le sujet principal ou la situation centrale.
+        - Si le texte est informatif : énonce l'information clé.
+        - Ne pas inclure d'exemples, d'illustrations ou de détails secondaires.
+        - Ne pas reproduire la phrase d'ouverture du texte telle quelle.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec l'idée principale, en 1 ou 2 phrases.
+        - Pas d'introduction, pas de commentaire, pas de liste.
+        """,
+            actionType: .ai,
+            shortDescription: "Identifier la thèse centrale en 1 à 2 phrases",
+            isFavorite: false,
+            displayOrder: 10,
+            category: .analyze
+        ),
+        Action(
+            name: "Explique simplement",
+            icon: "🧩",
+            prompt: """
+        Rôle : vulgarisateur expérimenté.
+
+        Tâche : expliquer simplement le texte fourni pour un lecteur non-spécialiste, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifie les concepts complexes ou techniques du texte.
+        2. Reformule-les avec des mots courants et des phrases courtes.
+        3. Préserve les idées essentielles, élimine les détails accessoires.
+
+        Règles :
+        - Remplacer le vocabulaire technique ou complexe par des mots courants.
+        - Raccourcir les phrases longues, simplifier les structures grammaticales.
+        - Supprimer le jargon sans valeur ajoutée.
+        - Utiliser des comparaisons ou analogies du quotidien si elles aident à comprendre.
+        - Conserver toutes les idées essentielles sans les dénaturer.
+        - Conserver la structure du texte (paragraphes, listes, etc.).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version vulgarisée du texte.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Vulgariser le texte pour un lecteur non-spécialiste",
+            isFavorite: false,
+            displayOrder: 11,
+            category: .analyze
+        ),
+        Action(
+            name: "Extrais la recette de cuisine",
+            icon: "🍳",
+            prompt: ActionsStore.recipeExtractionPrompt,
+            actionType: .ai,
+            shortDescription: "Extraire et reformater une recette en système métrique",
+            isFavorite: false,
+            displayOrder: 12,
+            category: .extract
+        ),
+        Action(
+            name: "Extrais les noms propres",
+            icon: "🏷️",
+            prompt: """
+        Rôle : expert en extraction d'entités nommées.
+
+        Tâche : extraire tous les noms propres du texte fourni et les regrouper par type, dans la même langue que le texte original.
+
+        Procédure :
+        1. Repère tous les noms propres : personnes, lieux, organisations.
+        2. Classe chaque nom dans sa catégorie.
+        3. Présente les résultats sous forme de liste structurée par type.
+
+        Règles d'extraction :
+        - **Personnes** : prénoms, noms de famille, personnages, fonctions nommées (le président Macron, etc.).
+        - **Lieux** : villes, pays, régions, lieux-dits, monuments, adresses.
+        - **Organisations** : entreprises, institutions, associations, marques, partis politiques.
+        - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
+        - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Format de sortie (Markdown) :
+
+        ## Personnes
+        - Nom 1
+        - Nom 2
+
+        ## Lieux
+        - Lieu 1
+        - Lieu 2
+
+        ## Organisations
+        - Organisation 1
+        - Organisation 2
+
+        Cas particuliers :
+        - Si une catégorie est vide, l'omettre du résultat.
+        - Si aucun nom propre n'est trouvé, répondre uniquement : "Aucun nom propre identifié dans le texte."
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste structurée par catégorie.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Lister les personnes lieux et organisations mentionnés",
+            isFavorite: false,
+            displayOrder: 13,
+            category: .extract
+        ),
+        Action(
+            name: "Extrais les dates",
+            icon: "📅",
+            prompt: """
+        Rôle : expert en extraction d'information.
+
+        Tâche : extraire toutes les dates mentionnées dans le texte fourni avec leur contexte, dans la même langue que le texte original.
+
+        Procédure :
+        1. Repère toutes les références temporelles précises du texte (dates, mois, années, périodes).
+        2. Pour chaque date, identifie l'événement ou le contexte associé.
+        3. Présente les résultats sous forme de liste structurée.
+
+        Règles d'extraction :
+        - Inclure les dates explicites (15 mars 2024, mars 2024, 2024).
+        - Inclure les dates relatives explicites (la semaine dernière, dans 3 mois) si le texte donne une date de référence.
+        - Ignorer les références temporelles vagues sans valeur informative (un jour, parfois, autrefois).
+        - Présenter les dates au format le plus précis disponible.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Format de sortie (Markdown) :
+        - Liste à puces, une ligne par date.
+        - Format : **[date]** — [contexte ou événement associé].
+        - Ordre chronologique ascendant si possible.
+
+        Cas particulier :
+        - Si aucune date n'est trouvée dans le texte, répondre uniquement : "Aucune date identifiée dans le texte."
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste des dates et leur contexte.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Lister toutes les dates mentionnées avec leur contexte",
+            isFavorite: false,
+            displayOrder: 14,
+            category: .extract
+        ),
+        Action(
+            name: "Reformule",
+            icon: "🔄",
+            prompt: """
+        Rôle : éditeur expérimenté.
+
+        Tâche : reformuler le texte fourni avec des tournures différentes en préservant strictement son sens, dans la même langue que le texte original.
+
+        Procédure :
+        1. Comprendre le sens exact de chaque phrase du texte.
+        2. Reformuler chaque idée avec un vocabulaire et une syntaxe différents.
+        3. Préserver le ton, le registre et la longueur globale.
+
+        Règles :
+        - Modifier les tournures de phrases, le vocabulaire et l'ordre des éléments.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver le ton et le registre (formel, informel, technique, neutre, etc.).
+        - Conserver une longueur équivalente (±10 %).
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas ajouter d'idées, ne pas supprimer d'informations.
+        - Conserver la langue d'origine du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version reformulée.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Paraphraser en préservant le sens et le registre",
+            isFavorite: false,
+            displayOrder: 15,
+            category: .transform
+        ),
+        Action(
+            name: "Rends plus formel",
+            icon: "🕴️",
+            prompt: """
+        Rôle : éditeur professionnel.
+
+        Tâche : réécrire le texte fourni dans un registre formel et soigné, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les tournures familières, relâchées ou ambiguës.
+        2. Les remplacer par des formulations soutenues et précises.
+        3. Préserver strictement le sens et les informations du texte.
+
+        Règles :
+        - Adopter un registre formel, soigné et bienveillant.
+        - Remplacer les tournures familières, l'argot, les contractions et les expressions relâchées.
+        - Préférer les formulations complètes et précises aux raccourcis.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas alourdir inutilement le texte (formel ≠ pompeux).
+        - Conserver la langue d'origine du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version réécrite.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Réécrire dans un registre formel et soigné",
+            isFavorite: false,
+            displayOrder: 16,
+            category: .transform
+        ),
+        Action(
+            name: "Rends plus convivial",
+            icon: "😊",
+            prompt: """
+        Rôle : rédacteur conversationnel.
+
+        Tâche : réécrire le texte fourni dans un registre chaleureux et accessible, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les tournures rigides, formelles ou distantes.
+        2. Les remplacer par des formulations naturelles et engageantes.
+        3. Préserver strictement le sens et les informations du texte.
+
+        Règles :
+        - Adopter un ton chaleureux, accessible et engageant.
+        - Utiliser le tutoiement si pertinent dans la langue cible.
+        - Remplacer les tournures rigides ou jargonnantes par des formulations simples.
+        - Privilégier les phrases courtes et directes.
+        - Préserver intégralement le sens et les informations du texte.
+        - Préserver la structure du texte (paragraphes, listes, etc.).
+        - Ne pas tomber dans le familier excessif ou l'oralité forcée.
+        - Conserver la langue d'origine du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la version réécrite.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Réécrire dans un registre chaleureux et accessible",
+            isFavorite: false,
+            displayOrder: 17,
+            category: .transform
+        ),
+        Action(
+            name: "Réponds à cet email",
+            icon: "📧",
+            prompt: """
+        Rôle : assistant de rédaction professionnelle.
+
+        Tâche : rédiger une réponse appropriée à l'email fourni, dans la même langue que l'email original.
+
+        Procédure :
+        1. Identifie le ton, le registre et l'objet de l'email reçu.
+        2. Détermine les points qui appellent une réponse (questions, demandes, propositions).
+        3. Rédige une réponse cohérente, structurée et adaptée au contexte.
+
+        Règles :
+        - Adopter le même registre que l'email reçu (formel, informel, professionnel, amical).
+        - Répondre point par point aux questions ou demandes explicites.
+        - Structurer la réponse : salutation, corps, formule de politesse adaptée.
+        - Rester concis et clair, éviter les longueurs inutiles.
+        - Si certains points nécessitent une information manquante, formuler une question de clarification.
+        - Préserver la langue de l'email original.
+        - Conserver la langue d'origine du texte source.
+
+        Cas particuliers :
+        - Si l'email contient des informations sensibles ou ambiguës, signaler les points à clarifier sans inventer de réponse.
+        - Si le ton est conflictuel, adopter une réponse mesurée et professionnelle.
+
+        Sortie attendue :
+        - Répondre uniquement avec le texte de l'email de réponse complet (salutation incluse, formule de politesse incluse).
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Rédiger une réponse adaptée au contenu reçu",
+            isFavorite: false,
+            displayOrder: 18,
+            category: .transform
+        ),
+        Action(
+            name: "Convertis en tableau",
+            icon: "📊",
+            prompt: """
+        Rôle : expert en structuration de données.
+
+        Tâche : transformer les informations du texte fourni en tableau Markdown structuré, dans la même langue que le texte original.
+
+        Procédure :
+        1. Analyser le contenu pour identifier les éléments comparables.
+        2. Déterminer les colonnes les plus pertinentes selon le contenu.
+        3. Construire le tableau Markdown avec ces colonnes et les données extraites.
+
+        Règles :
+        - Déterminer les colonnes les plus pertinentes selon le contenu (ex. Concept / Description / Exemple, ou Critère / Avantages / Inconvénients, etc.).
+        - Chaque ligne du tableau correspond à un élément, une idée ou une entrée distincte.
+        - Conserver toutes les informations importantes du texte original.
+        - Privilégier des en-têtes de colonnes courts et explicites.
+        - Si une cellule serait vide, indiquer "—" (tiret cadratin).
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
+
+        Cas particulier :
+        - Si le texte ne se prête pas à un tableau, répondre uniquement : "Ce texte ne peut pas être converti en tableau de manière pertinente."
+
+        Sortie attendue :
+        - Répondre uniquement avec le tableau en Markdown.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Transformer les informations en tableau Markdown",
+            isFavorite: false,
+            displayOrder: 19,
+            category: .structure
+        ),
+        Action(
+            name: "Propose un plan structuré",
+            icon: "🗂️",
+            prompt: """
+        Rôle : expert en structuration de contenu.
+
+        Tâche : transformer le texte fourni en plan hiérarchique numéroté, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les grandes idées du texte (parties principales).
+        2. Identifier les idées secondaires associées à chaque grande idée.
+        3. Construire un plan hiérarchique I / A / 1 / a en Markdown.
+
+        Règles :
+        - Utiliser une numérotation hiérarchique claire : I / II / III pour les parties, A / B / C pour les sous-parties, 1 / 2 / 3 pour les sous-sous-parties, a / b / c pour les détails.
+        - Regrouper les idées similaires sous des parties cohérentes.
+        - Les intitulés doivent être courts et explicites (5 à 10 mots maximum).
+        - N'inclure que les intitulés du plan, pas le contenu détaillé du texte.
+        - Utiliser le format Markdown pour la mise en forme (listes imbriquées ou numérotation manuelle).
+        - Maximum 4 niveaux hiérarchiques.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
+
+        Sortie attendue :
+        - Répondre uniquement avec le plan hiérarchique.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Transformer le texte en plan hiérarchique numéroté",
+            isFavorite: false,
+            displayOrder: 20,
+            category: .structure
+        ),
+        Action(
+            name: "Propose des titres",
+            icon: "📰",
+            prompt: """
+        Rôle : rédacteur en chef.
+
+        Tâche : proposer 5 titres pertinents et accrocheurs pour le texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier le sujet central et l'angle dominant du texte.
+        2. Imaginer plusieurs façons de présenter ce sujet avec des angles variés.
+        3. Formuler 5 propositions distinctes.
+
+        Règles :
+        - Chaque titre doit être court (5 à 12 mots), clair et accrocheur.
+        - Refléter fidèlement le contenu du texte (pas de clickbait trompeur).
+        - Varier les approches : informatif, intrigant, direct, question, accroche émotionnelle, etc.
+        - Numéroter les titres de 1 à 5.
+        - Les titres doivent être distincts et non redondants entre eux.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste numérotée des 5 titres.
+        - Pas d'introduction, pas de commentaire, pas d'explication des choix.
+        """,
+            actionType: .ai,
+            shortDescription: "Proposer plusieurs titres accrocheurs aux angles variés",
+            isFavorite: false,
+            displayOrder: 21,
+            category: .propose
+        ),
+        Action(
+            name: "Propose des questions",
+            icon: "❓",
+            prompt: """
+        Rôle : facilitateur de réflexion.
+
+        Tâche : proposer une liste de questions pertinentes à partir du texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier les zones d'ombre, les hypothèses implicites et les points discutables du texte.
+        2. Formuler des questions qui permettent d'approfondir la compréhension ou d'ouvrir le débat.
+        3. Varier les types de questions (compréhension, approfondissement, critique).
+
+        Règles :
+        - Proposer entre 3 et 10 questions selon la richesse du texte.
+        - Varier les types : questions de compréhension (que dit le texte ?), d'approfondissement (pourquoi ? comment ?), critiques (et si ? quelles limites ?).
+        - Chaque question doit être claire, ouverte (pas oui/non) et appeler une réflexion.
+        - Présenter les questions sous forme de liste numérotée en Markdown.
+        - Les questions doivent être distinctes et non redondantes.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec la liste numérotée des questions.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Proposer des questions pour approfondir ou ouvrir le débat",
+            isFavorite: false,
+            displayOrder: 22,
+            category: .propose
+        ),
+        Action(
+            name: "Propose des angles différents",
+            icon: "🔍",
+            prompt: """
+        Rôle : penseur multi-perspectives.
+
+        Tâche : proposer 3 angles ou perspectives alternatives sur le sujet du texte fourni, dans la même langue que le texte original.
+
+        Procédure :
+        1. Identifier le sujet central et l'angle dominant adopté par le texte.
+        2. Imaginer d'autres façons d'aborder ce même sujet (autres disciplines, autres parties prenantes, autres échelles temporelles, etc.).
+        3. Formuler 3 angles distincts qui enrichissent ou contrastent avec l'angle initial.
+
+        Règles :
+        - Proposer exactement 3 angles distincts.
+        - Chaque angle doit ouvrir une perspective réellement différente (pas une simple variation de formulation).
+        - Sources possibles d'angles alternatifs : autre discipline (économique vs sociologique, technique vs humain), autre échelle (individuel vs collectif, court terme vs long terme), autre partie prenante (utilisateur vs producteur, expert vs novice).
+        - Présenter chaque angle avec un titre court (## Angle 1 — Nom) suivi d'un paragraphe de 2 à 4 phrases expliquant la perspective.
+        - Les angles ne sont pas des opinions à défendre, ce sont des points de vue à expliciter.
+        - Rédiger la sortie en français, quelle que soit la langue du texte source.
+
+        Sortie attendue :
+        - Répondre uniquement avec les 3 angles structurés en Markdown.
+        - Pas d'introduction, pas de commentaire.
+        """,
+            actionType: .ai,
+            shortDescription: "Proposer plusieurs perspectives alternatives sur le sujet",
+            isFavorite: false,
+            displayOrder: 23,
+            category: .propose
         ),
     ]
 }
