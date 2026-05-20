@@ -57,8 +57,11 @@ enum PromptCategory: String, CaseIterable, Codable {
     case transform = "Transformer"
     case structure = "Structurer"
     case propose = "Proposer"
-    /// Catégorie ajoutée pour les modèles publiés par l'utilisateur via
-    /// l'éditeur d'action (toggle « Ajouter aux Modèles »). Correctif 2026-04-28.
+    /// DEPRECATED — case unused since K.unify.2 (2026-05-20). Le concept
+    /// « Mes modèles » (publication user → catalogue) a disparu avec la
+    /// refonte unifiée Actions/Modèles. Conservé dans l'enum pour ne pas
+    /// casser les `switch` exhaustifs (icon/color) et le décodage Codable
+    /// de valeurs historiques. Évaluer suppression post-V1.
     case custom = "Mes modèles"
 
     /// Icône SF Symbol associée — pas affichée dans `TemplateCard` (qui
@@ -99,16 +102,14 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     var icon: String
     var prompt: String
     var actionType: ActionType
-    /// Description courte (≤80 signes) éditée par l'utilisateur pour l'affichage
-    /// dans le catalogue Modèles si l'action est publiée (`isInTemplates == true`).
-    /// Si nil ou vide, le catalogue affiche les 80 premiers caractères du prompt.
-    /// Visible UNIQUEMENT dans l'éditeur d'action (pas dans la popup, pas dans
-    /// la sidebar liste). Correctif 2026-04-28.
+    /// Description courte (≤80 signes) reprise du seed `defaultActions`
+    /// (K.unify.1) ou éditée par l'utilisateur. Visible dans l'éditeur
+    /// d'action ; en K.unify.3 pourra alimenter la popup principale.
     var shortDescription: String?
-    /// `true` si l'utilisateur a coché « Ajouter aux Modèles » dans l'éditeur.
-    /// L'action apparaît alors dans l'onglet Modèles, catégorie « Mes modèles ».
-    /// Correctif 2026-04-28.
-    var isInTemplates: Bool
+    /// K.unify.2 (2026-05-20) : champ `isInTemplates` supprimé (concept
+    /// « Mes modèles » caduque avec le modèle unifié). Les Codable existants
+    /// avec une clé `isInTemplates` se décodent sans erreur (clé orpheline
+    /// ignorée par CodingKeys restreint).
     /// Nom du template d'origine si l'action a été ajoutée depuis l'onglet
     /// Modèles. Utilisé pour afficher la coche verte « déjà ajoutée » sur
     /// la card du template correspondant (cf. `TemplatesView.TemplateCard`).
@@ -144,7 +145,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
          prompt: String,
          actionType: ActionType = .ai,
          shortDescription: String? = nil,
-         isInTemplates: Bool = false,
          originTemplateName: String? = nil,
          isFavorite: Bool = false,
          isHidden: Bool = false,
@@ -156,7 +156,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         self.prompt = prompt
         self.actionType = actionType
         self.shortDescription = shortDescription
-        self.isInTemplates = isInTemplates
         self.originTemplateName = originTemplateName
         self.isFavorite = isFavorite
         self.isHidden = isHidden
@@ -167,9 +166,10 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     private enum CodingKeys: String, CodingKey {
         // K.0 : `slotIndex` retiré (legacy raccourcis ⌘1-⌘N).
         // K.unify.1 : ajout de `isFavorite/isHidden/displayOrder/category`.
-        // Les actions déjà sérialisées sans ces clés se décodent sans
-        // erreur via `decodeIfPresent` + valeurs par défaut.
-        case id, name, icon, prompt, actionType, shortDescription, isInTemplates, originTemplateName
+        // K.unify.2 : `isInTemplates` retiré (concept Mes modèles caduque).
+        // Les actions déjà sérialisées avec ces clés orphelines se décodent
+        // sans erreur (CodingKeys restreint → clé ignorée).
+        case id, name, icon, prompt, actionType, shortDescription, originTemplateName
         case isFavorite, isHidden, displayOrder, category
     }
 
@@ -181,7 +181,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         prompt = try container.decode(String.self, forKey: .prompt)
         actionType = try container.decodeIfPresent(ActionType.self, forKey: .actionType) ?? .ai
         shortDescription = try container.decodeIfPresent(String.self, forKey: .shortDescription)
-        isInTemplates = try container.decodeIfPresent(Bool.self, forKey: .isInTemplates) ?? false
         originTemplateName = try container.decodeIfPresent(String.self, forKey: .originTemplateName)
         // K.unify.1 : migration graceful des installs antérieures.
         isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
@@ -198,7 +197,6 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
         try container.encode(prompt, forKey: .prompt)
         try container.encode(actionType, forKey: .actionType)
         try container.encodeIfPresent(shortDescription, forKey: .shortDescription)
-        try container.encode(isInTemplates, forKey: .isInTemplates)
         try container.encodeIfPresent(originTemplateName, forKey: .originTemplateName)
         try container.encode(isFavorite, forKey: .isFavorite)
         try container.encode(isHidden, forKey: .isHidden)
@@ -241,6 +239,7 @@ class ActionsStore: ObservableObject {
     private let planActionsEmojiMigrationKey = "loucede_migration_plan_actions_emoji_done"
     private let planToTodoMigrationKey = "loucede_migration_plan_to_todo_done"
     private let summarizeV2MigrationKey = "loucede_migration_summarize_v2_done"
+    private let unify2MigrationKey = "loucede_migration_unify2_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -262,15 +261,12 @@ class ActionsStore: ObservableObject {
         "fork.knife": "🍳",
     ]
 
-    // MARK: - Cap du nombre d'actions
-
-    /// Nombre maximum d'actions qu'un utilisateur peut créer. Cap conservé
-    /// en K.0 (décision F) pour rester cohérent avec le dimensionnement
-    /// actuel de la popup (≈ 740 pt pour 15 lignes sans scroll). À
-    /// rediscuter en V1.x si besoin. Les raccourcis ⌘1-⌘N positionnels
-    /// (ex-`positionShortcuts`, Phase 6.8d-bis) ont été supprimés en K.0 :
-    /// navigation flèches + ↵ uniquement.
-    static let maxActions = 15
+    // K.unify.2 (2026-05-20) : `maxActions = 15` supprimé. Le cap n'a plus
+    // de sens avec le modèle unifié (favoris/catégories/filtres) — la
+    // popup affichera principalement les FAVORIS (+ exploration par
+    // catégorie en K.unify.3), pas la liste complète, donc le scroll d'une
+    // liste >15 n'est plus un problème UX. Code de cap/compteur retiré
+    // côté UI Réglages (ActionsView).
 
     static let shared = ActionsStore()
 
@@ -340,6 +336,7 @@ class ActionsStore: ObservableObject {
             migratePlanActionsEmojiIfNeeded()
             migratePlanToTodoIfNeeded()
             migrateSummarizePromptV2IfNeeded()
+            migrateUnify2IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -353,6 +350,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
             UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
             UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
+            UserDefaults.standard.set(true, forKey: unify2MigrationKey)
         }
     }
 
@@ -388,7 +386,8 @@ class ActionsStore: ObservableObject {
         let recipePresent = actions.contains { name in
             name.name == "Extrais la recette" || name.name == "Extrais la recette de cuisine"
         }
-        if !recipePresent && actions.count < ActionsStore.maxActions {
+        // K.unify.2 : cap `maxActions` supprimé, guard count retiré.
+        if !recipePresent {
             actions.append(Action(
                 name: "Extrais la recette de cuisine",
                 icon: "🍳",
@@ -556,6 +555,47 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
+    }
+
+    /// Migration K.unify.2 (2026-05-20) — modèle unifié Actions/Modèles/
+    /// Favoris. Pour chaque action custom existante dont le `name`
+    /// correspond exactement à un seed `defaultActions`, copie `category`
+    /// et `isFavorite` du seed. Préserve `prompt`, `icon`, `displayOrder`,
+    /// `shortDescription` custom de l'utilisateur. One-shot via
+    /// `unify2MigrationKey`. Sans cette migration, les actions custom
+    /// décodées avec les valeurs par défaut K.unify.1 (isFavorite=false,
+    /// category=nil) atterriraient toutes dans « Sans catégorie » sans
+    /// favori — friction immédiate au runtime.
+    private func migrateUnify2IfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: unify2MigrationKey) else { return }
+
+        // Indexer les seeds par nom (lookup O(1)).
+        var seedByName: [String: Action] = [:]
+        for seed in Self.defaultActions {
+            seedByName[seed.name] = seed
+        }
+
+        var changed = false
+        for idx in actions.indices {
+            guard let seed = seedByName[actions[idx].name] else { continue }
+            // On copie category et isFavorite si l'utilisateur ne les a
+            // pas déjà personnalisés (valeurs par défaut K.unify.1).
+            if actions[idx].category == nil && seed.category != nil {
+                actions[idx].category = seed.category
+                changed = true
+            }
+            if !actions[idx].isFavorite && seed.isFavorite {
+                actions[idx].isFavorite = true
+                changed = true
+            }
+            // `displayOrder` PAS copié (arbitrage Faab) : on respecte
+            // l'ordre actuel de l'utilisateur.
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: unify2MigrationKey)
     }
 
     func saveActions() {

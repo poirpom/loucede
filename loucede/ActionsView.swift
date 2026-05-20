@@ -9,19 +9,55 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+// MARK: - Filtre Réglages → Actions (K.unify.2)
+
+/// Filtre sélectionné via le `Picker` en tête de la sidebar. Single-radio,
+/// session-scoped (revient à `.all` au prochain démarrage — pas de
+/// persistance UserDefaults par décision Faab).
+fileprivate enum ActionsFilter: Hashable {
+    case all
+    case favorites
+    case category(PromptCategory)
+    case uncategorized
+    case hidden
+
+    var label: String {
+        switch self {
+        case .all: return "Toutes"
+        case .favorites: return "Favoris"
+        case .category(let c): return c.rawValue
+        case .uncategorized: return "Sans catégorie"
+        case .hidden: return "Masquées"
+        }
+    }
+
+    /// Ordre des options dans le Picker. `.custom` exclu (DEPRECATED).
+    static var allOptions: [ActionsFilter] {
+        var out: [ActionsFilter] = [.all, .favorites]
+        for c in PromptCategory.allCases where c != .custom {
+            out.append(.category(c))
+        }
+        out.append(.uncategorized)
+        out.append(.hidden)
+        return out
+    }
+}
+
 // MARK: - Actions Settings
 
 struct ActionsSettingsView: View {
     @Environment(\.colorScheme) var colorScheme
     @StateObject private var store = ActionsStore.shared
     @Binding var selectedAction: Action?
-    /// Suivi de l'index de la row actuellement survolée par un drag actif.
-    /// Mis à jour via les closures `isTargeted` de chaque `.dropDestination`.
-    /// Affiche une ligne bleue au top edge de la row correspondante via
-    /// `.overlay(alignment: .top)`. Reset à `nil` au drop (succès ou échec)
-    /// et quand le curseur sort de toutes les zones de drop.
-    /// Suivi Point 3 pre-V1 (2026-05-08).
-    @State private var dropTargetIndex: Int?
+    /// Filtre actif (session-scoped, défaut `.all`).
+    @State private var selectedFilter: ActionsFilter = .all
+    /// Suivi de l'ID de l'action actuellement survolée par un drag actif
+    /// (K.unify.2 : index → ID car le drop traverse des sections, plus
+    /// d'index linéaire fiable). Affiche une ligne bleue au top edge.
+    @State private var dropTargetActionID: UUID?
+    /// `true` quand un drag survole le header FAVORIS depuis une action
+    /// non-favorite — drop déclenche `isFavorite = true`.
+    @State private var isFavoritesHeaderTargeted: Bool = false
 
     /// Mini-session Point 3 pre-V1 (2026-05-08) : couleur de texte
     /// adaptive light/dark mode. Aligné sur le pattern de `TemplatesView`
@@ -31,6 +67,128 @@ struct ActionsSettingsView: View {
         colorScheme == .light
             ? Color(white: 0.35)
             : Color(white: 0.65)
+    }
+
+    // MARK: - K.unify.2 — sections affichées selon filtre
+
+    /// Section visible dans la sidebar : titre + actions ordonnées.
+    fileprivate struct SidebarSection: Identifiable {
+        let id: String     // ex: "favorites" / "category-translate" / "uncategorized" / "hidden"
+        let title: String
+        /// `true` pour la section FAVORIS (cible d'un drag depuis une
+        /// action non-favorite). Les autres sections ne sont pas cibles
+        /// de favorisation.
+        let isFavoritesSection: Bool
+        let actions: [Action]
+    }
+
+    /// Tri stable par `displayOrder` puis par ordre d'insertion (`firstIndex`).
+    /// Les actions custom existantes sans displayOrder personnalisé (0)
+    /// conservent leur ordre relatif d'insertion grâce au stable sort.
+    private func sorted(_ acts: [Action]) -> [Action] {
+        acts.enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.displayOrder != rhs.element.displayOrder {
+                    return lhs.element.displayOrder < rhs.element.displayOrder
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map { $0.element }
+    }
+
+    /// Liste des sections à afficher selon le filtre actif. `isHidden`
+    /// exclu partout sauf dans le filtre `.hidden`.
+    fileprivate var displayedSections: [SidebarSection] {
+        switch selectedFilter {
+        case .all:
+            var out: [SidebarSection] = []
+            let favs = sorted(store.actions.filter { $0.isFavorite && !$0.isHidden })
+            // FAVORIS toujours affiché en mode .all pour permettre le drop initial.
+            out.append(SidebarSection(id: "favorites", title: "FAVORIS", isFavoritesSection: true, actions: favs))
+            for cat in PromptCategory.allCases where cat != .custom {
+                let inCat = sorted(store.actions.filter { $0.category == cat && !$0.isFavorite && !$0.isHidden })
+                if !inCat.isEmpty {
+                    out.append(SidebarSection(id: "category-\(cat.rawValue)", title: cat.rawValue.uppercased(), isFavoritesSection: false, actions: inCat))
+                }
+            }
+            let uncat = sorted(store.actions.filter { $0.category == nil && !$0.isFavorite && !$0.isHidden })
+            if !uncat.isEmpty {
+                out.append(SidebarSection(id: "uncategorized", title: "SANS CATÉGORIE", isFavoritesSection: false, actions: uncat))
+            }
+            return out
+
+        case .favorites:
+            let favs = sorted(store.actions.filter { $0.isFavorite && !$0.isHidden })
+            return [SidebarSection(id: "favorites", title: "FAVORIS", isFavoritesSection: true, actions: favs)]
+
+        case .category(let cat):
+            let inCat = sorted(store.actions.filter { $0.category == cat && !$0.isHidden })
+            return [SidebarSection(id: "category-\(cat.rawValue)", title: cat.rawValue.uppercased(), isFavoritesSection: false, actions: inCat)]
+
+        case .uncategorized:
+            let uncat = sorted(store.actions.filter { $0.category == nil && !$0.isHidden })
+            return [SidebarSection(id: "uncategorized", title: "SANS CATÉGORIE", isFavoritesSection: false, actions: uncat)]
+
+        case .hidden:
+            let hid = sorted(store.actions.filter { $0.isHidden })
+            return [SidebarSection(id: "hidden", title: "MASQUÉES", isFavoritesSection: false, actions: hid)]
+        }
+    }
+
+    /// Toggle favori d'une action (clic étoile).
+    fileprivate func toggleFavorite(_ action: Action) {
+        guard let idx = store.actions.firstIndex(where: { $0.id == action.id }) else { return }
+        store.actions[idx].isFavorite.toggle()
+        if store.actions[idx].isFavorite {
+            let maxOrder = store.actions.filter { $0.isFavorite }.map { $0.displayOrder }.max() ?? -1
+            store.actions[idx].displayOrder = maxOrder + 1
+        }
+        store.saveActions()
+    }
+
+    /// Toggle masqué d'une action (clic œil ou toggle éditeur).
+    fileprivate func toggleHidden(_ action: Action) {
+        guard let idx = store.actions.firstIndex(where: { $0.id == action.id }) else { return }
+        store.actions[idx].isHidden.toggle()
+        store.saveActions()
+    }
+
+    /// Drop d'une action sur une autre row dans la même section.
+    /// Réordonne via `displayOrder`. Si la cible est dans FAVORIS et
+    /// que la source ne l'est pas, marque favori (drag-to-favorite).
+    fileprivate func handleDrop(droppedID: UUID, ontoActionID: UUID, inFavoritesSection: Bool) {
+        guard let fromIdx = store.actions.firstIndex(where: { $0.id == droppedID }),
+              let toIdx = store.actions.firstIndex(where: { $0.id == ontoActionID }),
+              fromIdx != toIdx else { return }
+        let sameSection = store.actions[fromIdx].isFavorite == store.actions[toIdx].isFavorite
+            && store.actions[fromIdx].category == store.actions[toIdx].category
+            && store.actions[fromIdx].isHidden == store.actions[toIdx].isHidden
+        guard sameSection || inFavoritesSection else { return }
+        if inFavoritesSection && !store.actions[fromIdx].isFavorite {
+            store.actions[fromIdx].isFavorite = true
+        }
+        let targetOrder = store.actions[toIdx].displayOrder
+        store.actions[fromIdx].displayOrder = targetOrder
+        for i in store.actions.indices where i != fromIdx {
+            if store.actions[i].isFavorite == store.actions[fromIdx].isFavorite
+                && store.actions[i].category == store.actions[fromIdx].category
+                && store.actions[i].displayOrder >= targetOrder
+                && store.actions[i].id != store.actions[fromIdx].id {
+                store.actions[i].displayOrder += 1
+            }
+        }
+        store.saveActions()
+    }
+
+    /// Drop sur le header FAVORIS : favorise + place en fin.
+    fileprivate func handleDropOnFavoritesHeader(droppedID: UUID) {
+        guard let idx = store.actions.firstIndex(where: { $0.id == droppedID }) else { return }
+        if !store.actions[idx].isFavorite {
+            store.actions[idx].isFavorite = true
+            let maxOrder = store.actions.filter { $0.isFavorite }.map { $0.displayOrder }.max() ?? -1
+            store.actions[idx].displayOrder = maxOrder + 1
+            store.saveActions()
+        }
     }
 
     var body: some View {
@@ -60,118 +218,136 @@ struct ActionsSettingsView: View {
             HStack(spacing: 0) {
             // Sidebar - Actions list
             VStack(alignment: .leading, spacing: 0) {
+                // K.unify.2 : barre filtres (Picker .menu, session-scoped).
+                // 9 options : Toutes / Favoris / 6 catégories / Sans catégorie
+                // / Masquées. Défaut .all à chaque démarrage.
+                HStack {
+                    Picker("Filtrer", selection: $selectedFilter) {
+                        ForEach(ActionsFilter.allOptions, id: \.self) { filter in
+                            Text(filter.label).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+
+                Divider()
+
+                // K.unify.2 : liste sectionnée selon le filtre actif.
+                // Sections : FAVORIS (toujours en mode .all pour permettre
+                // le drop initial) + catégories non-vides + Sans catégorie.
                 ScrollView {
-                    // K.0 (refonte fondations) : la liste affiche les actions
-                    // réelles (plus de « 15 slots fixes » Phase 6.8d-bis, les
-                    // raccourcis ⌘1-⌘N positionnels ayant été supprimés). Un
-                    // CTA « Nouvelle action » suit la liste tant que le cap
-                    // `maxActions` n'est pas atteint (décision F). Le
-                    // drag-and-drop de réordonnancement (Point 3 pre-V1) est
-                    // préservé : il ne sert plus qu'à l'ordre d'affichage.
-                    VStack(spacing: 2) {
-                        ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
-                            ActionListRow(
-                                action: action,
-                                isSelected: selectedAction?.id == action.id
-                            )
-                            .onTapGesture {
-                                selectedAction = action
-                            }
-                            // Chaque row est une zone de drop. Drop sur la row
-                            // d'index N → moveAction(to: N) (sémantique « drop
-                            // BEFORE target », cf. doc-string de `moveAction`).
-                            .overlay(alignment: .top) {
-                                if dropTargetIndex == index {
-                                    Rectangle()
-                                        .fill(Color.accentColor)
-                                        .frame(height: 2)
-                                }
-                            }
-                            .dropDestination(for: String.self) { items, _ in
-                                defer { dropTargetIndex = nil }
-                                guard let droppedIDStr = items.first,
-                                      let droppedID = UUID(uuidString: droppedIDStr),
-                                      let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID }),
-                                      fromIndex != index
-                                else { return false }
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    store.moveAction(from: fromIndex, to: index)
-                                }
-                                return true
-                            } isTargeted: { isTargeted in
-                                if isTargeted {
-                                    dropTargetIndex = index
-                                } else if dropTargetIndex == index {
-                                    // Garde-fou races : on ne nile que si on
-                                    // était la row targeted.
-                                    dropTargetIndex = nil
+                    VStack(spacing: 12) {
+                        ForEach(displayedSections) { section in
+                            VStack(alignment: .leading, spacing: 2) {
+                                // Header de section (style sidebar doc :
+                                // 10pt semibold secondary, majuscules).
+                                Text(section.title)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.top, 6)
+                                    .padding(.bottom, 2)
+                                    // Drop sur le header FAVORIS depuis une
+                                    // action non-favorite → favorise.
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        section.isFavoritesSection && isFavoritesHeaderTargeted
+                                            ? Color.accentColor.opacity(0.15)
+                                            : Color.clear
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .dropDestination(for: String.self) { items, _ in
+                                        defer { isFavoritesHeaderTargeted = false }
+                                        guard section.isFavoritesSection,
+                                              let droppedIDStr = items.first,
+                                              let droppedID = UUID(uuidString: droppedIDStr)
+                                        else { return false }
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            handleDropOnFavoritesHeader(droppedID: droppedID)
+                                        }
+                                        return true
+                                    } isTargeted: { targeted in
+                                        if section.isFavoritesSection {
+                                            isFavoritesHeaderTargeted = targeted
+                                        }
+                                    }
+
+                                // Rows de la section.
+                                ForEach(section.actions) { action in
+                                    ActionListRow(
+                                        action: action,
+                                        isSelected: selectedAction?.id == action.id,
+                                        onToggleFavorite: { toggleFavorite(action) },
+                                        onToggleHidden: { toggleHidden(action) }
+                                    )
+                                    .onTapGesture {
+                                        selectedAction = action
+                                    }
+                                    .overlay(alignment: .top) {
+                                        if dropTargetActionID == action.id {
+                                            Rectangle()
+                                                .fill(Color.accentColor)
+                                                .frame(height: 2)
+                                        }
+                                    }
+                                    .dropDestination(for: String.self) { items, _ in
+                                        defer { dropTargetActionID = nil }
+                                        guard let droppedIDStr = items.first,
+                                              let droppedID = UUID(uuidString: droppedIDStr),
+                                              droppedID != action.id
+                                        else { return false }
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            handleDrop(droppedID: droppedID,
+                                                       ontoActionID: action.id,
+                                                       inFavoritesSection: section.isFavoritesSection)
+                                        }
+                                        return true
+                                    } isTargeted: { targeted in
+                                        if targeted {
+                                            dropTargetActionID = action.id
+                                        } else if dropTargetActionID == action.id {
+                                            dropTargetActionID = nil
+                                        }
+                                    }
                                 }
                             }
                         }
-
-                        // CTA « Nouvelle action » + zone de drop « at end ».
-                        // Visible tant que le cap n'est pas atteint. Remplace
-                        // l'ancien EmptySlotRow « next available ».
-                        if store.actions.count < ActionsStore.maxActions {
-                            let endIndex = store.actions.count
-                            HStack(spacing: 10) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color(red: 0.0, green: 0.584, blue: 1.0).opacity(0.5),
-                                                style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
-                                }
-                                .frame(width: 24, height: 24)
-                                Text("Nouvelle action")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 10)
-                            .contentShape(Rectangle())
-                            .onTapGesture { addNewAction() }
-                            .overlay(alignment: .top) {
-                                if dropTargetIndex == endIndex {
-                                    Rectangle()
-                                        .fill(Color.accentColor)
-                                        .frame(height: 2)
-                                }
-                            }
-                            .dropDestination(for: String.self) { items, _ in
-                                defer { dropTargetIndex = nil }
-                                guard let droppedIDStr = items.first,
-                                      let droppedID = UUID(uuidString: droppedIDStr),
-                                      let fromIndex = store.actions.firstIndex(where: { $0.id == droppedID })
-                                else { return false }
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    store.moveAction(from: fromIndex, to: store.actions.count)
-                                }
-                                return true
-                            } isTargeted: { isTargeted in
-                                if isTargeted {
-                                    dropTargetIndex = endIndex
-                                } else if dropTargetIndex == endIndex {
-                                    dropTargetIndex = nil
-                                }
-                            }
-                        }
-
-                        // Compteur discret du cap (décision F, S6-A).
-                        Text("\(store.actions.count) / \(ActionsStore.maxActions) actions")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 8)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 8)
-                    .animation(.easeInOut(duration: 0.1), value: dropTargetIndex)
+                    .animation(.easeInOut(duration: 0.1), value: dropTargetActionID)
+                    .animation(.easeInOut(duration: 0.1), value: isFavoritesHeaderTargeted)
                 }
                 .scrollIndicators(.hidden)
+
+                // K.unify.2 : bouton « Nouvelle action » dédié en bas,
+                // séparé par Divider. Toujours visible (plus de cap). La
+                // nouvelle action a category=nil + isFavorite=false par
+                // défaut → va dans « Sans catégorie » quel que soit le
+                // filtre actif (l'utilisateur peut la voir via le filtre
+                // « Sans catégorie » ou « Toutes »).
+                Divider()
+                Button {
+                    addNewAction()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 13))
+                        Text("Nouvelle action")
+                            .font(.system(size: 13, weight: .semibold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))
 
                 // Footer sidebar : import / export (Phase 2.4 + 6.13)
                 Divider()
@@ -316,10 +492,9 @@ struct ActionsSettingsView: View {
     }
 
     func addNewAction() {
-        // Cap dur à `maxActions` (décision K.0-F : conservé pour le
-        // dimensionnement popup). La UI masque le CTA « Nouvelle action »
-        // au-delà ; garde côté store par sécurité.
-        guard store.actions.count < ActionsStore.maxActions else { return }
+        // K.unify.2 : cap `maxActions` supprimé — création illimitée.
+        // La nouvelle action a category=nil + isFavorite=false par défaut
+        // → apparaîtra dans « Sans catégorie ».
         let newAction = Action(
             name: "",
             icon: "star",
@@ -432,6 +607,10 @@ struct ActionListRow: View {
     @Environment(\.colorScheme) var colorScheme
     let action: Action
     let isSelected: Bool
+    /// K.unify.2 : closures injectées depuis le call-site pour basculer
+    /// les booléens isFavorite/isHidden via les icônes étoile/œil.
+    var onToggleFavorite: () -> Void
+    var onToggleHidden: () -> Void
 
     // Selected background color: #f1f1ef for light mode, accentColor opacity for dark mode
     var selectedBackgroundColor: Color {
@@ -508,8 +687,29 @@ struct ActionListRow: View {
                 .lineLimit(1)
 
             Spacer()
-            // K.0 : badge raccourci ⌘+touche retiré (raccourcis ⌘1-⌘N
-            // positionnels supprimés — navigation flèches + ↵).
+
+            // K.unify.2 : étoile (favoris) + œil (masqué/visible).
+            // SF Symbols, fond rond léger au survol, accentColor pour
+            // l'état actif (favori ou masqué).
+            Button(action: onToggleFavorite) {
+                Image(systemName: action.isFavorite ? "star.fill" : "star")
+                    .font(.system(size: 12))
+                    .foregroundStyle(action.isFavorite ? Color.yellow : Color.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(action.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris")
+
+            Button(action: onToggleHidden) {
+                Image(systemName: action.isHidden ? "eye.slash" : "eye")
+                    .font(.system(size: 12))
+                    .foregroundStyle(action.isHidden ? Color.accentColor : Color.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(action.isHidden ? "Afficher dans la popup" : "Masquer de la popup")
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -613,72 +813,103 @@ struct ActionEditorView: View {
                     // Phase 6.8d-bis) retiré — les raccourcis ⌘1-⌘N
                     // positionnels ont été supprimés (navigation flèches + ↵).
 
-                    // Bloc « Ajouter aux Modèles » (correctif 2026-04-28)
-                    // Toggle pour publier l'action dans le catalogue Modèles
-                    // (catégorie « Mes modèles ») + description courte
-                    // optionnelle (≤80 signes) affichée sur la card.
-                    // Si la description est vide, le catalogue retombe sur
-                    // les 80 premiers caractères du prompt.
-                    VStack(alignment: .leading, spacing: 10) {
-                        Toggle(isOn: $action.isInTemplates) {
+                    // K.unify.2 : bloc « Catégorie + Afficher dans la popup ».
+                    // Remplace l'ancien « Ajouter aux Modèles » (concept caduque
+                    // avec le modèle unifié). `shortDescription` reste éditable
+                    // via le champ ci-dessous (peuplé par les seeds, modifiable
+                    // par l'utilisateur).
+                    VStack(alignment: .leading, spacing: 14) {
+
+                        // Menu déroulant catégorie. « Aucune catégorie » en bas
+                        // correspond à `category = nil` (Sans catégorie). Case
+                        // .custom exclue (DEPRECATED depuis K.unify.2).
+                        HStack {
+                            Text("Catégorie")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(textGrayColor)
+                            Spacer()
+                            Picker("Catégorie", selection: Binding(
+                                get: { action.category },
+                                set: { newCategory in
+                                    action.category = newCategory
+                                }
+                            )) {
+                                ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
+                                    Text(cat.rawValue).tag(Optional(cat))
+                                }
+                                Divider()
+                                Text("Aucune catégorie").tag(PromptCategory?.none)
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                            .fixedSize()
+                            .onChange(of: action.category) { _, _ in
+                                scheduleSave()
+                            }
+                        }
+
+                        // Toggle « Afficher dans la popup » — synchronisé avec
+                        // l'icône œil de ActionListRow. `isHidden` stocké en
+                        // négatif logique → on inverse pour l'affichage.
+                        Toggle(isOn: Binding(
+                            get: { !action.isHidden },
+                            set: { newValue in
+                                action.isHidden = !newValue
+                            }
+                        )) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Ajouter aux Modèles")
+                                Text("Afficher dans la popup")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(textGrayColor)
-                                Text("Publie cette action dans l'onglet Modèles, catégorie « Mes modèles ».")
+                                Text("Décocher pour masquer cette action (reste accessible via le filtre « Masquées »).")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
                         }
                         .toggleStyle(.switch)
-                        .onChange(of: action.isInTemplates) { _, _ in
+                        .onChange(of: action.isHidden) { _, _ in
                             scheduleSave()
                         }
 
-                        if action.isInTemplates {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text("Description courte")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text("\(action.shortDescription?.count ?? 0) / 80")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor((action.shortDescription?.count ?? 0) > 80 ? .red : .secondary)
-                                }
-
-                                TextField(
-                                    "Optionnelle",
-                                    text: Binding(
-                                        get: { action.shortDescription ?? "" },
-                                        set: { newValue in
-                                            // Cap dur à 80 signes — le compteur
-                                            // ci-dessus passe en rouge à l'approche
-                                            // de la limite, mais on tronque ici
-                                            // pour empêcher de dépasser.
-                                            action.shortDescription = String(newValue.prefix(80))
-                                        }
-                                    )
-                                )
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 13))
-                                .foregroundColor(textGrayColor)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(inputBackgroundColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                )
-                                .onChange(of: action.shortDescription) { _, _ in
-                                    scheduleSave()
-                                }
+                        // Description courte (≤80 signes) — héritée des seeds
+                        // K.unify.1, modifiable. Sert à la popup K.unify.3
+                        // (affichage discret sous le nom).
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Description courte")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("\(action.shortDescription?.count ?? 0) / 80")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor((action.shortDescription?.count ?? 0) > 80 ? .red : .secondary)
                             }
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+
+                            TextField(
+                                "Optionnelle",
+                                text: Binding(
+                                    get: { action.shortDescription ?? "" },
+                                    set: { newValue in
+                                        action.shortDescription = String(newValue.prefix(80))
+                                    }
+                                )
+                            )
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .foregroundColor(textGrayColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(inputBackgroundColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
+                            .onChange(of: action.shortDescription) { _, _ in
+                                scheduleSave()
+                            }
                         }
                     }
-                    .animation(.easeInOut(duration: 0.2), value: action.isInTemplates)
                     .padding(16)
                     .background(inputBackgroundColor.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: 12))

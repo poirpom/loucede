@@ -72,33 +72,17 @@ struct TemplatesView: View {
     /// coche verte permanente (state persistant via `originTemplateName`).
     var onNavigateToActions: (Action) -> Void
 
-    /// Modèles publiés par l'utilisateur (correctif 2026-04-28). Rendus
-    /// dynamiquement à partir des actions du store dont `isInTemplates == true`.
-    /// Si la `shortDescription` est vide ou absente, on fallback sur les 80
-    /// premiers caractères du prompt.
-    var userTemplates: [PromptSuggestion] {
-        store.actions
-            .filter { $0.isInTemplates }
-            .map { action in
-                let desc: String = {
-                    if let s = action.shortDescription, !s.isEmpty {
-                        return s
-                    }
-                    return String(action.prompt.prefix(80))
-                }()
-                return PromptSuggestion(
-                    name: action.name.isEmpty ? "Sans titre" : action.name,
-                    description: desc,
-                    prompt: action.prompt,
-                    icon: action.icon,
-                    category: .custom
-                )
-            }
-    }
+    // K.unify.2 (2026-05-20) : `userTemplates` supprimé (concept
+    // « Mes modèles » caduque avec le modèle unifié — `isInTemplates`
+    // n'existe plus dans `Action`). L'utilisateur n'a plus besoin de
+    // publier ses actions dans le catalogue : avec K.unify, toutes les
+    // actions sont déjà unifiées (Mes actions = Modèles disponibles).
+    // K.unify.3 supprimera entièrement la vue Modèles côté Réglages.
 
-    /// Catalogue complet : built-ins + modèles utilisateur (en queue).
+    /// Catalogue complet (K.unify.2 : plus de fusion avec userTemplates,
+    /// uniquement les 24 seeds via le shim `promptSuggestions`).
     var allTemplates: [PromptSuggestion] {
-        promptSuggestions + userTemplates
+        promptSuggestions
     }
 
     var filteredTemplates: [PromptSuggestion] {
