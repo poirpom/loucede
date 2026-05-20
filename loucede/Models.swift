@@ -240,6 +240,12 @@ class ActionsStore: ObservableObject {
     private let planToTodoMigrationKey = "loucede_migration_plan_to_todo_done"
     private let summarizeV2MigrationKey = "loucede_migration_summarize_v2_done"
     private let unify2MigrationKey = "loucede_migration_unify2_done"
+    /// K.unify.2-fix-1 (2026-05-20) : flag distinct pour la passe 2
+    /// (ajout des seeds manquants). `unify2MigrationKey` étant déjà posé
+    /// chez les utilisateurs ayant tourné K.unify.2 initial, on ne peut
+    /// pas réutiliser le même flag — sinon la passe 2 ne se déclencherait
+    /// jamais chez eux.
+    private let unify2SeedsAddedKey = "loucede_migration_unify2_seeds_added"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -351,6 +357,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
             UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
             UserDefaults.standard.set(true, forKey: unify2MigrationKey)
+            UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
         }
     }
 
@@ -558,44 +565,80 @@ class ActionsStore: ObservableObject {
     }
 
     /// Migration K.unify.2 (2026-05-20) — modèle unifié Actions/Modèles/
-    /// Favoris. Pour chaque action custom existante dont le `name`
-    /// correspond exactement à un seed `defaultActions`, copie `category`
-    /// et `isFavorite` du seed. Préserve `prompt`, `icon`, `displayOrder`,
-    /// `shortDescription` custom de l'utilisateur. One-shot via
-    /// `unify2MigrationKey`. Sans cette migration, les actions custom
-    /// décodées avec les valeurs par défaut K.unify.1 (isFavorite=false,
-    /// category=nil) atterriraient toutes dans « Sans catégorie » sans
-    /// favori — friction immédiate au runtime.
+    /// Favoris. Deux passes :
+    ///
+    /// 1. **Enrichissement** : pour chaque action custom existante dont
+    ///    le `name` correspond exactement à un seed `defaultActions`,
+    ///    copie `category` et `isFavorite` du seed. Préserve `prompt`,
+    ///    `icon`, `displayOrder`, `shortDescription` custom.
+    ///
+    /// 2. **Ajout des seeds manquants** (K.unify.2-fix-1) : pour chaque
+    ///    seed de `defaultActions` absent de `store.actions` (match par
+    ///    `name`), ajoute le seed entier. Sans cette passe, les 16-17
+    ///    actions du catalogue unifié K.unify.1 (déplacées depuis
+    ///    `promptSuggestions`) restaient invisibles dans Réglages →
+    ///    Actions chez les utilisateurs existants qui n'avaient que les
+    ///    5 Top V1 en UserDefaults.
+    ///
+    /// One-shot via `unify2MigrationKey`.
     private func migrateUnify2IfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: unify2MigrationKey) else { return }
-
-        // Indexer les seeds par nom (lookup O(1)).
+        // Indexer les seeds par nom (lookup O(1)). Utile aux 2 passes.
         var seedByName: [String: Action] = [:]
         for seed in Self.defaultActions {
             seedByName[seed.name] = seed
         }
 
         var changed = false
-        for idx in actions.indices {
-            guard let seed = seedByName[actions[idx].name] else { continue }
-            // On copie category et isFavorite si l'utilisateur ne les a
-            // pas déjà personnalisés (valeurs par défaut K.unify.1).
-            if actions[idx].category == nil && seed.category != nil {
-                actions[idx].category = seed.category
+
+        // Passe 1 — enrichissement des actions existantes (one-shot via
+        // `unify2MigrationKey`). Copie `category` + `isFavorite` du seed
+        // matché par `name`. Préserve `prompt`/`icon`/`displayOrder`/
+        // `shortDescription` custom.
+        if !UserDefaults.standard.bool(forKey: unify2MigrationKey) {
+            for idx in actions.indices {
+                guard let seed = seedByName[actions[idx].name] else { continue }
+                if actions[idx].category == nil && seed.category != nil {
+                    actions[idx].category = seed.category
+                    changed = true
+                }
+                if !actions[idx].isFavorite && seed.isFavorite {
+                    actions[idx].isFavorite = true
+                    changed = true
+                }
+            }
+            UserDefaults.standard.set(true, forKey: unify2MigrationKey)
+        }
+
+        // Passe 2 — ajout des seeds manquants (K.unify.2-fix-1, one-shot
+        // via `unify2SeedsAddedKey`). Sans cette passe, les 16-17 actions
+        // du catalogue unifié K.unify.1 (déplacées depuis
+        // `promptSuggestions`) restaient invisibles chez les utilisateurs
+        // qui n'avaient que les 5 Top V1 stockés en UserDefaults.
+        if !UserDefaults.standard.bool(forKey: unify2SeedsAddedKey) {
+            let existingNames = Set(actions.map { $0.name })
+            for seed in Self.defaultActions where !existingNames.contains(seed.name) {
+                // Copie complète du seed (nouvelle UUID via init implicite
+                // — pas le même id que l'instance Swift `Action` du seed).
+                actions.append(Action(
+                    name: seed.name,
+                    icon: seed.icon,
+                    prompt: seed.prompt,
+                    actionType: seed.actionType,
+                    shortDescription: seed.shortDescription,
+                    originTemplateName: nil,  // seed direct, pas dérivé
+                    isFavorite: seed.isFavorite,
+                    isHidden: seed.isHidden,
+                    displayOrder: seed.displayOrder,
+                    category: seed.category
+                ))
                 changed = true
             }
-            if !actions[idx].isFavorite && seed.isFavorite {
-                actions[idx].isFavorite = true
-                changed = true
-            }
-            // `displayOrder` PAS copié (arbitrage Faab) : on respecte
-            // l'ordre actuel de l'utilisateur.
+            UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
         }
 
         if changed {
             saveActions()
         }
-        UserDefaults.standard.set(true, forKey: unify2MigrationKey)
     }
 
     func saveActions() {

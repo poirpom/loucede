@@ -181,7 +181,10 @@ struct TemplatesView: View {
                         selectedCategory = nil
                     }
 
-                    ForEach(PromptCategory.allCases, id: \.self) { category in
+                    // K.unify.2-fix-1 : `.custom` (libellé « Mes modèles »)
+                    // filtré (DEPRECATED depuis K.unify.2 — concept caduc
+                    // avec le modèle unifié).
+                    ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { category in
                         TemplateCategoryPill(
                             title: category.rawValue,
                             isSelected: selectedCategory == category,

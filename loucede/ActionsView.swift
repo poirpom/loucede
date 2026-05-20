@@ -277,6 +277,41 @@ struct ActionsSettingsView: View {
                                         }
                                     }
 
+                                // K.unify.2-fix-1 : zone fantôme drop-en-tête.
+                                // 6pt invisible entre header et 1ère row qui
+                                // capture les drops "au-dessus" du 1er item
+                                // (sinon consommés par le header FAVORIS →
+                                // place en fin). Réutilise `handleDrop` avec
+                                // la 1ère row comme cible : le drop devient
+                                // le nouveau 1er, le décalage `displayOrder`
+                                // est géré par le handler existant. Le
+                                // surlignage visuel utilise `dropTargetActionID
+                                // = first.id` (cohérent avec « drop AVANT 1er »).
+                                if let first = section.actions.first {
+                                    Color.clear
+                                        .frame(height: 6)
+                                        .contentShape(Rectangle())
+                                        .dropDestination(for: String.self) { items, _ in
+                                            defer { dropTargetActionID = nil }
+                                            guard let s = items.first,
+                                                  let id = UUID(uuidString: s),
+                                                  id != first.id
+                                            else { return false }
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                handleDrop(droppedID: id,
+                                                           ontoActionID: first.id,
+                                                           inFavoritesSection: section.isFavoritesSection)
+                                            }
+                                            return true
+                                        } isTargeted: { targeted in
+                                            if targeted {
+                                                dropTargetActionID = first.id
+                                            } else if dropTargetActionID == first.id {
+                                                dropTargetActionID = nil
+                                            }
+                                        }
+                                }
+
                                 // Rows de la section.
                                 ForEach(section.actions) { action in
                                     ActionListRow(
@@ -848,28 +883,9 @@ struct ActionEditorView: View {
                             }
                         }
 
-                        // Toggle « Afficher dans la popup » — synchronisé avec
-                        // l'icône œil de ActionListRow. `isHidden` stocké en
-                        // négatif logique → on inverse pour l'affichage.
-                        Toggle(isOn: Binding(
-                            get: { !action.isHidden },
-                            set: { newValue in
-                                action.isHidden = !newValue
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Afficher dans la popup")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(textGrayColor)
-                                Text("Décocher pour masquer cette action (reste accessible via le filtre « Masquées »).")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .onChange(of: action.isHidden) { _, _ in
-                            scheduleSave()
-                        }
+                        // K.unify.2-fix-1 : Toggle « Afficher dans la popup »
+                        // supprimé (redondant avec l'icône œil de
+                        // ActionListRow — l'œil reste l'unique mécanisme).
 
                         // Description courte (≤80 signes) — héritée des seeds
                         // K.unify.1, modifiable. Sert à la popup K.unify.3
