@@ -153,30 +153,87 @@ struct ActionsSettingsView: View {
         store.saveActions()
     }
 
+    /// K.unify.2-fix-3 — Deux actions appartiennent-elles à la même
+    /// section visuelle ?
+    ///
+    /// - Section **FAVORIS** : tous les favoris (isFavorite=true)
+    ///   forment une seule section, indépendamment de leur catégorie
+    ///   (les 5 Top V1 ont des catégories différentes — `category ==`
+    ///   ne marche pas comme filtre de section ici).
+    /// - Sections **par catégorie** : seuls les non-favoris partagent
+    ///   une section ; filtre `category == && isHidden ==`.
+    /// - Croisement favori ↔ non-favori : sections différentes.
+    private func inSameSection(_ a: Action, _ b: Action) -> Bool {
+        if a.isFavorite && b.isFavorite {
+            return true
+        }
+        if !a.isFavorite && !b.isFavorite {
+            return a.category == b.category && a.isHidden == b.isHidden
+        }
+        return false
+    }
+
+    /// K.unify.2-fix-3 — Re-compacte les `displayOrder` de la section
+    /// contenant `reference` en valeurs contiguës `0, 1, 2, ...`. Tri
+    /// stable : par `displayOrder` courant, puis par ordre d'insertion
+    /// dans `store.actions`. Évite l'accumulation de collisions au fil
+    /// des drops successifs.
+    private func normalizeDisplayOrder(forSectionOf reference: Action) {
+        let sectionIndices = store.actions.indices.filter {
+            inSameSection(store.actions[$0], reference)
+        }
+        let sortedIndices = sectionIndices.sorted { lhs, rhs in
+            if store.actions[lhs].displayOrder != store.actions[rhs].displayOrder {
+                return store.actions[lhs].displayOrder < store.actions[rhs].displayOrder
+            }
+            return lhs < rhs  // stable par ordre d'insertion
+        }
+        for (newOrder, idx) in sortedIndices.enumerated() {
+            store.actions[idx].displayOrder = newOrder
+        }
+    }
+
     /// Drop d'une action sur une autre row dans la même section.
     /// Réordonne via `displayOrder`. Si la cible est dans FAVORIS et
     /// que la source ne l'est pas, marque favori (drag-to-favorite).
+    ///
+    /// K.unify.2-fix-3 : la condition « même section » utilise
+    /// `inSameSection(_:_:)` (favoris ignorent category) au lieu du
+    /// filtre `category ==` qui empêchait le décalage correct entre
+    /// favoris de catégories différentes. Normalisation post-drop pour
+    /// re-compacter les displayOrder en 0,1,2,...
     fileprivate func handleDrop(droppedID: UUID, ontoActionID: UUID, inFavoritesSection: Bool) {
         guard let fromIdx = store.actions.firstIndex(where: { $0.id == droppedID }),
               let toIdx = store.actions.firstIndex(where: { $0.id == ontoActionID }),
               fromIdx != toIdx else { return }
-        let sameSection = store.actions[fromIdx].isFavorite == store.actions[toIdx].isFavorite
-            && store.actions[fromIdx].category == store.actions[toIdx].category
-            && store.actions[fromIdx].isHidden == store.actions[toIdx].isHidden
-        guard sameSection || inFavoritesSection else { return }
+
+        // Drag-to-favorite : si on drop dans FAVORIS depuis non-favori,
+        // marquer favori AVANT le calcul de section (sinon
+        // `inSameSection(from, to)` retournerait false).
         if inFavoritesSection && !store.actions[fromIdx].isFavorite {
             store.actions[fromIdx].isFavorite = true
         }
+
+        // Vérification post-favorisation : source et cible doivent être
+        // dans la même section visuelle pour autoriser le drop.
+        guard inSameSection(store.actions[fromIdx], store.actions[toIdx]) else { return }
+
+        // Décalage « drop BEFORE target » : la source prend le
+        // displayOrder de la cible, tous les autres de la section
+        // dont displayOrder >= targetOrder sont décalés de +1.
         let targetOrder = store.actions[toIdx].displayOrder
         store.actions[fromIdx].displayOrder = targetOrder
         for i in store.actions.indices where i != fromIdx {
-            if store.actions[i].isFavorite == store.actions[fromIdx].isFavorite
-                && store.actions[i].category == store.actions[fromIdx].category
-                && store.actions[i].displayOrder >= targetOrder
-                && store.actions[i].id != store.actions[fromIdx].id {
+            if inSameSection(store.actions[i], store.actions[fromIdx])
+                && store.actions[i].displayOrder >= targetOrder {
                 store.actions[i].displayOrder += 1
             }
         }
+
+        // Normalisation : compacte les displayOrder de la section en
+        // 0, 1, 2, ... — propre pour les prochains drops.
+        normalizeDisplayOrder(forSectionOf: store.actions[fromIdx])
+
         store.saveActions()
     }
 
