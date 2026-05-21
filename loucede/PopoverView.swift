@@ -532,13 +532,22 @@ struct PopoverView: View {
                         }
                     }
                     .onChange(of: state.selectedIndex) { _, newIndex in
-                        // `selectableItems[newIndex].id` == l'id ForEach de
-                        // la `RenderedRow` correspondante → cible scrollTo
-                        // valide. anchor .center : recentre la sélection.
+                        // K.unify.3-fix-1 — pattern Spotlight : scroll MINIMAL.
+                        // `scrollTo` sans anchor (anchor nil) ne défile que le
+                        // strict nécessaire pour rendre la cible visible : rien
+                        // si elle est déjà dans le viewport, sinon il l'amène
+                        // au bord (en bas quand on descend, en haut quand on
+                        // remonte). Remplace `anchor: .center` qui re-centrait
+                        // à chaque déplacement → tout le contenu bougeait
+                        // (ressenti « saccadé / la liste remonte »). Fiable
+                        // ici car le VStack est NON-lazy : toutes les lignes
+                        // existent, donc `scrollTo` trouve toujours sa cible.
+                        // `selectableItems[newIndex].id` == l'id ForEach de la
+                        // `RenderedRow` correspondante → cible scrollTo valide.
                         let sel = selectableItems
                         guard sel.indices.contains(newIndex) else { return }
                         withAnimation(.easeOut(duration: 0.15)) {
-                            proxy.scrollTo(sel[newIndex].id, anchor: .center)
+                            proxy.scrollTo(sel[newIndex].id)
                         }
                     }
                 }
