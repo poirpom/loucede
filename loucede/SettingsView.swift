@@ -55,26 +55,25 @@ struct SettingsView: View {
                 TabIconButton(title: "Actions", systemImage: "square.and.pencil", isSelected: selectedTab == 1) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
                 }
-                TabIconButton(title: "Modèles", systemImage: "wand.and.stars", isSelected: selectedTab == 2) {
+                // K.unify.3 (2026-05-21) : onglet « Modèles » retiré (modèle
+                // unifié — les modèles vivent désormais dans Actions). Les
+                // index suivants sont décalés : Licence 3→2, Mises à jour
+                // 4→3, À propos 5→4.
+                TabIconButton(title: "Licence", systemImage: "key.fill", isSelected: selectedTab == 2) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 2 }
                 }
-                // Phase 6.2 (2026-04-27) : onglet Licence inséré entre
-                // Modèles et À propos.
-                TabIconButton(title: "Licence", systemImage: "key.fill", isSelected: selectedTab == 3) {
-                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
-                }
-                // Phase 6.3 (2026-04-28) : onglet Mises à jour inséré entre
-                // Licence et À propos. Badge orange si mise à jour disponible.
+                // Phase 6.3 (2026-04-28) : onglet Mises à jour. Badge orange
+                // si mise à jour disponible.
                 TabIconButton(
                     title: "Mises à jour",
                     systemImage: "arrow.triangle.2.circlepath",
-                    isSelected: selectedTab == 4,
+                    isSelected: selectedTab == 3,
                     showBadge: updateChecker.updateAvailable
                 ) {
-                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 4 }
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
                 }
-                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 5) {
-                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 5 }
+                TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 4) {
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 4 }
                 }
             }
             .padding(.vertical, 8)
@@ -97,13 +96,10 @@ struct SettingsView: View {
                 switch selectedTab {
                 case 0: GeneralSettingsView()
                 case 1: ActionsSettingsView(selectedAction: $selectedAction)
-                case 2: TemplatesView(onNavigateToActions: { action in
-                    selectedAction = action
-                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 1 }
-                })
-                case 3: LicenseSettingsView()
-                case 4: UpdatesView()
-                case 5: AboutView()
+                // K.unify.3 : case 2 (TemplatesView) supprimé, index décalés.
+                case 2: LicenseSettingsView()
+                case 3: UpdatesView()
+                case 4: AboutView()
                 default: EmptyView()
                 }
             }

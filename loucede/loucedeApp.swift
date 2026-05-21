@@ -380,6 +380,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static let popoverActionRowHeight: CGFloat = 36
     /// Spacing entre lignes dans le `VStack(spacing: 2)` de la liste.
     static let popoverActionRowSpacing: CGFloat = 2
+    /// K.unify.3 (2026-05-21) : hauteur d'un en-tête de section dans la
+    /// liste popup (`sectionHeaderRow` : Text 10pt + padding top 10
+    /// + bottom 2). Plus court qu'une ligne d'action — doit être compté
+    /// distinctement dans `calculatedPopoverHeight`. Doit rester synchro
+    /// avec `sectionHeaderRow` (PopoverView.swift). Valeur empirique à
+    /// calibrer runtime.
+    static let popoverSectionHeaderHeight: CGFloat = 25
+    /// K.unify.3 (2026-05-21) : hauteur « peek » de la vue par défaut
+    /// (champ de recherche vide). Calculée pour montrer FAVORIS (en-tête
+    /// + 5 favoris) + l'en-tête de la catégorie suivante + ½ ligne
+    /// d'action — un cue visuel « il y a plus à explorer » (scroll). En
+    /// mode champ vide la fenêtre prend `min(contenu réel, cette valeur)`.
+    static let popoverDefaultPeekHeight: CGFloat =
+        popoverSectionHeaderHeight                 // en-tête FAVORIS
+        + 5 * popoverActionRowHeight               // 5 favoris
+        + popoverSectionHeaderHeight               // en-tête catégorie suivante
+        + 0.5 * popoverActionRowHeight             // ½ ligne (cue « scroll »)
+        + 7 * popoverActionRowSpacing              // spacings inter-éléments
     /// Hauteur du chrome qui entoure la liste (top bar logo + search bar
     /// + dividers + footer nav 2 lignes). Ne dépend pas du nombre
     /// d'actions. Mesure empirique validée à ±2pt sur Sequoia 15.x.
@@ -449,31 +467,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Hauteur idéale du popup en fonction de l'état courant.
-    /// Point 2 pre-V1 (2026-05-08) : popup à hauteur DYNAMIQUE — elle
-    /// s'adapte au nombre d'actions visibles, capée par `popoverMaxHeight`.
-    /// Le paramètre `actionCount` permet aux call-sites qui connaissent
-    /// le nombre d'actions filtrées (ex. `PopoverView` après recherche)
-    /// de passer cette valeur ; sinon on retombe sur `actions.count` pour
-    /// l'ouverture initiale (search vide à ce moment-là, cf. `reset()`).
-    static func calculatedPopoverHeight(actionCount: Int? = nil) -> CGFloat {
+    /// Point 2 pre-V1 (2026-05-08) : popup à hauteur DYNAMIQUE.
+    /// K.unify.3 (2026-05-21) : le paramètre `searchQuery` (recherche
+    /// courante) sert à reconstruire la liste via `PopupItemBuilder` pour
+    /// mesurer la hauteur réelle (en-têtes + lignes). Champ vide → hauteur
+    /// « peek » (cue scroll, `popoverDefaultPeekHeight`) ; recherche →
+    /// hauteur adaptative au contenu. Capée par `popoverMaxHeight`.
+    static func calculatedPopoverHeight(searchQuery: String = "") -> CGFloat {
         // Empty state : popup minimaliste (texte contextuel + 1 item
         // « Configure une clé API » + footer nav simplifié). Pas de
         // search bar, pas de liste, pas de settingsRow. Hauteur fixe
-        // + delta selection éventuel. Le paramètre actionCount est
+        // + delta selection éventuel. Le paramètre searchQuery est
         // ignoré dans cette branche.
         if !ActionsStore.shared.hasUsableProvider {
             let withSelection = CapturedTextManager.shared.hasSelection
             return popoverEmptyStateHeight + (withSelection ? popoverPreviewHeight : 0)
         }
 
-        let count = actionCount ?? ActionsStore.shared.actions.count
+        // K.unify.3.5 : la liste mêle des en-têtes de section (hauteur
+        // réduite) et des lignes d'action (popoverActionRowHeight). On
+        // reconstruit les items via le builder unifié (source de vérité
+        // partagée avec PopoverView) pour mesurer la hauteur réelle.
+        let items = PopupItemBuilder.build(actions: ActionsStore.shared.actions,
+                                           searchQuery: searchQuery)
+        let isSearching = !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
 
         let listHeight: CGFloat
-        if count == 0 {
+        if items.isEmpty {
+            // Champ vide ET aucune action visible → message « Aucune action ».
             listHeight = popoverEmptyListHeight
         } else {
-            listHeight = CGFloat(count) * popoverActionRowHeight
-                       + CGFloat(count - 1) * popoverActionRowSpacing
+            let contentHeight = listContentHeight(for: items)
+            // Champ vide (vue par défaut) : hauteur « peek » fixe (cue
+            // scroll), bornée par le contenu réel pour ne pas laisser de
+            // vide quand il y a peu d'actions.
+            // Recherche : hauteur adaptative au contenu réel (feedback saisie).
+            listHeight = isSearching ? contentHeight
+                                     : min(contentHeight, popoverDefaultPeekHeight)
         }
 
         let withSelection = CapturedTextManager.shared.hasSelection
@@ -487,6 +517,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return min(popoverMaxHeight, contentHeight)
     }
 
+    /// K.unify.3.5 — hauteur réelle du contenu de la liste popup :
+    /// en-têtes de section (`popoverSectionHeaderHeight`) + lignes d'action
+    /// (`popoverActionRowHeight`) + spacings du `VStack(spacing: 2)`.
+    private static func listContentHeight(for items: [PopupItem]) -> CGFloat {
+        guard !items.isEmpty else { return 0 }
+        var h: CGFloat = 0
+        for item in items {
+            switch item {
+            case .sectionHeader:      h += popoverSectionHeaderHeight
+            case .action, .generator: h += popoverActionRowHeight
+            }
+        }
+        h += CGFloat(items.count - 1) * popoverActionRowSpacing
+        return h
+    }
+
     /// Bascule la fenêtre popup vers le mode demandé avec animation fluide
     /// (NSAnimationContext, 250 ms). Recalcule le centrage pour compenser
     /// le changement de dimensions.
@@ -496,7 +542,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// tantôt « retour résultat compact »). Le mode explicite est désormais
     /// une `PopoverMode`, ce qui empêche le call site de prendre la mauvaise
     /// décision pour la hauteur cible.
-    func resizePopover(to mode: PopoverMode, actionCount: Int? = nil) {
+    func resizePopover(to mode: PopoverMode, searchQuery: String = "") {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
         let screenRect = screen.visibleFrame
         let width: CGFloat
@@ -504,10 +550,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .list:
             width = Self.popoverDefaultWidth
-            // Point 2 pre-V1 (2026-05-08) : passe le compte filtré quand
-            // disponible (cf. PopoverView .onChange(of: searchQuery)) pour
-            // que la popup se redimensionne dynamiquement pendant la frappe.
-            height = Self.calculatedPopoverHeight(actionCount: actionCount)
+            // Point 2 pre-V1 (2026-05-08) / K.unify.3 : passe la recherche
+            // courante (cf. PopoverView .onChange(of: searchQuery)) pour que
+            // la popup se redimensionne dynamiquement pendant la frappe — le
+            // builder reconstruit la liste (en-têtes + lignes) pour mesurer.
+            height = Self.calculatedPopoverHeight(searchQuery: searchQuery)
         case .resultCompact:
             width = Self.popoverDefaultWidth
             height = Self.popoverResultCompactHeight
@@ -651,9 +698,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onOpenUpdates: { [weak self] in
                 // Phase 6.3 : ferme le popup et ouvre les Réglages directement
-                // sur l'onglet Mises à jour (index 4).
+                // sur l'onglet Mises à jour. K.unify.3 : index 4 → 3 (onglet
+                // Modèles retiré, renumérotation des onglets suivants).
                 self?.hidePopover()
-                self?.openSettings(tab: 4)
+                self?.openSettings(tab: 3)
             }
         )
 

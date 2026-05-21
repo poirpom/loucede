@@ -156,10 +156,10 @@ struct PopoverView: View {
             // pendant l'animation NSWindow.
             if newValue == nil {
                 state.suspendFlush()
-                // Point 2 pre-V1 (2026-05-08) : passe le compte filtré pour
-                // que la popup retrouve sa taille dynamique (cohérent avec
-                // l'éventuelle search active à ce moment).
-                globalAppDelegate?.resizePopover(to: .list, actionCount: popupItems.count)
+                // Point 2 pre-V1 (2026-05-08) : passe la recherche courante
+                // pour que la popup retrouve sa taille dynamique (le builder
+                // K.unify.3 reconstruit la liste pour mesurer la hauteur).
+                globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
                 // Phase 6.14-fix-2 : set instantané, pas de withAnimation
                 // (cf. `toggleResultExpanded` pour l'analyse complète).
                 if resultExpanded {
@@ -314,52 +314,14 @@ struct PopoverView: View {
 
     // MARK: - Main
 
-    /// K.1 — liste unifiée 3 sections de la popup.
-    ///
-    /// • Recherche vide : statu quo — section MES ACTIONS + toutes les
-    ///   actions custom (pas de MODÈLES, pas de GÉNÉRATEUR).
-    /// • Recherche active : 3 sections toujours affichées (en-têtes
-    ///   empilés = signal contextuel même si une section est vide) —
-    ///   MES ACTIONS (top 5 fuzzy), MODÈLES (top 5 fuzzy hors
-    ///   déjà-custom via `originTemplateName`), GÉNÉRATEUR (placeholder).
+    /// K.unify.3 — liste unifiée de la popup (FAVORIS + catégories +
+    /// Sans catégorie + Générateur). Toute la logique de construction
+    /// vit dans `PopupItemBuilder` (pure, partagée avec le calcul de
+    /// hauteur de la fenêtre). Plus de filtrage `originTemplateName` :
+    /// avec le modèle unifié, une action n'existe qu'une fois, pas de
+    /// duplication possible entre « actions » et « modèles ».
     private var popupItems: [PopupItem] {
-        let q = state.searchQuery.trimmingCharacters(in: .whitespaces)
-
-        if q.isEmpty {
-            guard !store.actions.isEmpty else { return [] }
-            return [.sectionHeader(.myActions)] + store.actions.map { .myAction($0) }
-        }
-
-        var items: [PopupItem] = []
-
-        // MES ACTIONS — top 5 par score décroissant.
-        items.append(.sectionHeader(.myActions))
-        let topActions = store.actions
-            .map { ($0, ActionSearch.score(query: q, against: $0.name)) }
-            .filter { $0.1 > 0 }
-            .sorted { $0.1 > $1.1 }
-            .prefix(5)
-            .map { $0.0 }
-        items += topActions.map { .myAction($0) }
-
-        // MODÈLES — top 5, hors modèles déjà ajoutés en custom.
-        items.append(.sectionHeader(.models))
-        let alreadyCustom = Set(store.actions.compactMap { $0.originTemplateName })
-        let topModels = promptSuggestions
-            .filter { !alreadyCustom.contains($0.name) }
-            .map { ($0, ActionSearch.score(query: q, against: $0.name)) }
-            .filter { $0.1 > 0 }
-            .sorted { $0.1 > $1.1 }
-            .prefix(5)
-            .map { $0.0 }
-        items += topModels.map { .modelSuggestion($0) }
-
-        // GÉNÉRATEUR — toujours visible quand une recherche est active
-        // (placeholder K.1 ; câblage IA en K.2).
-        items.append(.sectionHeader(.generator))
-        items.append(.generator)
-
-        return items
+        PopupItemBuilder.build(actions: store.actions, searchQuery: state.searchQuery)
     }
 
     /// Items navigables au clavier (en-têtes de section exclus).
@@ -368,27 +330,15 @@ struct PopoverView: View {
         popupItems.filter { $0.isSelectable }
     }
 
-    /// Exécute l'item activé (↵ ou clic). K.1 : `.generator` est un
-    /// placeholder (toast) — le câblage IA arrive en K.2.
+    /// Exécute l'item activé (↵ ou clic). K.unify.3 : une seule sorte de
+    /// ligne d'action (`.action`) — plus de conversion modèle→action.
+    /// `.generator` reste un placeholder (toast) — câblage IA en K.2.
     private func activate(_ item: PopupItem) {
         switch item {
         case .sectionHeader:
             break // non sélectionnable, n'arrive jamais
-        case .myAction(let action):
+        case .action(let action):
             state.runAction(action)
-        case .modelSuggestion(let suggestion):
-            // Convertit le modèle en action custom (lien d'origine via
-            // `originTemplateName`, cohérent avec `addTemplateToActions`),
-            // l'ajoute au store, puis la lance sur le texte sélectionné.
-            let newAction = Action(
-                name: suggestion.name,
-                icon: suggestion.icon,
-                prompt: suggestion.prompt,
-                actionType: .ai,
-                originTemplateName: suggestion.name
-            )
-            store.addAction(newAction)
-            state.runAction(newAction)
         case .generator:
             showConfirmation("✨ Générateur — à venir en K.2")
         }
@@ -456,9 +406,9 @@ struct PopoverView: View {
         // qu'elle s'adapte dynamiquement au nombre d'actions visibles
         // après filtrage (search à 1 résultat → popup compacte ; clear
         // search → popup retrouve sa pleine hauteur).
-        .onChange(of: state.searchQuery) { _, _ in
+        .onChange(of: state.searchQuery) { _, newValue in
             state.selectedIndex = 0
-            globalAppDelegate?.resizePopover(to: .list, actionCount: popupItems.count)
+            globalAppDelegate?.resizePopover(to: .list, searchQuery: newValue)
         }
         // 2026-05-07 : recalcule la taille de la fenêtre quand le provider
         // bascule de « pas utilisable » à « utilisable » (ou inverse) sans
@@ -469,7 +419,7 @@ struct PopoverView: View {
         // la clé). Sans ce hook, la NSWindow resterait figée à la taille
         // d'ouverture.
         .onChange(of: store.hasUsableProvider) { _, _ in
-            globalAppDelegate?.resizePopover(to: .list)
+            globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
         }
     }
 
@@ -549,29 +499,47 @@ struct PopoverView: View {
 
                 // Point 2 pre-V1 (2026-05-07) : popup à hauteur dynamique
                 // (cf. AppDelegate.calculatedPopoverHeight). Le ScrollView
-                // n'a plus de .frame(maxHeight:) figée — il s'adapte à
-                // l'espace alloué par la NSWindow, qui est elle-même calculée
-                // pour afficher TOUTES les actions sans scroll (jusqu'à la
-                // limite V1 = 15 actions, popup max ≈ 740pt). Si la liste
-                // dépasse le cap (V1.x avec >15 actions), SwiftUI active
-                // naturellement le scroll dans l'espace restant.
-                ScrollView {
-                    let rows = renderedRows
-                    if rows.isEmpty {
-                        // Cas rare : recherche vide ET aucune action custom
-                        // (l'utilisateur a tout supprimé).
-                        Text("Aucune action")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 24)
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(rows) { row in
-                                popupRow(row)
+                // s'adapte à l'espace alloué par la NSWindow. K.unify.3 :
+                // en vue par défaut la fenêtre est volontairement plus
+                // courte que le contenu (hauteur « peek » → cue scroll),
+                // donc le ScrollView défile pour explorer FAVORIS +
+                // catégories. En recherche, hauteur adaptative au contenu.
+                //
+                // K.unify.3.4 — scroll auto : `ScrollViewReader` permet de
+                // garder la ligne sélectionnée visible lors de la nav ↑/↓
+                // (pattern Spotlight). La nav modifie `state.selectedIndex`
+                // (cf. `.onKeyPress` du TextField, hors scope du proxy) ;
+                // le `.onChange` ci-dessous, dans le scope du reader,
+                // défile vers l'item sélectionné.
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        let rows = renderedRows
+                        if rows.isEmpty {
+                            // Cas rare : recherche vide ET aucune action
+                            // visible (tout supprimé ou tout masqué).
+                            Text("Aucune action")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .padding(.vertical, 24)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(rows) { row in
+                                    popupRow(row)
+                                }
                             }
+                            .padding(.horizontal, 8)
                         }
-                        .padding(.horizontal, 8)
+                    }
+                    .onChange(of: state.selectedIndex) { _, newIndex in
+                        // `selectableItems[newIndex].id` == l'id ForEach de
+                        // la `RenderedRow` correspondante → cible scrollTo
+                        // valide. anchor .center : recentre la sélection.
+                        let sel = selectableItems
+                        guard sel.indices.contains(newIndex) else { return }
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            proxy.scrollTo(sel[newIndex].id, anchor: .center)
+                        }
                     }
                 }
 
@@ -732,11 +700,8 @@ struct PopoverView: View {
         switch row.item {
         case .sectionHeader(let title):
             sectionHeaderRow(title)
-        case .myAction(let action):
+        case .action(let action):
             selectableItemRow(icon: action.icon, name: action.name,
-                              selIndex: row.selIndex, item: row.item)
-        case .modelSuggestion(let suggestion):
-            selectableItemRow(icon: suggestion.icon, name: suggestion.name,
                               selIndex: row.selIndex, item: row.item)
         case .generator:
             selectableItemRow(icon: "✨", name: "Générer cette action",
