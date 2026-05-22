@@ -617,6 +617,21 @@ struct LicenseSettingsView: View {
             .font(.system(size: 12))
             .multilineTextAlignment(.center)
             .frame(maxWidth: 320)
+
+            // K.4-lot3 (L1) : moyenne quotidienne sous la phrase du total.
+            // Hérite de la condition d'affichage de `usageCounter` (count > 0) ;
+            // garde défensive si la moyenne est indisponible (ne devrait pas
+            // arriver avec count > 0, firstUseDate étant alors posée).
+            if let average = usageTracker.formattedDailyAverage() {
+                (
+                    Text("Soit une moyenne de ").foregroundStyle(.secondary)
+                    + Text("\(average) fois/jour.").foregroundStyle(.primary)
+                )
+                .font(.system(size: 12))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+                .padding(.top, 2)
+            }
         }
     }
 

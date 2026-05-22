@@ -236,9 +236,12 @@ final class PopoverState: ObservableObject {
 
             // Compteur d'utilisations total (distinct du trial) —
             // incrémenté sur tout stream réussi, quel que soit le
-            // statut de licence.
+            // statut de licence. K.4-lot3 (L2) : on incrémente AUSSI le
+            // compteur par action (clé = action.id) sur le MÊME événement
+            // « stream réussi » → total et par-action restent cohérents.
             if streamSucceeded {
                 UsageTracker.shared.recordSuccessfulUse()
+                UsageTracker.shared.recordActionUse(actionID: action.id)
             }
         }
     }
