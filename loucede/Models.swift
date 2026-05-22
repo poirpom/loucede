@@ -246,6 +246,10 @@ class ActionsStore: ObservableObject {
     /// pas réutiliser le même flag — sinon la passe 2 ne se déclencherait
     /// jamais chez eux.
     private let unify2SeedsAddedKey = "loucede_migration_unify2_seeds_added"
+    /// K.4-A1 (2026-05-22) : fix anti-encapsulation du prompt « Extrais la
+    /// recette de cuisine ». Flag distinct (one-shot) — cf.
+    /// `migrateK4RecipePromptIfNeeded()`.
+    private let k4RecipePromptFixKey = "loucede_migration_k4_recipe_prompt_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -343,6 +347,7 @@ class ActionsStore: ObservableObject {
             migratePlanToTodoIfNeeded()
             migrateSummarizePromptV2IfNeeded()
             migrateUnify2IfNeeded()
+            migrateK4RecipePromptIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -358,6 +363,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
             UserDefaults.standard.set(true, forKey: unify2MigrationKey)
             UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
+            UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
         }
     }
 
@@ -562,6 +568,35 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
+    }
+
+    /// Migration one-shot K.4-A1 (2026-05-22) : applique le fix
+    /// anti-encapsulation du prompt « Extrais la recette de cuisine »
+    /// (le modèle encapsulait la sortie dans un bloc de code ```...```
+    /// au lieu d'un Markdown direct).
+    ///
+    /// Match BIT-EXACT sur (name + ancien prompt) — même convention que
+    /// `migrateSummarizePromptV2IfNeeded`. Si l'utilisateur a édité son
+    /// prompt depuis le seed, l'égalité stricte échoue → on ne touche
+    /// RIEN (sa personnalisation est préservée). Seul le champ `prompt`
+    /// est mis à jour ; name/icon/category/isFavorite/displayOrder/
+    /// shortDescription sont laissés intacts.
+    private func migrateK4RecipePromptIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: k4RecipePromptFixKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Extrais la recette de cuisine"
+                && actions[idx].prompt == Self.legacyRecipePrompt_preK4 {
+                actions[idx].prompt = Self.recipeExtractionPrompt
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
     }
 
     /// Migration K.unify.2 (2026-05-20) — modèle unifié Actions/Modèles/
@@ -1144,7 +1179,7 @@ class ActionsStore: ObservableObject {
       anecdotes, histoire personnelle, publicité, commentaires, digressions.
     - Ne conserver que ce qui est utile à la réalisation du plat.
 
-    Structure de sortie (Markdown obligatoire) :
+    Structure de sortie (Markdown brut obligatoire, sans encapsuler la réponse dans un bloc de code ```...```) :
 
     # [Nom de la recette]
 
@@ -1299,6 +1334,62 @@ class ActionsStore: ObservableObject {
       - Optionnel : `## Notes` si le texte contient astuces/variantes
     - Ignore le contenu hors-recette (publicité, anecdotes, commentaires, histoire personnelle du blogueur)
     - Réponds uniquement avec la recette structurée, sans introduction
+    """
+
+    /// K.4-A1 (2026-05-22) — version du prompt recette ANTÉRIEURE au fix
+    /// anti-encapsulation. Sert UNIQUEMENT au match bit-exact de
+    /// `migrateK4RecipePromptIfNeeded()` : seules les actions dont le
+    /// prompt est encore CETTE version exacte sont migrées vers
+    /// `recipeExtractionPrompt` (les prompts édités par l'utilisateur ne
+    /// matchent plus → jamais écrasés). Différence unique avec la version
+    /// corrigée : la ligne « Structure de sortie ».
+    fileprivate static let legacyRecipePrompt_preK4: String = """
+    Rôle : expert en extraction et normalisation de recettes de cuisine.
+
+    Tâche : extraire et reformater une recette de cuisine à partir du texte fourni, puis la présenter en français clair et standardisé.
+
+    Procédure :
+    1. Identifier automatiquement la langue source.
+    2. Isoler uniquement le contenu utile à la recette (ingrédients, étapes, astuces culinaires).
+    3. Traduire en français naturel si nécessaire.
+    4. Reformater la recette de manière structurée et cohérente.
+
+    Normalisation obligatoire :
+    - Convertir toutes les unités au système métrique :
+      - Poids → grammes (g) ou kilogrammes (kg)
+      - Volume → millilitres (ml) ou litres (l)
+      - Températures → degrés Celsius (°C)
+      - Tasses (cups), cuillères, onces → équivalents métriques précis ou estimés cohérents
+    - Uniformiser les quantités (éviter les approximations multiples)
+
+    Filtrage du contenu :
+    - Supprimer tout contenu non essentiel à la recette :
+      anecdotes, histoire personnelle, publicité, commentaires, digressions.
+    - Ne conserver que ce qui est utile à la réalisation du plat.
+
+    Structure de sortie (Markdown obligatoire) :
+
+    # [Nom de la recette]
+
+    ## Ingrédients
+    - Liste à puces
+    - Format : quantité + unité + ingrédient
+
+    ## Préparation
+    1. Étape claire et actionnable
+    2. Une seule action principale par étape
+    3. Ordre chronologique respecté
+
+    ## Notes (optionnel)
+    - Astuces
+    - Variantes
+    - Conseils de cuisson ou de conservation
+
+    Règles finales :
+    - Traduction fluide et naturelle en français
+    - Aucune information ajoutée inventée
+    - Aucune explication ou commentaire hors recette
+    - Répondre uniquement avec la recette structurée
     """
 
     // MARK: - Seed des nouveaux utilisateurs (K.unify.1, 2026-05-20)
