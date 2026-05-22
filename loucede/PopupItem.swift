@@ -160,14 +160,23 @@ enum PopupItemBuilder {
     }
 
     private static func topMatches(_ pool: [Action], query: String, limit: Int) -> [Action] {
-        pool.map { ($0, ActionSearch.score(query: query, against: $0.name)) }
-            .filter { $0.1 > 0 }
-            // K.4-P2 : tri par score décroissant, puis displayOrder croissant
-            // en tie-break. En recherche basique (K.4) tous les scores valent
-            // 1.0 → l'ordre devient celui du displayOrder (déterministe). En
-            // fuzzy, le score prime, displayOrder ne sert qu'aux ex æquo.
-            .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.displayOrder < $1.0.displayOrder }
-            .prefix(limit)
-            .map { $0.0 }
+        // K.4-lot2-fix-1 : chaînage découpé en étapes typées explicitement.
+        // L'expression monolithique (map → tuple inféré → filter → sorted
+        // → prefix → map) dépassait le budget d'inférence de types Swift
+        // (« unable to type-check this expression in reasonable time »).
+        // Le tuple nommé typé `[(action:, score:)]` lève l'ambiguïté.
+        let scored: [(action: Action, score: Double)] = pool.map { action in
+            (action, ActionSearch.score(query: query, against: action.name))
+        }
+        let matched: [(action: Action, score: Double)] = scored.filter { $0.score > 0 }
+        // Tri par score décroissant, puis displayOrder croissant en tie-break.
+        // En recherche basique (K.4) tous les scores valent 1.0 → l'ordre
+        // devient celui du displayOrder (déterministe). En fuzzy, le score
+        // prime, displayOrder ne sert qu'aux ex æquo.
+        let sorted: [(action: Action, score: Double)] = matched.sorted { lhs, rhs in
+            lhs.score != rhs.score ? lhs.score > rhs.score
+                                   : lhs.action.displayOrder < rhs.action.displayOrder
+        }
+        return sorted.prefix(limit).map { $0.action }
     }
 }
