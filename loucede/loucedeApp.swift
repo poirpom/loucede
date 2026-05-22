@@ -399,7 +399,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         + 0.5 * popoverActionRowHeight             // ½ ligne (cue « scroll »)
         + 7 * popoverActionRowSpacing              // spacings inter-éléments
     /// Hauteur du chrome qui entoure la liste (top bar logo + search bar
-    /// + dividers + footer nav 2 lignes). Ne dépend pas du nombre
+    /// + dividers + footer nav 1 ligne). Ne dépend pas du nombre
     /// d'actions. Mesure empirique validée à ±2pt sur Sequoia 15.x.
     /// Phase 6.18-fix-2 (2026-04-28) : 108 → 161 (+53). Le logo loucedé
     /// est désormais TOUJOURS visible dans la top bar (28pt + paddings
@@ -417,7 +417,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// non diagnostiquée précisément (probable padding.bottom interne
     /// non comptabilisé OU radius/shadow item débordant la rowHeight
     /// déclarée). Calage empirique : à monter à 164 si 162 insuffisant.
-    static let popoverChromeHeight: CGFloat = 162
+    /// K.4-lot1 (2026-05-22, P1) : 162 → 131 (−31pt). Retrait de la
+    /// ligne 2 du footer (⌘, Réglages / ⌘D Doc) + son Divider central
+    /// (ligne 2 ≈ 30pt + Divider 1pt = 31pt). Valeur à recalibrer
+    /// runtime si le bord inférieur mord à nouveau le highlight.
+    static let popoverChromeHeight: CGFloat = 131
     /// Hauteur maximale du popup en mode liste (Point 2 pre-V1, 2026-05-08).
     /// La popup est désormais à hauteur DYNAMIQUE — elle s'adapte au nombre
     /// d'actions visibles jusqu'à ce plafond. Avec V1 (limite 15 actions),
@@ -720,7 +724,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.level = .floating
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.wantsLayer = true
-        hostingView.layer?.cornerRadius = 12
+        // K.4-lot1 (P3) : radius 12 → 16. DOIT rester synchro avec le
+        // `.clipShape(RoundedRectangle(cornerRadius:))` du body SwiftUI
+        // (PopoverView.swift) pour aligner coins fenêtre et contenu.
+        hostingView.layer?.cornerRadius = 16
         hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
         panel.hasShadow = true  // Native shadow since we mask corners at AppKit level

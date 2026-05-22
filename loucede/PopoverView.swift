@@ -92,7 +92,11 @@ struct PopoverView: View {
         // Phase 1.4h : fond popup solide (remplace le VisualEffectBlur
         // translucide). Adaptatif light/dark depuis Phase 6.7b revertée.
         .background(Color(NSColor.windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        // K.4-lot1 (P3) : radius 12 → 16 (look macOS récent sans copier les
+        // radius exagérés de Tahoe). DOIT rester synchro avec le layer de la
+        // NSWindow (`hostingView.layer.cornerRadius` dans loucedeApp.swift).
+        // Couvre liste ET résultat (même body/fenêtre).
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         // Phase 6.2 Étape 9 (2026-04-27) : modal « trial épuisé »
         // présenté en overlay (reste dans la fenêtre popup, pas une
         // sheet macOS séparée). Apparaît quand `state.showTrialExpiredModal`
@@ -355,9 +359,9 @@ struct PopoverView: View {
             // droite.
             // Point 2 pre-V1 (2026-05-07) : le logo devient passif —
             // élément d'identité visuelle uniquement. Réglages reste
-            // accessible via ⌘, dans le footer ligne 2 (cf. actionsListView)
-            // ou via l'item « 🔑 Configure une clé API » en empty state.
-            // Évite deux chemins redondants vers Réglages.
+            // accessible via ⌘, (raccourci, monitor NSEvent — K.4-lot1 a
+            // retiré son affichage du footer) ou via l'item « 🔑 Configure
+            // une clé API » en empty state.
             HStack(alignment: .top, spacing: 8) {
                 if textManager.hasSelection {
                     Text(textManager.capturedText)
@@ -555,8 +559,8 @@ struct PopoverView: View {
                 // Phase 6.3 : ligne « Mise à jour disponible » conditionnelle
                 // au-dessus du footer quand UpdateChecker détecte une version
                 // plus récente. Point 2 pre-V1 (2026-05-07) : settingsRow
-                // retiré, Réglages désormais accessible via ⌘, dans le footer
-                // ligne 2.
+                // retiré, Réglages accessible via ⌘, (raccourci ; K.4-lot1 a
+                // retiré son affichage du footer).
                 Divider()
                 if updateChecker.updateAvailable {
                     updateRow()
@@ -565,44 +569,28 @@ struct PopoverView: View {
                     Divider()
                 }
 
-                // Footer 2 lignes (Point 2 pre-V1, 2026-05-07) :
-                // - Ligne 1 : navigation popup (↑↓ ↵ esc) — padding vertical
-                //   8pt (calibré runtime) pour respirer entre les deux dividers
-                //   qui l'encadrent (au-dessus : zone scroll/updateRow ; en
-                //   dessous : Divider central footer).
-                // - Ligne 2 : shortcuts vers d'autres surfaces (⌘, ⌘D) —
-                //   padding vertical 6pt (plus serré, ligne 2 = appoint).
-                VStack(spacing: 0) {
-                    HStack(spacing: 8) {
-                        // Phase 1.4e : mêmes dimensions typographiques que les
-                        // boutons de la fenêtre résultat (13pt, taille .body
-                        // par défaut) pour cohérence visuelle entre les deux
-                        // footers.
-                        KeyboardKey("↑")
-                        KeyboardKey("↓")
-                        Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
-                        Spacer()
-                        KeyboardKey("↵")
-                        Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
-                        Spacer()
-                        KeyboardKey("esc")
-                        Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-
-                    Divider()
-
-                    HStack(spacing: 8) {
-                        KeyboardKey("⌘,")
-                        Text("Réglages").font(.system(size: 13)).foregroundStyle(.primary)
-                        Spacer()
-                        KeyboardKey("⌘D")
-                        Text("Doc").font(.system(size: 13)).foregroundStyle(.primary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                // Footer 1 ligne (K.4-lot1, 2026-05-22) : navigation popup
+                // (↑↓ ↵ esc). La ligne 2 (⌘, Réglages / ⌘D Doc) a été retirée
+                // — l'onboarding configure tout, la doc rejoindra les Réglages
+                // (Phase F), et la popup priorise la vue d'actions. Les
+                // raccourcis ⌘,/⌘D restent FONCTIONNELS (cf. monitor NSEvent
+                // `installSlotMonitorIfNeeded`) — seul l'affichage disparaît.
+                HStack(spacing: 8) {
+                    // Phase 1.4e : mêmes dimensions typographiques que les
+                    // boutons de la fenêtre résultat (13pt, taille .body
+                    // par défaut) pour cohérence visuelle.
+                    KeyboardKey("↑")
+                    KeyboardKey("↓")
+                    Text("Naviguer").font(.system(size: 13)).foregroundStyle(.primary)
+                    Spacer()
+                    KeyboardKey("↵")
+                    Text("Valider").font(.system(size: 13)).foregroundStyle(.primary)
+                    Spacer()
+                    KeyboardKey("esc")
+                    Text("Fermer").font(.system(size: 13)).foregroundStyle(.primary)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
             .background(Color(NSColor.controlBackgroundColor))
     }
@@ -671,7 +659,9 @@ struct PopoverView: View {
         .padding(.vertical, 8)
         .foregroundStyle(Color.white)
         .background(Color(hex: "3F84F7"))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        // K.4-lot1 (P3) : radius 8, concentrique (popup 16 − inset 8pt) —
+        // aligné sur la barre de sélection (même inset latéral 8pt).
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
         .onTapGesture { onOpenSettings() }
         .pointerCursor()
@@ -749,7 +739,10 @@ struct PopoverView: View {
         // Phase 1.4j : sélection #3F84F7, texte blanc pour contraste.
         .foregroundStyle(isSelected ? Color.white : Color.primary)
         .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        // K.4-lot1 (P3) : radius 6 → 8, concentrique avec la popup :
+        // radius_barre = radius_popup (16) − inset latéral (8pt, le
+        // `.padding(.horizontal, 8)` du VStack de la liste) = 8.
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
         .onTapGesture { activate(item) }
         .onHover { hovering in
@@ -777,7 +770,9 @@ struct PopoverView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(updateOrange.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        // K.4-lot1 (P3) : radius 8, concentrique (popup 16 − inset 8pt) —
+        // aligné sur la barre de sélection (même inset latéral 8pt).
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
         .onTapGesture { onOpenUpdates() }
         .pointerCursor()
