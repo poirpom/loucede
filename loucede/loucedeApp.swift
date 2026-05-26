@@ -461,8 +461,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // K.2-B lot 2a (2026-05-26) — Mode Générateur, hauteurs par phase.
     /// Hauteur du popover générateur en mode compact (saisie / loading /
     /// erreur). Top bar + label + TextField + bouton/spinner/erreur.
-    /// Point de départ — à calibrer runtime.
-    static let popoverGeneratorCompactHeight: CGFloat = 150
+    /// Dimensionnée pour accueillir un message d'erreur 2 lignes 13pt
+    /// (cas `noApiKey`) sans animation — stabilité visuelle sur les 3
+    /// phases (compact / loading / error). Léger espace vide en bas en
+    /// saisie normale, accepté (prix de la stabilité).
+    static let popoverGeneratorCompactHeight: CGFloat = 200
     /// Hauteur du popover générateur en mode résultat lecture seule
     /// (les 4 champs Titre/Emoji/Description/Prompt visibles).
     /// Point de départ — à calibrer runtime.

@@ -891,8 +891,8 @@ struct PopoverView: View {
     /// Top bar commune à toutes les phases du générateur : titre à gauche
     /// + logo loucedé à droite (cohérent avec la top bar de `mainView`).
     private var generatorTopBar: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("Nouvelle action")
+        HStack(spacing: 8) {
+            Text("🆕 Générer une nouvelle action")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -903,9 +903,7 @@ struct PopoverView: View {
                 .frame(width: 28, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(12)
     }
 
     /// Contenu compact : label + helper d'exemple + TextField + bouton.
@@ -922,11 +920,11 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Action à générer")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 Text("Ex. : traduis en russe")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
 
             HStack(spacing: 8) {
@@ -949,7 +947,6 @@ struct PopoverView: View {
                         KeyboardKey("↵")
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(state.generatorInputText.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -957,7 +954,7 @@ struct PopoverView: View {
 
             if let error {
                 Text(error)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Color.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -971,7 +968,7 @@ struct PopoverView: View {
     private var generatorLoadingContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Action à générer")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
             TextField("", text: .constant(state.generatorInputText))
@@ -988,9 +985,10 @@ struct PopoverView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Génération en cours…")
+                Text("Génération en cours… 30 sec. de patience max 🙏")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, 12)
