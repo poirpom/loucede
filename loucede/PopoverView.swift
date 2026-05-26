@@ -261,6 +261,24 @@ struct PopoverView: View {
                     globalAppDelegate?.openDocumentation()
                     return nil
                 }
+                // ⌘G — K.2-B lot 1 TEMPORAIRE : hook de test à sec du
+                // moteur ActionGenerator. Capture la searchQuery
+                // courante, lance `testGenerate` (logs console
+                // détaillés), ne touche pas l'UI. À RETIRER en K.2-B
+                // lot 2 quand le câblage UI réel du Générateur le
+                // remplacera.
+                if event.charactersIgnoringModifiers == "g" {
+                    let request = state.searchQuery
+                        .trimmingCharacters(in: .whitespaces)
+                    if !request.isEmpty {
+                        Task { @MainActor in
+                            _ = await ActionGenerator.testGenerate(userRequest: request)
+                        }
+                    } else {
+                        print("[ActionGenerator] ⌘G ignoré : searchQuery vide.")
+                    }
+                    return nil
+                }
                 return event
             }
 
