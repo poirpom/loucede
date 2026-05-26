@@ -1213,7 +1213,7 @@ class ActionsStore: ObservableObject {
       anecdotes, histoire personnelle, publicité, commentaires, digressions.
     - Ne conserver que ce qui est utile à la réalisation du plat.
 
-    Structure de sortie (Markdown brut obligatoire, sans encapsuler la réponse dans un bloc de code ```...```) :
+    Structure de sortie :
 
     # [Nom de la recette]
 
@@ -1235,6 +1235,7 @@ class ActionsStore: ObservableObject {
     - Traduction fluide et naturelle en français
     - Aucune information ajoutée inventée
     - Aucune explication ou commentaire hors recette
+    - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```
     - Répondre uniquement avec la recette structurée
     """
 
@@ -1506,33 +1507,33 @@ class ActionsStore: ObservableObject {
             name: "Traduis en anglais",
             icon: "🇬🇧",
             prompt: """
-        Role: professional translator.
+        Rôle : traducteur professionnel.
 
-        Task: translate the provided text into English.
+        Tâche : traduire le texte fourni en anglais.
 
-        Procedure:
-        1. Automatically detect the source language.
-        2. Understand the overall meaning before translating.
-        3. Produce a faithful, clear and natural English translation.
+        Procédure :
+        1. Détecte automatiquement la langue source.
+        2. Comprends le sens global avant de traduire.
+        3. Produis une traduction fidèle, claire et naturelle en anglais.
 
-        Translation rules:
-        - Use natural and fluent English (avoid word-for-word translation).
-        - Preserve the exact meaning, tone and register of the original (formal, informal, technical, etc.).
-        - Preserve proper names, brands, acronyms and standard technical terms.
-        - Adapt idiomatic expressions to natural English equivalents.
-        - If no natural equivalent exists, keep the original term in quotes with a brief explanation in parentheses.
-        - Do not add or omit information.
+        Règles de traduction :
+        - Anglais fluide et naturel (éviter la traduction mot à mot).
+        - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+        - Conserver les noms propres, marques, acronymes et termes techniques standard.
+        - Adapter les expressions idiomatiques vers leur équivalent naturel en anglais.
+        - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+        - Éviter les ajouts ou interprétations non présents dans le texte.
 
-        Formatting:
-        - Strictly preserve the original structure: titles, subtitles, lists, quotations, paragraphs and line breaks.
-        - Keep the order of sentences and sections.
+        Mise en forme :
+        - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+        - Conserver l'ordre des phrases et des sections.
 
-        Filtering:
-        - If a passage is clearly out of context (advertising, external reference, isolated image caption), remove it.
+        Filtrage :
+        - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
 
-        Expected output:
-        - Reply only with the translation.
-        - Do not add anything before or after the translation.
+        Sortie attendue :
+        - Répondre uniquement avec la traduction.
+        - Ne rien ajouter avant ou après la traduction.
         """,
             actionType: .ai,
             shortDescription: "Traduire en anglais naturel et idiomatique",
@@ -1544,33 +1545,34 @@ class ActionsStore: ObservableObject {
             name: "Traduis en espagnol",
             icon: "🇪🇸",
             prompt: """
-        Rol: traductor profesional.
+        Rôle : traducteur professionnel.
 
-        Tarea: traducir el texto proporcionado al español neutro internacional.
+        Tâche : traduire le texte fourni en espagnol.
 
-        Procedimiento:
-        1. Detecta automáticamente el idioma de origen.
-        2. Comprende el sentido global del texto antes de traducir.
-        3. Produce una traducción fiel, clara y natural en español neutro internacional.
+        Procédure :
+        1. Détecte automatiquement la langue source.
+        2. Comprends le sens global avant de traduire.
+        3. Produis une traduction fidèle, claire et naturelle en espagnol.
 
-        Reglas de traducción:
-        - Utiliza un español neutro comprensible en todo el mundo hispanohablante.
-        - Evita regionalismos propios de un país específico (España o América Latina).
-        - Prioriza un vocabulario estándar ampliamente comprendido.
-        - Usa el tratamiento de "tú" por defecto, salvo que el texto original requiera un registro formal.
-        - Conserva el sentido exacto, el tono y el registro del texto original (formal, informal, técnico, etc.).
-        - Conserva los nombres propios, marcas, acrónimos y términos técnicos estándar.
-        - Adapta las expresiones idiomáticas a un equivalente natural y universal en español.
-        - Si no existe un equivalente natural, conserva el término original entre comillas con una breve explicación entre paréntesis.
-        - No añadas ni elimines información.
+        Règles de traduction :
+        - Espagnol neutre international (éviter les régionalismes propres à l'Espagne ou à l'Amérique latine) ; tutoiement « tú » par défaut sauf si le texte requiert un registre formel.
+        - Espagnol fluide et naturel (éviter la traduction mot à mot).
+        - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+        - Conserver les noms propres, marques, acronymes et termes techniques standard.
+        - Adapter les expressions idiomatiques vers leur équivalent naturel en espagnol.
+        - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+        - Éviter les ajouts ou interprétations non présents dans le texte.
 
-        Formato:
-        - Conserva estrictamente la estructura original: títulos, subtítulos, listas, citas, párrafos y saltos de línea.
-        - Mantén el orden de las frases y de las secciones.
+        Mise en forme :
+        - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+        - Conserver l'ordre des phrases et des sections.
 
-        Salida esperada:
-        - Responde únicamente con la traducción.
-        - No añadas nada antes ni después de la traducción.
+        Filtrage :
+        - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
+
+        Sortie attendue :
+        - Répondre uniquement avec la traduction.
+        - Ne rien ajouter avant ou après la traduction.
         """,
             actionType: .ai,
             shortDescription: "Traduire en espagnol neutre international",
@@ -1582,30 +1584,33 @@ class ActionsStore: ObservableObject {
             name: "Traduis en portugais",
             icon: "🇵🇹",
             prompt: """
-        Papel: tradutor profissional.
+        Rôle : traducteur professionnel.
 
-        Tarefa: traduzir o texto fornecido para português.
+        Tâche : traduire le texte fourni en portugais.
 
-        Procedimento:
-        1. Detecta automaticamente o idioma de origem.
-        2. Compreende o sentido global antes de traduzir.
-        3. Produz uma tradução fiel, natural e fluida em português.
+        Procédure :
+        1. Détecte automatiquement la langue source.
+        2. Comprends le sens global avant de traduire.
+        3. Produis une traduction fidèle, claire et naturelle en portugais.
 
-        Regras de tradução:
-        - Usar português natural e corrente (evitar tradução literal ou excessivamente livre).
-        - Manter o tom, o registo e o nível de formalidade do texto original (formal, informal, técnico, etc.).
-        - Preservar nomes próprios, marcas e acrónimos sem alteração.
-        - Adaptar expressões idiomáticas para equivalentes naturais em português.
-        - Se não existir equivalente natural, manter o termo original entre aspas com uma breve explicação entre parênteses.
-        - Não acrescentar nem omitir informações.
+        Règles de traduction :
+        - Portugais fluide et naturel (éviter la traduction mot à mot).
+        - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+        - Conserver les noms propres, marques, acronymes et termes techniques standard.
+        - Adapter les expressions idiomatiques vers leur équivalent naturel en portugais.
+        - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+        - Éviter les ajouts ou interprétations non présents dans le texte.
 
-        Formatação:
-        - Manter rigorosamente a estrutura original: títulos, subtítulos, listas, citações, parágrafos e quebras de linha.
-        - Respeitar a ordem do texto original.
+        Mise en forme :
+        - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+        - Conserver l'ordre des phrases et des sections.
 
-        Saída:
-        - Responder apenas com a tradução.
-        - Sem introdução, sem comentários, sem explicações.
+        Filtrage :
+        - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
+
+        Sortie attendue :
+        - Répondre uniquement avec la traduction.
+        - Ne rien ajouter avant ou après la traduction.
         """,
             actionType: .ai,
             shortDescription: "Traduire en portugais naturel et idiomatique",
@@ -1617,30 +1622,33 @@ class ActionsStore: ObservableObject {
             name: "Traduis en allemand",
             icon: "🇩🇪",
             prompt: """
-        Rolle: professioneller Übersetzer.
+        Rôle : traducteur professionnel.
 
-        Aufgabe: den bereitgestellten Text ins Deutsche übersetzen.
+        Tâche : traduire le texte fourni en allemand.
 
-        Vorgehen:
-        1. Erkenne automatisch die Ausgangssprache.
-        2. Verstehe den Gesamtsinn, bevor du übersetzt.
-        3. Erstelle eine treue, klare und natürliche deutsche Übersetzung.
+        Procédure :
+        1. Détecte automatiquement la langue source.
+        2. Comprends le sens global avant de traduire.
+        3. Produis une traduction fidèle, claire et naturelle en allemand.
 
-        Übersetzungsregeln:
-        - Verwende natürliches und flüssiges Deutsch (vermeide Wort-für-Wort-Übersetzungen).
-        - Bewahre den genauen Sinn, den Ton und das Register des Originals (formell, informell, technisch, etc.).
-        - Bewahre Eigennamen, Marken, Akronyme und gängige Fachbegriffe.
-        - Passe idiomatische Ausdrücke an ihre natürlichen deutschen Entsprechungen an.
-        - Wenn keine natürliche Entsprechung existiert, behalte den Originalbegriff in Anführungszeichen mit einer kurzen Erklärung in Klammern.
-        - Füge nichts hinzu, lasse nichts aus.
+        Règles de traduction :
+        - Allemand fluide et naturel (éviter la traduction mot à mot).
+        - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+        - Conserver les noms propres, marques, acronymes et termes techniques standard.
+        - Adapter les expressions idiomatiques vers leur équivalent naturel en allemand.
+        - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+        - Éviter les ajouts ou interprétations non présents dans le texte.
 
-        Formatierung:
-        - Bewahre strikt die ursprüngliche Struktur: Titel, Untertitel, Listen, Zitate, Absätze und Zeilenumbrüche.
-        - Behalte die Reihenfolge der Sätze und Abschnitte bei.
+        Mise en forme :
+        - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+        - Conserver l'ordre des phrases et des sections.
 
-        Ausgabe:
-        - Antworte nur mit der Übersetzung.
-        - Füge nichts vor oder nach der Übersetzung hinzu.
+        Filtrage :
+        - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
+
+        Sortie attendue :
+        - Répondre uniquement avec la traduction.
+        - Ne rien ajouter avant ou après la traduction.
         """,
             actionType: .ai,
             shortDescription: "Traduire en allemand naturel et idiomatique",
@@ -1652,30 +1660,33 @@ class ActionsStore: ObservableObject {
             name: "Traduis en italien",
             icon: "🇮🇹",
             prompt: """
-        Ruolo: traduttore professionale.
+        Rôle : traducteur professionnel.
 
-        Compito: tradurre il testo fornito in italiano.
+        Tâche : traduire le texte fourni en italien.
 
-        Procedura:
-        1. Rileva automaticamente la lingua di origine.
-        2. Comprendi il senso globale prima di tradurre.
-        3. Produci una traduzione fedele, chiara e naturale in italiano.
+        Procédure :
+        1. Détecte automatiquement la langue source.
+        2. Comprends le sens global avant de traduire.
+        3. Produis une traduction fidèle, claire et naturelle en italien.
 
-        Regole di traduzione:
-        - Usa un italiano naturale e fluente (evita la traduzione parola per parola).
-        - Mantieni il senso esatto, il tono e il registro dell'originale (formale, informale, tecnico, ecc.).
-        - Conserva i nomi propri, marchi, acronimi e termini tecnici standard.
-        - Adatta le espressioni idiomatiche a equivalenti naturali in italiano.
-        - Se non esiste un equivalente naturale, mantieni il termine originale tra virgolette con una breve spiegazione tra parentesi.
-        - Non aggiungere né omettere informazioni.
+        Règles de traduction :
+        - Italien fluide et naturel (éviter la traduction mot à mot).
+        - Conserver le sens exact, le ton et le registre de l'original (formel, informel, technique, etc.).
+        - Conserver les noms propres, marques, acronymes et termes techniques standard.
+        - Adapter les expressions idiomatiques vers leur équivalent naturel en italien.
+        - Si aucun équivalent naturel n'existe, conserver le terme original entre guillemets avec une brève explication entre parenthèses.
+        - Éviter les ajouts ou interprétations non présents dans le texte.
 
-        Formattazione:
-        - Mantieni rigorosamente la struttura originale: titoli, sottotitoli, elenchi, citazioni, paragrafi e a capo.
-        - Rispetta l'ordine delle frasi e delle sezioni.
+        Mise en forme :
+        - Conserver strictement la structure originale : titres, sous-titres, listes, citations, paragraphes, sauts de ligne, etc.
+        - Conserver l'ordre des phrases et des sections.
 
-        Uscita:
-        - Rispondi solo con la traduzione.
-        - Senza introduzione, commenti o spiegazioni.
+        Filtrage :
+        - Si un passage est manifestement hors contexte (publicité, référence externe, légende d'image isolée), le supprimer.
+
+        Sortie attendue :
+        - Répondre uniquement avec la traduction.
+        - Ne rien ajouter avant ou après la traduction.
         """,
             actionType: .ai,
             shortDescription: "Traduire en italien naturel et idiomatique",
@@ -1777,6 +1788,7 @@ class ActionsStore: ObservableObject {
         - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
         - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
         - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Format de sortie (Markdown) :
 
@@ -1798,6 +1810,7 @@ class ActionsStore: ObservableObject {
 
         Sortie attendue :
         - Répondre uniquement avec la liste structurée par catégorie.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
             actionType: .ai,
@@ -1825,6 +1838,7 @@ class ActionsStore: ObservableObject {
         - Ignorer les références temporelles vagues sans valeur informative (un jour, parfois, autrefois).
         - Présenter les dates au format le plus précis disponible.
         - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Format de sortie (Markdown) :
         - Liste à puces, une ligne par date.
@@ -1836,6 +1850,7 @@ class ActionsStore: ObservableObject {
 
         Sortie attendue :
         - Répondre uniquement avec la liste des dates et leur contexte.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
             actionType: .ai,
@@ -1961,7 +1976,6 @@ class ActionsStore: ObservableObject {
         - Rester concis et clair, éviter les longueurs inutiles.
         - Si certains points nécessitent une information manquante, formuler une question de clarification.
         - Préserver la langue de l'email original.
-        - Conserver la langue d'origine du texte source.
 
         Cas particuliers :
         - Si l'email contient des informations sensibles ou ambiguës, signaler les points à clarifier sans inventer de réponse.
@@ -2067,9 +2081,11 @@ class ActionsStore: ObservableObject {
         - Numéroter les titres de 1 à 5.
         - Les titres doivent être distincts et non redondants entre eux.
         - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Sortie attendue :
         - Répondre uniquement avec la liste numérotée des 5 titres.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire, pas d'explication des choix.
         """,
             actionType: .ai,
@@ -2098,9 +2114,11 @@ class ActionsStore: ObservableObject {
         - Présenter les questions sous forme de liste numérotée en Markdown.
         - Les questions doivent être distinctes et non redondantes.
         - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Sortie attendue :
         - Répondre uniquement avec la liste numérotée des questions.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
             actionType: .ai,
@@ -2129,9 +2147,11 @@ class ActionsStore: ObservableObject {
         - Présenter chaque angle avec un titre court (## Angle 1 — Nom) suivi d'un paragraphe de 2 à 4 phrases expliquant la perspective.
         - Les angles ne sont pas des opinions à défendre, ce sont des points de vue à expliciter.
         - Rédiger la sortie en français, quelle que soit la langue du texte source.
+        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
 
         Sortie attendue :
         - Répondre uniquement avec les 3 angles structurés en Markdown.
+        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
         - Pas d'introduction, pas de commentaire.
         """,
             actionType: .ai,
