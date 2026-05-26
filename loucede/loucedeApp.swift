@@ -66,12 +66,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         globalAppDelegate = self
 
-        // K.2-B lot 1-ter TEMPORAIRE — self-test du tokenizer JSON
-        // défensif d'ActionGenerator (7 cas, ✅/❌ + récap en console).
-        // À RETIRER en K.2-B lot 2 avec le hook ⌘G et la fonction
-        // `ActionGenerator.runSelfTest()` elle-même.
-        ActionGenerator.runSelfTest()
-
         // URL scheme handler (loucede:// — réservé aux automations, pas d'OAuth)
         NSAppleEventManager.shared().setEventHandler(
             self,
@@ -464,6 +458,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 300pt + footer boutons). Mesurée empiriquement.
     static let popoverResultCompactHeight: CGFloat = 394
 
+    // K.2-B lot 2a (2026-05-26) — Mode Générateur, hauteurs par phase.
+    /// Hauteur du popover générateur en mode compact (saisie / loading /
+    /// erreur). Top bar + label + TextField + bouton/spinner/erreur.
+    /// Point de départ — à calibrer runtime.
+    static let popoverGeneratorCompactHeight: CGFloat = 150
+    /// Hauteur du popover générateur en mode résultat lecture seule
+    /// (les 4 champs Titre/Emoji/Description/Prompt visibles).
+    /// Point de départ — à calibrer runtime.
+    static let popoverGeneratorResultHeight: CGFloat = 480
+
+    /// Phase du popover générateur, sert à dimensionner la fenêtre.
+    /// Compact couvre `.compact`, `.loading`, `.error` de PopoverState ;
+    /// `.resultRO` couvre `.resultReadOnly`.
+    enum GeneratorPopupPhase {
+        case compact
+        case resultRO
+    }
+
     /// Mode d'affichage du popup principal — détermine ses dimensions.
     /// Transitions résolues par `resizePopover(to:)` avec animation 250 ms.
     enum PopoverMode {
@@ -474,6 +486,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case resultCompact
         /// Vue résultat en format agrandi (touche F). 70 % de la hauteur écran.
         case resultExpanded
+        /// K.2-B lot 2a — mode Générateur d'actions AI. Largeur identique
+        /// à `.list` (400pt), hauteur fonction de la phase courante.
+        case generator(GeneratorPopupPhase)
     }
 
     /// Hauteur idéale du popup en fonction de l'état courant.
@@ -571,6 +586,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case .resultExpanded:
             width = Self.popoverExpandedWidth
             height = screenRect.height * 0.7
+        case .generator(let phase):
+            // K.2-B lot 2a — Mode Générateur. Largeur identique à .list
+            // pour continuité visuelle. Hauteur fonction de la phase.
+            width = Self.popoverDefaultWidth
+            switch phase {
+            case .compact:  height = Self.popoverGeneratorCompactHeight
+            case .resultRO: height = Self.popoverGeneratorResultHeight
+            }
         }
         let x = (screenRect.width - width) / 2 + screenRect.minX
         let y = (screenRect.height - height) / 2 + screenRect.minY

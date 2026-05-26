@@ -39,6 +39,33 @@ final class PopoverState: ObservableObject {
     // flèches directionnelles + Entrée ne sont plus captées).
     @Published var openCounter: Int = 0
 
+    // MARK: - K.2-B lot 2a — Générateur d'actions AI
+
+    /// Phase courante du Générateur d'actions AI. `nil` = pas en mode
+    /// générateur (la popup affiche `mainView` ou `resultView`).
+    /// Non-nil = la popup affiche `generatorView`. Mutuellement exclusif
+    /// avec `activeAction` (la priorité dans le `body` de PopoverView est
+    /// générateur > résultat > main).
+    @Published var generatorPhase: GeneratorPhase?
+
+    /// Texte du champ « Action à générer » dans le popover générateur.
+    /// Lié au TextField (mono-ligne) via `Binding`. Pré-rempli par
+    /// `enterGeneratorMode(prefilled:)`, éditable par l'utilisateur.
+    @Published var generatorInputText: String = ""
+
+    /// Token UUID renouvelé à chaque déclenchement de génération. Sert à
+    /// l'annulation LOGIQUE d'une génération en cours (Esc pendant
+    /// loading) : à la fin du Task, on vérifie que le token n'a pas
+    /// changé ; sinon le résultat est ignoré. `ActionGenerator.generate`
+    /// ne vérifie pas `Task.isCancelled` (fichier sain à ne pas toucher),
+    /// l'appel API se poursuit donc en arrière-plan — coût accepté V1.
+    private var currentGenerationToken: UUID?
+
+    /// Handle vers le Task de génération courant. `Task.cancel()` à
+    /// l'annulation pour hygiène, même si la cancellation logique passe
+    /// par le token.
+    private var generationTask: Task<Void, Never>?
+
     // Le Task de streaming n'est pas @Published car on ne veut pas
     // déclencher de re-render quand il change — c'est juste un handle
     // pour pouvoir l'annuler.
@@ -69,11 +96,14 @@ final class PopoverState: ObservableObject {
     /// Appelé par AppDelegate.showPopover juste avant orderFront.
     func reset() {
         endStream()
+        cancelOngoingGeneration()
         activeAction = nil
         selectedIndex = 0
         isProcessing = false
         resultText = ""
         searchQuery = ""
+        generatorPhase = nil
+        generatorInputText = ""
         showTrialExpiredModal = false
         openCounter &+= 1
     }
@@ -97,6 +127,90 @@ final class PopoverState: ObservableObject {
         endStream()
         activeAction = nil
         resultText = ""
+    }
+
+    // MARK: - Générateur — méthodes (K.2-B lot 2a)
+
+    /// Active le mode Générateur. Affecte `generatorInputText` à la valeur
+    /// pré-remplie (typiquement la `searchQuery` de la popup au moment du
+    /// clic « Générer cette action ») et passe `generatorPhase` à
+    /// `.compact`. PopoverView observe ce changement et bascule le `body`
+    /// vers `generatorView` + redimensionne la NSWindow.
+    func enterGeneratorMode(prefilled: String) {
+        generatorInputText = prefilled
+        generatorPhase = .compact
+    }
+
+    /// Déclenche la génération à partir de `generatorInputText`. Si vide
+    /// (après trim), no-op. Sinon : token + `.loading` + Task qui appelle
+    /// `ActionGenerator.generate`. À la fin du Task, ignore le résultat
+    /// si le token a changé (cas Esc pendant loading).
+    func runGeneration() {
+        let input = generatorInputText.trimmingCharacters(in: .whitespaces)
+        guard !input.isEmpty else { return }
+
+        let myToken = UUID()
+        currentGenerationToken = myToken
+        generatorPhase = .loading
+
+        // Annule un éventuel Task précédent (sécurité — il ne devrait pas
+        // y avoir 2 générations simultanées).
+        generationTask?.cancel()
+        generationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await ActionGenerator.generate(userRequest: input)
+
+            // Annulation logique : si le token a changé entre-temps
+            // (Esc pendant le loading), on jette le résultat.
+            guard self.currentGenerationToken == myToken else { return }
+
+            switch result {
+            case .success(let action):
+                self.generatorPhase = .resultReadOnly(action)
+            case .failure(let error):
+                let msg = Self.userFacingErrorMessage(for: error)
+                self.generatorPhase = .error(message: msg)
+            }
+        }
+    }
+
+    /// Esc en mode Générateur — comportement dépendant de la phase :
+    /// - `.loading` → annule + retour à `.compact` (préserve l'input pour
+    ///   retry rapide).
+    /// - `.compact` / `.resultReadOnly` / `.error` → quitte le mode
+    ///   Générateur entièrement, retour à `mainView`.
+    func handleEscapeInGeneratorMode() {
+        guard let phase = generatorPhase else { return }
+        cancelOngoingGeneration()
+        switch phase {
+        case .loading:
+            generatorPhase = .compact
+        case .compact, .resultReadOnly, .error:
+            generatorPhase = nil
+            generatorInputText = ""
+        }
+    }
+
+    /// Invalide le token (annulation logique d'un résultat en cours) et
+    /// `cancel()` le Task. Sûr à appeler même sans génération active.
+    private func cancelOngoingGeneration() {
+        currentGenerationToken = nil
+        generationTask?.cancel()
+        generationTask = nil
+    }
+
+    /// Mappe un `GeneratorError` vers le message user-facing affiché dans
+    /// la phase `.error`. K.2-B lot 2a : 2 messages (pas un par cas — le
+    /// polish fin viendra en K.3). Un actionnable pour `noApiKey`, un
+    /// générique pour les autres cas (providerUnavailable, emptyResponse,
+    /// invalidJSON, incompleteFields).
+    private static func userFacingErrorMessage(for error: GeneratorError) -> String {
+        switch error {
+        case .noApiKey:
+            return "Aucun fournisseur IA configuré. Va dans les Réglages pour en configurer un."
+        case .providerUnavailable, .emptyResponse, .invalidJSON, .incompleteFields:
+            return "La génération a échoué. Réessaie."
+        }
     }
 
     /// Ajoute le tampon de chunks accumulés à `resultText` en une seule
@@ -245,4 +359,26 @@ final class PopoverState: ObservableObject {
             }
         }
     }
+}
+
+// MARK: - GeneratorPhase (K.2-B lot 2a)
+
+/// Phase courante du popover Générateur d'actions AI. Stockée dans
+/// `PopoverState.generatorPhase: GeneratorPhase?` ; `nil` signifie
+/// « pas en mode générateur ».
+///
+/// - `.compact` : saisie de la demande. TextField focalisé, bouton
+///   « Générer » actif.
+/// - `.loading` : appel `ActionGenerator.generate` en cours. UI affiche
+///   un spinner. TextField désactivé.
+/// - `.resultReadOnly(GeneratedAction)` : génération réussie. Les 4
+///   champs (titre/emoji/description/prompt) affichés en lecture seule.
+///   Lot 2b les rendra éditables + ajoutera barre Annuler/Valider.
+/// - `.error(message: String)` : génération échouée. Message affiché,
+///   bouton Générer prêt à relancer. Popover reste compact.
+enum GeneratorPhase: Equatable {
+    case compact
+    case loading
+    case resultReadOnly(GeneratedAction)
+    case error(message: String)
 }

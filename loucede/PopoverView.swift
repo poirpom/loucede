@@ -28,6 +28,7 @@ extension View {
 private enum PopoverFocus: Hashable {
     case main
     case result
+    case generator   // K.2-B lot 2a
 }
 
 struct PopoverView: View {
@@ -53,6 +54,11 @@ struct PopoverView: View {
     // Text + Rectangle clignotant + capture .onKeyPress). Forcé à
     // l'ouverture en mode liste (NSWindow préchargée → focus à re-armer).
     @FocusState private var isSearchFocused: Bool
+    // K.2-B lot 2a : focus du TextField « Action à générer » dans le mode
+    // Générateur. Re-armé via .onChange(of: state.generatorPhase) quand on
+    // entre/sort des phases qui requièrent un TextField focalisé
+    // (.compact et .error).
+    @FocusState private var isGeneratorFocused: Bool
     // Phase 1.4b : état « fenêtre résultat agrandie » (touche F).
     // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
     // du popup), pour que chaque nouvelle action reparte en format compact.
@@ -79,7 +85,12 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let action = state.activeAction {
+            // K.2-B lot 2a : 3 branches mutuellement exclusives. Priorité
+            // générateur > résultat > main : si une génération est en
+            // cours, elle prime sur tout le reste.
+            if state.generatorPhase != nil {
+                generatorView
+            } else if let action = state.activeAction {
                 resultView(for: action)
             } else {
                 mainView
@@ -184,6 +195,42 @@ struct PopoverView: View {
             // déclenche une nouvelle action depuis le résultat agrandi, ce
             // qui n'arrive pas dans l'UX actuelle mais reste safe).
         }
+        // K.2-B lot 2a — Transitions du mode Générateur :
+        // 1) Resize la NSWindow selon la phase (compact vs resultRO).
+        // 2) Gère le focus du TextField « Action à générer ».
+        // 3) Au retour à `nil` (sortie du mode), retour à `.list`.
+        .onChange(of: state.generatorPhase) { _, newPhase in
+            if let phase = newPhase {
+                // Resize selon la phase.
+                let popupPhase: AppDelegate.GeneratorPopupPhase
+                switch phase {
+                case .compact, .loading, .error: popupPhase = .compact
+                case .resultReadOnly:            popupPhase = .resultRO
+                }
+                state.suspendFlush()
+                globalAppDelegate?.resizePopover(to: .generator(popupPhase))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    state.resumeFlush()
+                }
+                // Focus du TextField uniquement quand il est éditable.
+                switch phase {
+                case .compact, .error:
+                    DispatchQueue.main.async { isGeneratorFocused = true }
+                case .loading, .resultReadOnly:
+                    isGeneratorFocused = false
+                }
+                focus = .generator
+            } else {
+                // Retour au popup d'actions (main).
+                state.suspendFlush()
+                globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    state.resumeFlush()
+                }
+                focus = .main
+                DispatchQueue.main.async { isSearchFocused = true }
+            }
+        }
     }
 
     // MARK: - Confirmation toast helper
@@ -203,6 +250,10 @@ struct PopoverView: View {
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
             // Esc — K.0-fix-1 : la gestion dépend du contexte.
+            // • Mode générateur (K.2-B lot 2a) : monitor handles
+            //   ENTIRELY (consume). Le TextField du générateur ne
+            //   déclare PAS .onKeyPress(.escape) — single source of
+            //   truth, pas de double-traitement.
             // • Vue liste (TextField focalisé) : on LAISSE PASSER à
             //   SwiftUI (`return event`). Le `.onKeyPress(.escape)` du
             //   TextField gère le 2-temps (clear puis close) en lisant
@@ -211,12 +262,33 @@ struct PopoverView: View {
             // • Vue résultat / empty state (pas de TextField focalisé) :
             //   le monitor ferme ici (couche fiable sans field editor).
             if mods.isEmpty && event.keyCode == 53 {
+                if state.generatorPhase != nil {
+                    state.handleEscapeInGeneratorMode()
+                    return nil
+                }
                 if state.activeAction == nil && store.hasUsableProvider {
                     return event // → SwiftUI .onKeyPress(.escape) du TextField
                 }
                 state.endStream()
                 closeHandler()
                 return nil
+            }
+
+            // K.2-B lot 2a — En mode générateur, le flux est focalisé.
+            // • Esc : géré ci-dessus (consume + handleEscapeInGeneratorMode).
+            // • ⌘, / ⌘D : DÉSACTIVÉS, consommés silencieusement. Le mode
+            //   générateur ne se quitte que par Esc — on n'ouvre pas
+            //   Réglages/Doc par-dessus une génération en cours ou un
+            //   résultat non sauvegardé.
+            // • Autres touches (incl. ↵) : déléguées à SwiftUI (TextField
+            //   pour la frappe, .onSubmit pour ↵ → runGeneration).
+            if state.generatorPhase != nil {
+                if mods == [.command]
+                    && (event.charactersIgnoringModifiers == ","
+                        || event.charactersIgnoringModifiers == "d") {
+                    return nil
+                }
+                return event
             }
 
             // Le reste (⌘,, ⌘D) ne s'applique qu'en vue liste.
@@ -259,24 +331,6 @@ struct PopoverView: View {
                 if event.charactersIgnoringModifiers == "d" {
                     closeHandler()
                     globalAppDelegate?.openDocumentation()
-                    return nil
-                }
-                // ⌘G — K.2-B lot 1 TEMPORAIRE : hook de test à sec du
-                // moteur ActionGenerator. Capture la searchQuery
-                // courante, lance `testGenerate` (logs console
-                // détaillés), ne touche pas l'UI. À RETIRER en K.2-B
-                // lot 2 quand le câblage UI réel du Générateur le
-                // remplacera.
-                if event.charactersIgnoringModifiers == "g" {
-                    let request = state.searchQuery
-                        .trimmingCharacters(in: .whitespaces)
-                    if !request.isEmpty {
-                        Task { @MainActor in
-                            _ = await ActionGenerator.testGenerate(userRequest: request)
-                        }
-                    } else {
-                        print("[ActionGenerator] ⌘G ignoré : searchQuery vide.")
-                    }
                     return nil
                 }
                 return event
@@ -354,7 +408,9 @@ struct PopoverView: View {
 
     /// Exécute l'item activé (↵ ou clic). K.unify.3 : une seule sorte de
     /// ligne d'action (`.action`) — plus de conversion modèle→action.
-    /// `.generator` reste un placeholder (toast) — câblage IA en K.2.
+    /// K.2-B lot 2a — `.generator` bascule la popup en mode générateur,
+    /// pré-rempli avec la `searchQuery` courante. La transition de view
+    /// + resize est pilotée par `.onChange(of: state.generatorPhase)`.
     private func activate(_ item: PopupItem) {
         switch item {
         case .sectionHeader:
@@ -362,7 +418,7 @@ struct PopoverView: View {
         case .action(let action):
             state.runAction(action)
         case .generator:
-            showConfirmation("✨ Générateur — à venir en K.2")
+            state.enterGeneratorMode(prefilled: state.searchQuery)
         }
     }
 
@@ -798,6 +854,196 @@ struct PopoverView: View {
 
     private var updateOrange: Color {
         Color(red: 0.976, green: 0.620, blue: 0.043) // #F59E0B
+    }
+
+    // MARK: - Generator (K.2-B lot 2a)
+
+    /// Vue racine du mode Générateur. Top bar commune + zone contenu
+    /// variable selon `state.generatorPhase`. Largeur identique au popup
+    /// liste (400pt, posée par le `.frame(width:)` du `body` racine) ;
+    /// hauteur pilotée par `resizePopover(to: .generator(...))` côté
+    /// AppDelegate. 4 phases : compact (saisie), loading, resultReadOnly
+    /// (4 champs lecture seule — 2a), error (compact + message).
+    @ViewBuilder
+    private var generatorView: some View {
+        VStack(spacing: 0) {
+            generatorTopBar
+            Divider()
+            if let phase = state.generatorPhase {
+                switch phase {
+                case .compact:
+                    generatorCompactContent(error: nil)
+                case .loading:
+                    generatorLoadingContent
+                case .resultReadOnly(let action):
+                    generatorResultROContent(action)
+                case .error(let message):
+                    generatorCompactContent(error: message)
+                }
+            }
+        }
+        .background(Color(NSColor.controlBackgroundColor))
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focus, equals: .generator)
+    }
+
+    /// Top bar commune à toutes les phases du générateur : titre à gauche
+    /// + logo loucedé à droite (cohérent avec la top bar de `mainView`).
+    private var generatorTopBar: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("Nouvelle action")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 28, height: 28)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+    }
+
+    /// Contenu compact : label + helper d'exemple + TextField + bouton.
+    /// `error` non-nil → affiche le message d'erreur sous le champ
+    /// (phase `.error` réutilise cette vue avec le message).
+    ///
+    /// K.2-B lot 2a — Ajustement 2 : pas de placeholder dans le TextField
+    /// (le champ est pré-rempli avec `searchQuery` au moment de l'entrée
+    /// en mode générateur, le placeholder ne serait quasi jamais visible).
+    /// L'exemple « Ex. : traduis en russe » est affiché au-DESSUS du
+    /// champ, toujours visible quel que soit l'état de saisie.
+    @ViewBuilder
+    private func generatorCompactContent(error: String?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Action à générer")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Ex. : traduis en russe")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary.opacity(0.7))
+            }
+
+            HStack(spacing: 8) {
+                TextField("", text: $state.generatorInputText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.primary.opacity(0.06))
+                    )
+                    .focused($isGeneratorFocused)
+                    .onSubmit { state.runGeneration() }
+
+                Button(action: { state.runGeneration() }) {
+                    HStack(spacing: 6) {
+                        Text("Générer")
+                            .font(.system(size: 13))
+                        KeyboardKey("↵")
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(state.generatorInputText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+    }
+
+    /// Phase loading : TextField désactivé + spinner.
+    private var generatorLoadingContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Action à générer")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            TextField("", text: .constant(state.generatorInputText))
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.04))
+                )
+                .disabled(true)
+
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Génération en cours…")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+    }
+
+    /// Phase resultReadOnly : 4 champs de l'action générée affichés en
+    /// lecture seule. Lot 2b les rendra éditables + ajoutera sélecteur
+    /// catégorie + barre Annuler/Valider.
+    @ViewBuilder
+    private func generatorResultROContent(_ action: GeneratedAction) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            generatorResultROField(label: "Titre", value: action.title)
+            generatorResultROField(label: "Emoji", value: action.emoji)
+            generatorResultROField(label: "Description", value: action.description)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Prompt")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                ScrollView {
+                    Text(action.prompt)
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding(8)
+                }
+                .frame(maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.04))
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+    }
+
+    /// Champ lecture seule simple (Titre / Emoji / Description) du
+    /// résultat. Label gris + valeur primaire.
+    private func generatorResultROField(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Result

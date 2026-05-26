@@ -153,43 +153,6 @@ enum ActionGenerator {
         return .success(generated)
     }
 
-    // MARK: Test à sec (lot 1 uniquement)
-
-    /// Point d'entrée de TEST à sec — log tout (demande, prompt envoyé,
-    /// réponse brute si succès, erreur si échec) puis retourne le
-    /// `Result`. Appelé en lot 1 via le hook ⌘G temporaire de
-    /// `PopoverView.installSlotMonitorIfNeeded`. À RETIRER en K.2-B
-    /// lot 2 quand le câblage UI réel le remplace.
-    @MainActor
-    static func testGenerate(userRequest: String) async -> Result<GeneratedAction, GeneratorError> {
-        print("══════════════════════════════════════════════════════")
-        print("[ActionGenerator] testGenerate — début")
-        print("[ActionGenerator] Demande utilisateur : \(userRequest)")
-
-        let examples = pickFewShotExamples()
-        let metaPrompt = buildMetaPrompt(userRequest: userRequest, examples: examples)
-        print("[ActionGenerator] Méta-prompt envoyé (\(metaPrompt.count) chars) :")
-        print(metaPrompt)
-        print("──────────────────────────────────────────────────────")
-
-        let result = await generate(userRequest: userRequest)
-
-        switch result {
-        case .success(let action):
-            print("[ActionGenerator] ✅ SUCCÈS")
-            print("  title       : \(action.title)")
-            print("  emoji       : \(action.emoji)")
-            print("  description : \(action.description)")
-            print("  prompt (\(action.prompt.count) chars) :")
-            print(action.prompt)
-        case .failure(let error):
-            print("[ActionGenerator] ❌ ÉCHEC : \(error.localizedDescription)")
-        }
-        print("══════════════════════════════════════════════════════")
-
-        return result
-    }
-
     // MARK: Few-shot
 
     /// Pioche 3 actions de `ActionsStore.defaultActions` dans 3
@@ -479,84 +442,5 @@ enum ActionGenerator {
             missing.append("prompt")
         }
         return missing
-    }
-
-    // MARK: - SelfTest (K.2-B lot 1-ter — TEMPORAIRE)
-
-    /// Harnais de test à sec du tokenizer `escapeUnescapedControlChars`.
-    /// Couvre 7 cas tordus (newline littéral, déjà échappé, guillemet
-    /// échappé, backslash double, newline structurel hors string, tab
-    /// littéral, cas mixte du bug observé). Affiche ✅/❌ par cas + récap.
-    ///
-    /// À RETIRER en K.2-B lot 2 (avec le hook ⌘G), une fois la robustesse
-    /// du tokenizer confirmée par les tests à sec.
-    ///
-    /// Pour déclencher : depuis Xcode LLDB `expr ActionGenerator.runSelfTest()`,
-    /// OU ajouter temporairement `ActionGenerator.runSelfTest()` dans
-    /// `applicationDidFinishLaunching` (loucedeApp.swift).
-    static func runSelfTest() {
-        print("══════════════════════════════════════════════════════")
-        print("[ActionGenerator.runSelfTest] tokenizer escapeUnescapedControlChars")
-        print("══════════════════════════════════════════════════════")
-
-        // (name, input, expected). Les `\n` Swift = newline réel (0x0A) ;
-        // `\\n` Swift = 2 chars (backslash + n) = forme échappée JSON.
-        let cases: [(name: String, input: String, expected: String)] = [
-            (
-                "1. Newline littéral dans string",
-                "{\"k\":\"abc\n  xyz\"}",
-                "{\"k\":\"abc\\n  xyz\"}"
-            ),
-            (
-                "2. Déjà bien échappé (passe-through)",
-                "{\"k\":\"abc\\n  xyz\"}",
-                "{\"k\":\"abc\\n  xyz\"}"
-            ),
-            (
-                "3. Guillemet échappé \\\" dans string",
-                "{\"k\":\"il a dit \\\"oui\\\"\"}",
-                "{\"k\":\"il a dit \\\"oui\\\"\"}"
-            ),
-            (
-                "4. Backslash double \\\\ dans string",
-                "{\"k\":\"path\\\\file\"}",
-                "{\"k\":\"path\\\\file\"}"
-            ),
-            (
-                "5. Newline hors string (pretty-print structurel)",
-                "{\n  \"k\": \"v\"\n}",
-                "{\n  \"k\": \"v\"\n}"
-            ),
-            (
-                "6. Tab littéral dans string",
-                "{\"k\":\"a\tb\"}",
-                "{\"k\":\"a\\tb\"}"
-            ),
-            (
-                "7. Cas mixte (newlines structurels + littéral intra-string)",
-                "{\n  \"k\": \"abc\n  xyz\",\n  \"emoji\": \"🇷🇺\"\n}",
-                "{\n  \"k\": \"abc\\n  xyz\",\n  \"emoji\": \"🇷🇺\"\n}"
-            ),
-        ]
-
-        var passed = 0
-        var failed = 0
-        for c in cases {
-            let result = escapeUnescapedControlChars(in: c.input)
-            if result == c.expected {
-                print("✅ \(c.name)")
-                passed += 1
-            } else {
-                print("❌ \(c.name)")
-                print("    INPUT    : \(c.input.debugDescription)")
-                print("    EXPECTED : \(c.expected.debugDescription)")
-                print("    GOT      : \(result.debugDescription)")
-                failed += 1
-            }
-        }
-
-        print("──────────────────────────────────────────────────────")
-        print("Récap : \(passed)/\(cases.count) OK" + (failed > 0 ? " — \(failed) ÉCHEC(S)" : ""))
-        print("══════════════════════════════════════════════════════")
     }
 }
