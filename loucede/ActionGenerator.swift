@@ -62,8 +62,8 @@ enum GeneratorError: LocalizedError {
         case .emptyResponse:
             return "Réponse IA vide."
         case .invalidJSON(let raw):
-            let preview = raw.prefix(200)
-            return "JSON invalide. Brut (200 premiers chars) : \(preview)"
+            let preview = raw.prefix(1000)
+            return "JSON invalide. Longueur totale : \(raw.count) chars. Brut (1000 premiers chars) :\n\(preview)"
         case .incompleteFields(let fields):
             return "Champ(s) manquant(s) ou invalide(s) : \(fields.joined(separator: ", "))"
         }
@@ -315,16 +315,21 @@ enum ActionGenerator {
           "prompt": "..."
         }
 
+        Règles JSON strictes :
+        - N'insère AUCUN saut de ligne littéral à l'intérieur des valeurs de chaîne JSON. Tout saut de ligne à l'intérieur d'une valeur DOIT être échappé en \\n (deux caractères : un backslash suivi de la lettre n). Les valeurs longues doivent rester sur une seule ligne logique, avec \\n pour les retours.
+        - Les guillemets internes doivent être échappés en \\".
+
         Description précise de chaque champ :
 
-        - title : nom court de l'action, à l'impératif, 2 à 6 mots. Exemples du style attendu (cohérent avec le catalogue loucedé) : « Résume ce texte », « Corrige les fautes », « Traduis en français ». Pas de point final.
+        - title : nom court de l'action, 2 à 6 mots. Le title commence TOUJOURS par un verbe conjugué à l'impératif 2ᵉ personne du singulier (« Résume », « Traduis », « Extrais », « Génère », « Analyse », « Corrige », « Propose »…). JAMAIS un verbe à l'infinitif. Pas de point final. Exemples corrects : « Résume ce texte », « Extrais les dates ». Exemple INCORRECT : « Extraire les idées » (infinitif — à proscrire).
         - emoji : un seul emoji représentatif (1 grapheme cluster, ex. 🤏, 🇫🇷, 📝). Pas de texte, juste l'emoji.
         - description : courte description à l'infinitif, 5 à 12 mots, qui explique ce que l'action fait. Exemples du style attendu : « Extraire les idées essentielles en quelques points clés », « Reformuler le texte avec un autre angle ». Pas de point final.
         - prompt : le prompt complet que loucedé enverra à l'IA quand l'utilisateur exécutera cette action. Il doit :
+          • Être TOUJOURS rédigé en français, y compris quand l'action est une traduction vers une autre langue. Ne jamais rédiger le prompt dans la langue cible. Seule la SORTIE produite par l'action, une fois exécutée, sera dans la langue cible — jamais le prompt lui-même. Exemple : une action « Traduis en russe » a un prompt entièrement en français qui instruit de produire la traduction en russe.
           • Être structuré de manière claire (par exemple : Rôle / Tâche / Règles / Sortie attendue), en adaptant le niveau de détail à la complexité de l'action — une action simple n'a pas besoin d'un prompt sur-structuré.
-          • Inclure une clause de langue : produire la sortie en français par défaut, SAUF si l'action concerne explicitement une autre langue (ex. traduction vers une autre langue).
-          • Inclure une clause anti-encapsulation Markdown si la sortie est formatée : « Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```. »
-          • Être en français, ton clair, instructions actionnables.
+          • Inclure une clause de langue de sortie : produire la sortie en français par défaut, SAUF si l'action concerne explicitement une autre langue (ex. traduction vers une autre langue).
+          • Clause anti-encapsulation Markdown — règle précise : si l'action produit une sortie comportant le moindre formatage Markdown (titres ##, listes à puces, listes numérotées, tableaux, cases à cocher — y compris une simple liste), alors inclure dans le prompt généré la clause : « Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```. ». Si l'action produit une sortie en prose pure (paragraphes de texte continu, sans aucune liste ni titre — ex. une traduction, une reformulation, un résumé en prose), NE PAS inclure cette clause.
+          • Ton clair, instructions actionnables.
 
         Voici 3 exemples d'actions existantes du catalogue loucedé pour calibrage du style et du niveau de détail attendu :
 
@@ -355,12 +360,16 @@ enum ActionGenerator {
     // MARK: Parsing défensif
 
     /// Extrait l'objet JSON d'une réponse texte potentiellement
-    /// enveloppée. Stratégie en 2 passes :
+    /// enveloppée. Stratégie en 3 passes :
     /// 1. Strip ` ```json ` / ` ``` ` de tête et de queue si présents
     ///    (cas le plus fréquent : modèle qui ignore l'instruction
     ///    anti-encapsulation).
     /// 2. Sous-chaîne du PREMIER `{` au DERNIER `}` — couvre les cas
     ///    « Voici le JSON : {…} » avec texte parasite avant/après.
+    /// 3. Échappement défensif des caractères de contrôle littéraux
+    ///    (\n, \r, \t) qui se trouvent À L'INTÉRIEUR d'une valeur de
+    ///    chaîne JSON (cf. `escapeUnescapedControlChars`). Travers LLM
+    ///    classique sur les réponses longues — diagnostiqué K.2-B lot 1.
     /// `nil` si pas de `{…}` repérable.
     private static func extractJSONData(from raw: String) -> Data? {
         var s = raw
@@ -382,7 +391,69 @@ enum ActionGenerator {
               firstBrace <= lastBrace else {
             return nil
         }
-        return String(s[firstBrace...lastBrace]).data(using: .utf8)
+        let extracted = String(s[firstBrace...lastBrace])
+        // K.2-B lot 1-ter — échappement défensif des newlines/CR/tabs
+        // littéraux dans les valeurs JSON (le LLM les insère parfois
+        // au lieu de \\n, ce qui fait rejeter JSONDecoder).
+        let escaped = escapeUnescapedControlChars(in: extracted)
+        return escaped.data(using: .utf8)
+    }
+
+    /// K.2-B lot 1-ter — parser d'état minimal qui parcourt un blob JSON
+    /// caractère par caractère et **échappe les caractères de contrôle
+    /// littéraux** (newline `\n`, carriage return `\r`, tab `\t`)
+    /// trouvés À L'INTÉRIEUR des valeurs de chaîne (`"..."`).
+    ///
+    /// Travers LLM classique : le modèle insère de vrais sauts de ligne
+    /// au lieu de les échapper en `\\n`. La RFC 8259 interdit les
+    /// caractères de contrôle non échappés dans les chaînes →
+    /// `JSONDecoder` rejette. Cette fonction normalise.
+    ///
+    /// Approche : track l'état `inString` (booléen) en parcourant les
+    /// `Unicode.Scalar`. Dans une chaîne, sur `\\` on consomme aussi
+    /// le caractère suivant tel quel (gestion correcte de `\\"`, `\\\\`,
+    /// `\\n` déjà échappé, `\\uXXXX`). Sur `"` non précédé d'un `\\`,
+    /// on sort de la chaîne. Hors chaîne, tout est pass-through (les
+    /// newlines structurels du pretty-print entre champs sont préservés).
+    ///
+    /// À RETIRER en K.2-B lot 2 si le méta-prompt 1-ter suffit
+    /// désormais ; à conserver sinon comme filet de sécurité.
+    static func escapeUnescapedControlChars(in input: String) -> String {
+        var out = String()
+        out.reserveCapacity(input.unicodeScalars.count + 32)
+        var inString = false
+        var iterator = input.unicodeScalars.makeIterator()
+        while let c = iterator.next() {
+            if !inString {
+                if c == "\"" { inString = true }
+                out.unicodeScalars.append(c)
+            } else {
+                switch c {
+                case "\\":
+                    // Séquence d'échappement : consomme aussi le
+                    // caractère suivant tel quel. Couvre proprement
+                    // \", \\, \n déjà échappé, \/, \uXXXX (le 'u' passe
+                    // ici puis les 4 hex tombent dans default ci-dessous
+                    // à l'itération suivante).
+                    out.unicodeScalars.append(c)
+                    if let next = iterator.next() {
+                        out.unicodeScalars.append(next)
+                    }
+                case "\"":
+                    inString = false
+                    out.unicodeScalars.append(c)
+                case "\n":
+                    out.append("\\n")
+                case "\r":
+                    out.append("\\r")
+                case "\t":
+                    out.append("\\t")
+                default:
+                    out.unicodeScalars.append(c)
+                }
+            }
+        }
+        return out
     }
 
     /// Valide qu'un `GeneratedAction` a ses 4 champs non vides (et
@@ -408,5 +479,84 @@ enum ActionGenerator {
             missing.append("prompt")
         }
         return missing
+    }
+
+    // MARK: - SelfTest (K.2-B lot 1-ter — TEMPORAIRE)
+
+    /// Harnais de test à sec du tokenizer `escapeUnescapedControlChars`.
+    /// Couvre 7 cas tordus (newline littéral, déjà échappé, guillemet
+    /// échappé, backslash double, newline structurel hors string, tab
+    /// littéral, cas mixte du bug observé). Affiche ✅/❌ par cas + récap.
+    ///
+    /// À RETIRER en K.2-B lot 2 (avec le hook ⌘G), une fois la robustesse
+    /// du tokenizer confirmée par les tests à sec.
+    ///
+    /// Pour déclencher : depuis Xcode LLDB `expr ActionGenerator.runSelfTest()`,
+    /// OU ajouter temporairement `ActionGenerator.runSelfTest()` dans
+    /// `applicationDidFinishLaunching` (loucedeApp.swift).
+    static func runSelfTest() {
+        print("══════════════════════════════════════════════════════")
+        print("[ActionGenerator.runSelfTest] tokenizer escapeUnescapedControlChars")
+        print("══════════════════════════════════════════════════════")
+
+        // (name, input, expected). Les `\n` Swift = newline réel (0x0A) ;
+        // `\\n` Swift = 2 chars (backslash + n) = forme échappée JSON.
+        let cases: [(name: String, input: String, expected: String)] = [
+            (
+                "1. Newline littéral dans string",
+                "{\"k\":\"abc\n  xyz\"}",
+                "{\"k\":\"abc\\n  xyz\"}"
+            ),
+            (
+                "2. Déjà bien échappé (passe-through)",
+                "{\"k\":\"abc\\n  xyz\"}",
+                "{\"k\":\"abc\\n  xyz\"}"
+            ),
+            (
+                "3. Guillemet échappé \\\" dans string",
+                "{\"k\":\"il a dit \\\"oui\\\"\"}",
+                "{\"k\":\"il a dit \\\"oui\\\"\"}"
+            ),
+            (
+                "4. Backslash double \\\\ dans string",
+                "{\"k\":\"path\\\\file\"}",
+                "{\"k\":\"path\\\\file\"}"
+            ),
+            (
+                "5. Newline hors string (pretty-print structurel)",
+                "{\n  \"k\": \"v\"\n}",
+                "{\n  \"k\": \"v\"\n}"
+            ),
+            (
+                "6. Tab littéral dans string",
+                "{\"k\":\"a\tb\"}",
+                "{\"k\":\"a\\tb\"}"
+            ),
+            (
+                "7. Cas mixte (newlines structurels + littéral intra-string)",
+                "{\n  \"k\": \"abc\n  xyz\",\n  \"emoji\": \"🇷🇺\"\n}",
+                "{\n  \"k\": \"abc\\n  xyz\",\n  \"emoji\": \"🇷🇺\"\n}"
+            ),
+        ]
+
+        var passed = 0
+        var failed = 0
+        for c in cases {
+            let result = escapeUnescapedControlChars(in: c.input)
+            if result == c.expected {
+                print("✅ \(c.name)")
+                passed += 1
+            } else {
+                print("❌ \(c.name)")
+                print("    INPUT    : \(c.input.debugDescription)")
+                print("    EXPECTED : \(c.expected.debugDescription)")
+                print("    GOT      : \(result.debugDescription)")
+                failed += 1
+            }
+        }
+
+        print("──────────────────────────────────────────────────────")
+        print("Récap : \(passed)/\(cases.count) OK" + (failed > 0 ? " — \(failed) ÉCHEC(S)" : ""))
+        print("══════════════════════════════════════════════════════")
     }
 }

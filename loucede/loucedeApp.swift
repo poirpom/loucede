@@ -66,6 +66,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         globalAppDelegate = self
 
+        // K.2-B lot 1-ter TEMPORAIRE — self-test du tokenizer JSON
+        // défensif d'ActionGenerator (7 cas, ✅/❌ + récap en console).
+        // À RETIRER en K.2-B lot 2 avec le hook ⌘G et la fonction
+        // `ActionGenerator.runSelfTest()` elle-même.
+        ActionGenerator.runSelfTest()
+
         // URL scheme handler (loucede:// — réservé aux automations, pas d'OAuth)
         NSAppleEventManager.shared().setEventHandler(
             self,
