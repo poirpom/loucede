@@ -250,6 +250,10 @@ class ActionsStore: ObservableObject {
     /// recette de cuisine ». Flag distinct (one-shot) — cf.
     /// `migrateK4RecipePromptIfNeeded()`.
     private let k4RecipePromptFixKey = "loucede_migration_k4_recipe_prompt_done"
+    /// K.2-A (2026-05-26) : renommage « Propose un plan structuré » →
+    /// « Construis un plan » (catégorie Structurer, « structuré » redondant).
+    /// Flag distinct (one-shot) — cf. `migrateProposePlanRenameIfNeeded()`.
+    private let proposePlanRenameKey = "loucede_migration_propose_plan_rename_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -348,6 +352,7 @@ class ActionsStore: ObservableObject {
             migrateSummarizePromptV2IfNeeded()
             migrateUnify2IfNeeded()
             migrateK4RecipePromptIfNeeded()
+            migrateProposePlanRenameIfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -364,6 +369,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: unify2MigrationKey)
             UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
             UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
+            UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
         }
     }
 
@@ -597,6 +603,34 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
+    }
+
+    /// Migration one-shot K.2-A (2026-05-26) : renomme l'action
+    /// « Propose un plan structuré » en « Construis un plan ». L'action est
+    /// en catégorie Structurer (« Propose » crée une dissonance) et
+    /// « structuré » est redondant (catégorie + nature d'un plan).
+    ///
+    /// Match par NOM SEUL (décision K.2-A cadrage) : on corrige le titre
+    /// même si l'utilisateur a personnalisé son prompt. Le rename ne touche
+    /// QUE le champ `name` — prompt/icon/category/isFavorite/isHidden/
+    /// displayOrder/shortDescription sont préservés. Une personnalisation
+    /// du prompt par l'utilisateur n'interfère donc pas avec le renommage
+    /// (et reste intacte après).
+    private func migrateProposePlanRenameIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: proposePlanRenameKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Propose un plan structuré" {
+                actions[idx].name = "Construis un plan"
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
     }
 
     /// Migration K.unify.2 (2026-05-20) — modèle unifié Actions/Modèles/
@@ -1980,7 +2014,7 @@ class ActionsStore: ObservableObject {
             category: .structure
         ),
         Action(
-            name: "Propose un plan structuré",
+            name: "Construis un plan",
             icon: "🗂️",
             prompt: """
         Rôle : expert en structuration de contenu.

@@ -375,9 +375,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Hauteur dynamique du popup (Phase 6.9b, 2026-04-25)
 
-    /// Hauteur d'une ligne d'action (icône emoji 20pt + padding vertical 8+8).
-    /// Doit rester synchro avec `actionRow` dans PopoverView.swift.
-    static let popoverActionRowHeight: CGFloat = 36
+    /// Hauteur d'une ligne d'action. Doit rester synchro avec
+    /// `selectableItemRow` dans PopoverView.swift.
+    /// K.2-A (2026-05-26) : 36 → 44 (+8pt). La cartouche emoji 28×28
+    /// remplace l'ancien ActionIconView 20×20 → contenu HStack passe de
+    /// 20pt à 28pt, +8pt avec padding vertical 8+8 inchangé. Cascade
+    /// automatique sur `popoverDefaultPeekHeight` (262 → 306pt).
+    static let popoverActionRowHeight: CGFloat = 44
     /// Spacing entre lignes dans le `VStack(spacing: 2)` de la liste.
     static let popoverActionRowSpacing: CGFloat = 2
     /// K.unify.3 (2026-05-21) : hauteur d'un en-tête de section dans la

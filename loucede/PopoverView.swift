@@ -729,7 +729,16 @@ struct PopoverView: View {
                                    selIndex: Int?, item: PopupItem) -> some View {
         let isSelected = selIndex != nil && selIndex == state.selectedIndex
         return HStack(spacing: 10) {
+            // K.2-A (2026-05-26) — cartouche emoji 28×28, radius 6pt, fond
+            // Material adaptatif (light/dark + sur le fond bleu de sélection).
+            // ActionIconView reste à boxSize 20 / fontSize 14 (l'emoji se
+            // centre dans la cartouche 28×28, pas de modif d'ActionIconView
+            // qui rayonne sur Réglages + vue résultat). `.regularMaterial`
+            // choisi pour rester visible sur fond bleu — calibrer à
+            // `.thinMaterial` si trop opaque en runtime.
             ActionIconView(icon: icon, boxSize: 20, fontSize: 14)
+                .frame(width: 28, height: 28)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
             Text(name)
                 .font(.system(size: 13))
             Spacer()
