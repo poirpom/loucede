@@ -128,6 +128,15 @@ struct EmojiPickerButton: View {
     /// `.grayCircle` explicitement.
     var placeholderStyle: IconPlaceholderStyle = .plusButton
 
+    /// K.2-B lot 2b fix (2026-05-27) — callback optionnel invoqué juste
+    /// après l'ouverture de la palette emoji système. Utilisé par le
+    /// popover éditable du Générateur (NSPanel custom) pour suspendre
+    /// temporairement son monitor de clic extérieur — sinon le clic
+    /// dans la palette est interprété comme « clic hors popup → fermer ».
+    /// `nil` par défaut → zero impact pour les usages existants (Réglages
+    /// est une NSWindow standard, pas concerné).
+    var onPaletteOpen: (() -> Void)? = nil
+
     /// Champ-tampon invisible : reçoit l'emoji inséré par la palette
     /// système. Vidé après chaque traitement pour ne pas accumuler les
     /// graphème entre deux ouvertures successives.
@@ -200,6 +209,11 @@ struct EmojiPickerButton: View {
             // au-dessus, par ex.) au lieu du nôtre.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 NSApp.orderFrontCharacterPalette(nil)
+                // K.2-B lot 2b fix — callback après l'ouverture effective
+                // de la palette. Permet au call-site (popover éditable du
+                // Générateur) de suspendre son monitor de clic extérieur
+                // le temps de la sélection.
+                onPaletteOpen?()
             }
         }
     }

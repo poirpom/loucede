@@ -1093,9 +1093,22 @@ struct PopoverView: View {
                         // Composant réutilisable de IconPickerView.swift :
                         // clic ouvre la palette emoji système macOS (cf.
                         // ActionsView.swift:855 pour l'usage modèle).
+                        //
+                        // K.2-B lot 2b fix — `onPaletteOpen` suspend le
+                        // monitor de clic extérieur du KeyablePanel le
+                        // temps que l'utilisateur sélectionne un emoji
+                        // dans la palette. Sans ça, le clic dans la
+                        // palette ferme le popover → contexte d'édition
+                        // perdu. Filet de sécurité 15s ; réinstallation
+                        // anticipée via .onChange(editableEmoji) plus
+                        // bas dès qu'un emoji est choisi.
                         EmojiPickerButton(icon: $state.editableEmoji,
                                           boxSize: 36,
-                                          fontSize: 24)
+                                          fontSize: 24,
+                                          onPaletteOpen: {
+                                              globalAppDelegate?
+                                                  .suspendOutsideClickMonitor(for: 15)
+                                          })
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Titre")
@@ -1124,6 +1137,21 @@ struct PopoverView: View {
             .padding(.horizontal, 12)
             .padding(.top, 10)
             .padding(.bottom, 12)
+        }
+        // K.2-B lot 2b fix — réinstallation anticipée du monitor de clic
+        // extérieur dès que l'emoji change. Deux scénarios :
+        // 1. L'utilisateur vient de choisir un emoji dans la palette
+        //    système (monitor suspendu par `onPaletteOpen` ci-dessus) →
+        //    `resumeOutsideClickMonitorIfSuspended()` réinstalle
+        //    immédiatement, le clic extérieur reprend sans attendre
+        //    les 15s du filet de sécurité.
+        // 2. Génération/regénération qui peuple `editableEmoji` par code
+        //    (cf. `runGeneration` success branch dans PopoverState) →
+        //    le monitor n'est pas suspendu, la méthode est no-op grâce
+        //    au guard `outsideClickMonitorSuspended` côté AppDelegate.
+        // Idempotence assumée — pas de test côté call-site.
+        .onChange(of: state.editableEmoji) { _, _ in
+            globalAppDelegate?.resumeOutsideClickMonitorIfSuspended()
         }
     }
 

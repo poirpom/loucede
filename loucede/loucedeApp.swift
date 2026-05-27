@@ -57,6 +57,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var docWindow: NSWindow?
     var eventMonitor: Any?
     var localEventMonitor: Any?
+    /// K.2-B lot 2b fix (2026-05-27) — état de la suspension du monitor
+    /// de clic extérieur. Activé pendant la fenêtre où l'utilisateur
+    /// interagit avec une fenêtre système secondaire (ex. palette emoji
+    /// via `NSApp.orderFrontCharacterPalette`) — sinon le clic dans
+    /// cette fenêtre serait perçu comme « clic hors popup → fermer ».
+    /// Géré par `suspendOutsideClickMonitor(for:)` et
+    /// `resumeOutsideClickMonitorIfSuspended()`.
+    private var outsideClickMonitorSuspended: Bool = false
+    /// Timer de réinstallation automatique du monitor (filet de
+    /// sécurité). `DispatchWorkItem` plutôt que `Task` pour annulation
+    /// synchrone fiable (ex. réinstallation anticipée déclenchée par
+    /// `.onChange(editableEmoji)` côté PopoverView au choix d'un emoji).
+    private var outsideClickMonitorResumeTask: DispatchWorkItem?
     var hotKeyRef: EventHotKeyRef?
     var pendingAction: Action?
     var cancellables = Set<AnyCancellable>()
@@ -629,6 +642,56 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - K.2-B lot 2b fix — suspension temporaire du monitor
+
+    /// Lecture seule de l'état de suspension. Utile pour debug / variantes
+    /// (le call-site PopoverView n'en a pas besoin grâce à l'idempotence
+    /// de `resumeOutsideClickMonitorIfSuspended()`).
+    var isOutsideClickMonitorSuspended: Bool {
+        outsideClickMonitorSuspended
+    }
+
+    /// Suspend le monitor de clic extérieur pendant `seconds` secondes.
+    /// Appelé par le call-site du `EmojiPickerButton` dans le popover
+    /// éditable du Générateur (PopoverView.swift) juste après
+    /// `NSApp.orderFrontCharacterPalette(nil)` — sans suspension, le clic
+    /// dans la palette emoji serait interprété par le monitor global
+    /// comme « clic hors popup → fermer », faisant disparaître tout le
+    /// contexte d'édition.
+    ///
+    /// Idempotence au double-tap : un nouvel appel reset le timer
+    /// (annule l'ancien, programme un nouveau). Pas d'addition.
+    func suspendOutsideClickMonitor(for seconds: TimeInterval) {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+        outsideClickMonitorResumeTask?.cancel()
+        outsideClickMonitorSuspended = true
+
+        let task = DispatchWorkItem { [weak self] in
+            self?.resumeOutsideClickMonitorIfSuspended()
+        }
+        outsideClickMonitorResumeTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: task)
+    }
+
+    /// Réinstalle le monitor de clic extérieur SI une suspension est
+    /// active. No-op sinon — idempotence assumée (nom explicite).
+    /// Appelé par 2 chemins :
+    /// 1. Le timer programmé par `suspendOutsideClickMonitor(for:)` (filet
+    ///    de sécurité après 15s — cas « palette ouverte mais rien choisi »).
+    /// 2. Le `.onChange(state.editableEmoji)` côté PopoverView quand
+    ///    l'utilisateur choisit un emoji (réinstallation anticipée → le
+    ///    clic extérieur reprend immédiatement, pas d'attente).
+    func resumeOutsideClickMonitorIfSuspended() {
+        guard outsideClickMonitorSuspended else { return }
+        outsideClickMonitorResumeTask?.cancel()
+        outsideClickMonitorResumeTask = nil
+        outsideClickMonitorSuspended = false
+        installOutsideClickMonitor()
+    }
+
     func captureSelectedText() {
         // Guardar el contenido actual del clipboard
         let pasteboard = NSPasteboard.general
@@ -683,6 +746,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
+        // K.2-B lot 2b fix — annule le timer de réinstallation si une
+        // suspension de monitor était en cours au moment de la fermeture
+        // (cas Esc/Valider avec palette emoji encore ouverte). Sans ça,
+        // le timer tenterait de réinstaller un monitor sur une fenêtre
+        // déjà ordered out.
+        outsideClickMonitorResumeTask?.cancel()
+        outsideClickMonitorResumeTask = nil
+        outsideClickMonitorSuspended = false
     }
 
     func hidePopoverAndRestoreFocus() {
