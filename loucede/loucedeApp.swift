@@ -466,17 +466,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// phases (compact / loading / error). Léger espace vide en bas en
     /// saisie normale, accepté (prix de la stabilité).
     static let popoverGeneratorCompactHeight: CGFloat = 200
-    /// Hauteur du popover générateur en mode résultat lecture seule
-    /// (les 4 champs Titre/Emoji/Description/Prompt visibles).
-    /// Point de départ — à calibrer runtime.
-    static let popoverGeneratorResultHeight: CGFloat = 480
+    /// K.2-B lot 2b — hauteur du popover générateur en mode résultat
+    /// ÉDITABLE (les 4 champs Titre/Emoji/Description/Prompt + champ
+    /// « Action à générer » + bouton Regénérer + sélecteur de catégorie
+    /// + barre Annuler/Valider). Calibrage runtime. Décomposition :
+    /// top bar 52 + divider 1 + padTop 10 + section « Action à générer »
+    /// (~68) + spacing 16 + 3 champs mono (~174) + Prompt scrollable
+    /// (~230) + catégorie (~48) + padBottom 12 + divider + bottom bar
+    /// (~53) ≈ 664pt → buffer 16pt = 680pt.
+    static let popoverGeneratorEditableHeight: CGFloat = 680
 
     /// Phase du popover générateur, sert à dimensionner la fenêtre.
     /// Compact couvre `.compact`, `.loading`, `.error` de PopoverState ;
-    /// `.resultRO` couvre `.resultReadOnly`.
+    /// `.resultEditable` couvre `.resultEditable` (K.2-B lot 2b).
     enum GeneratorPopupPhase {
         case compact
-        case resultRO
+        case resultEditable
     }
 
     /// Mode d'affichage du popup principal — détermine ses dimensions.
@@ -594,8 +599,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // pour continuité visuelle. Hauteur fonction de la phase.
             width = Self.popoverDefaultWidth
             switch phase {
-            case .compact:  height = Self.popoverGeneratorCompactHeight
-            case .resultRO: height = Self.popoverGeneratorResultHeight
+            case .compact:         height = Self.popoverGeneratorCompactHeight
+            case .resultEditable:  height = Self.popoverGeneratorEditableHeight
             }
         }
         let x = (screenRect.width - width) / 2 + screenRect.minX

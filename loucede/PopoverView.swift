@@ -59,6 +59,10 @@ struct PopoverView: View {
     // entre/sort des phases qui requièrent un TextField focalisé
     // (.compact et .error).
     @FocusState private var isGeneratorFocused: Bool
+    // K.2-B lot 2b : focus du TextField « Titre » du popover éditable.
+    // Armé à l'entrée en `.resultEditable` (premier des 4 champs à
+    // retoucher, prompt en bas). Désarmé dans toutes les autres phases.
+    @FocusState private var isEditableTitleFocused: Bool
     // Phase 1.4b : état « fenêtre résultat agrandie » (touche F).
     // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
     // du popup), pour que chaque nouvelle action reparte en format compact.
@@ -196,7 +200,7 @@ struct PopoverView: View {
             // qui n'arrive pas dans l'UX actuelle mais reste safe).
         }
         // K.2-B lot 2a — Transitions du mode Générateur :
-        // 1) Resize la NSWindow selon la phase (compact vs resultRO).
+        // 1) Resize la NSWindow selon la phase (compact vs resultEditable).
         // 2) Gère le focus du TextField « Action à générer ».
         // 3) Au retour à `nil` (sortie du mode), retour à `.list`.
         .onChange(of: state.generatorPhase) { _, newPhase in
@@ -205,30 +209,49 @@ struct PopoverView: View {
                 let popupPhase: AppDelegate.GeneratorPopupPhase
                 switch phase {
                 case .compact, .loading, .error: popupPhase = .compact
-                case .resultReadOnly:            popupPhase = .resultRO
+                case .resultEditable:            popupPhase = .resultEditable
                 }
                 state.suspendFlush()
                 globalAppDelegate?.resizePopover(to: .generator(popupPhase))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
-                // Focus du TextField uniquement quand il est éditable.
+                // Focus :
+                // - `.compact` / `.error` : focus sur le TextField « Action à générer ».
+                // - `.loading` : pas de focus (champ désactivé).
+                // - `.resultEditable` (K.2-B lot 2b) : focus sur le champ Titre
+                //   éditable (premier des 4 champs à retoucher — le prompt est
+                //   en bas, donc on commence par le haut).
                 switch phase {
                 case .compact, .error:
+                    isEditableTitleFocused = false
                     DispatchQueue.main.async { isGeneratorFocused = true }
-                case .loading, .resultReadOnly:
+                case .loading:
                     isGeneratorFocused = false
+                    isEditableTitleFocused = false
+                case .resultEditable:
+                    isGeneratorFocused = false
+                    DispatchQueue.main.async { isEditableTitleFocused = true }
                 }
                 focus = .generator
             } else {
-                // Retour au popup d'actions (main).
-                state.suspendFlush()
-                globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    state.resumeFlush()
+                // K.2-B lot 2b — Retour à la liste, SAUF si l'utilisateur
+                // vient de valider l'action et qu'elle a été lancée
+                // (`activeAction != nil`). Dans ce cas, on laisse
+                // `.onChange(activeAction)` resize vers `.resultCompact` —
+                // pas de double resize ni de saut `.generator` → `.list`
+                // → `.resultCompact` (animation moche).
+                if state.activeAction == nil {
+                    state.suspendFlush()
+                    globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        state.resumeFlush()
+                    }
+                    focus = .main
+                    DispatchQueue.main.async { isSearchFocused = true }
                 }
-                focus = .main
-                DispatchQueue.main.async { isSearchFocused = true }
+                isGeneratorFocused = false
+                isEditableTitleFocused = false
             }
         }
     }
@@ -856,14 +879,15 @@ struct PopoverView: View {
         Color(red: 0.976, green: 0.620, blue: 0.043) // #F59E0B
     }
 
-    // MARK: - Generator (K.2-B lot 2a)
+    // MARK: - Generator (K.2-B lot 2a + lot 2b)
 
     /// Vue racine du mode Générateur. Top bar commune + zone contenu
     /// variable selon `state.generatorPhase`. Largeur identique au popup
     /// liste (400pt, posée par le `.frame(width:)` du `body` racine) ;
     /// hauteur pilotée par `resizePopover(to: .generator(...))` côté
-    /// AppDelegate. 4 phases : compact (saisie), loading, resultReadOnly
-    /// (4 champs lecture seule — 2a), error (compact + message).
+    /// AppDelegate. 4 phases : compact (saisie), loading, resultEditable
+    /// (lot 2b — 4 champs éditables + Regénérer + catégorie + barre
+    /// Annuler/Valider), error (compact + message).
     @ViewBuilder
     private var generatorView: some View {
         VStack(spacing: 0) {
@@ -875,8 +899,12 @@ struct PopoverView: View {
                     generatorCompactContent(error: nil)
                 case .loading:
                     generatorLoadingContent
-                case .resultReadOnly(let action):
-                    generatorResultROContent(action)
+                case .resultEditable:
+                    // K.2-B lot 2b — popover éditable + bottom bar
+                    // Annuler/Valider en bas (en dehors du ScrollView).
+                    generatorEditableContent
+                    Divider()
+                    generatorEditableBottomBar
                 case .error(let message):
                     generatorCompactContent(error: message)
                 }
@@ -996,52 +1024,207 @@ struct PopoverView: View {
         .padding(.bottom, 12)
     }
 
-    /// Phase resultReadOnly : 4 champs de l'action générée affichés en
-    /// lecture seule. Lot 2b les rendra éditables + ajoutera sélecteur
-    /// catégorie + barre Annuler/Valider.
-    @ViewBuilder
-    private func generatorResultROContent(_ action: GeneratedAction) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            generatorResultROField(label: "Titre", value: action.title)
-            generatorResultROField(label: "Emoji", value: action.emoji)
-            generatorResultROField(label: "Description", value: action.description)
+    /// Phase resultEditable (K.2-B lot 2b) : popover ÉDITABLE complet.
+    /// - Section A : champ « Action à générer » (toujours visible) + bouton
+    ///   « Regénérer » (relance la génération, écrase les éditions
+    ///   manuelles, décision actée).
+    /// - Section B : 4 champs éditables (Titre/Emoji/Description mono-lignes,
+    ///   Prompt multi-ligne plafonné à 200pt scrollable).
+    /// - Section C : sélecteur de catégorie (« Sans catégorie » par défaut
+    ///   + 6 catégories réelles, `.custom` DEPRECATED exclu).
+    /// Wrappé dans un ScrollView pour safety si l'écran est très petit.
+    /// La bottom bar Annuler/Valider est en dehors (côté `generatorView`),
+    /// pour rester fixée en bas.
+    private var generatorEditableContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // --- Section A : Action à générer + Regénérer ---
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Action à générer")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Text("Ex. : traduis en russe")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Prompt")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                ScrollView {
-                    Text(action.prompt)
-                        .font(.system(size: 12))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(8)
+                    HStack(spacing: 8) {
+                        TextField("", text: $state.generatorInputText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.primary.opacity(0.06))
+                            )
+                            .focused($isGeneratorFocused)
+
+                        // K.2-B lot 2b — Regénérer est SECONDAIRE dans ce
+                        // contexte (l'action principale est Valider de la
+                        // bottom bar). Style discret `.bordered`, pas
+                        // `.borderedProminent` qui inverserait la hiérarchie
+                        // visuelle. Pas de raccourci dédié (Faab a tranché).
+                        Button(action: { state.runGeneration() }) {
+                            Text("Regénérer")
+                                .font(.system(size: 13))
+                                .padding(.horizontal, 6)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(state.generatorInputText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
                 }
-                .frame(maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.04))
-                )
+
+                // --- Section B : 4 champs éditables ---
+                editableSingleLineField(label: "Titre",
+                                        text: $state.editableTitle,
+                                        focusBinding: $isEditableTitleFocused)
+                editableSingleLineField(label: "Emoji",
+                                        text: $state.editableEmoji)
+                editableSingleLineField(label: "Description",
+                                        text: $state.editableDescription)
+                editablePromptField
+
+                // --- Section C : sélecteur de catégorie ---
+                editableCategoryPicker
             }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
     }
 
-    /// Champ lecture seule simple (Titre / Emoji / Description) du
-    /// résultat. Label gris + valeur primaire.
-    private func generatorResultROField(label: String, value: String) -> some View {
+    /// Champ éditable mono-ligne — version avec focus binding (Titre).
+    /// Label 12pt secondary + TextField primary sur fond
+    /// `Color.primary.opacity(0.06)` radius 8 (cohérent avec le champ de
+    /// recherche du popup, V3 du brief).
+    private func editableSingleLineField(label: String,
+                                         text: Binding<String>,
+                                         focusBinding: FocusState<Bool>.Binding) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-            Text(value)
+            TextField("", text: text)
+                .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.06))
+                )
+                .focused(focusBinding)
         }
+    }
+
+    /// Champ éditable mono-ligne — version sans focus binding (Emoji,
+    /// Description). Même styling visuel que la version avec focus.
+    /// Surcharge plutôt que paramètre optionnel pour éviter le mélange
+    /// de types View dans un ViewBuilder.
+    private func editableSingleLineField(label: String,
+                                         text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            TextField("", text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.06))
+                )
+        }
+    }
+
+    /// Champ Prompt — multi-ligne via TextEditor. Plafonné à 200pt
+    /// (au-delà, scroll interne natif). ↵ insère un saut de ligne — pas
+    /// de risque de validation accidentelle, la validation passe par ⌘↵
+    /// sur la bottom bar.
+    private var editablePromptField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Prompt")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            TextEditor(text: $state.editablePrompt)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .frame(maxHeight: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.06))
+                )
+        }
+    }
+
+    /// Sélecteur de catégorie. Première option = « Sans catégorie » (nil,
+    /// choix valide). Suit avec les 6 catégories réelles ; `.custom`
+    /// (« Mes modèles ») est DEPRECATED depuis K.unify.2 et exclu.
+    private var editableCategoryPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Catégorie")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Picker("", selection: $state.editableCategory) {
+                Text("Sans catégorie").tag(PromptCategory?.none)
+                ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
+                    Text(cat.rawValue).tag(PromptCategory?.some(cat))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
+    }
+
+    /// Barre inférieure du popover éditable. Esc Annuler à gauche, ⌘↵
+    /// Valider à droite (convention macOS : action principale à droite).
+    /// Modèle visuel : `resultView` (mêmes `.buttonStyle(.plain)` +
+    /// `KeyboardKey` + `Text`).
+    ///
+    /// ⌘↵ binding via `.keyboardShortcut(.return, modifiers: .command)` —
+    /// ↵ seul n'est PAS un raccourci de validation, pour ne pas entrer en
+    /// conflit avec la saisie multi-ligne du Prompt. `.disabled(!canValidate)`
+    /// désactive aussi le raccourci.
+    ///
+    /// Esc côté clavier est intercepté par le NSEvent monitor — ce bouton
+    /// reste actionnable à la souris pour découvrabilité.
+    private var generatorEditableBottomBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                state.exitGeneratorMode()
+            } label: {
+                HStack(spacing: 6) {
+                    KeyboardKey("esc")
+                    Text("Annuler")
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button {
+                state.validateAndRun()
+            } label: {
+                HStack(spacing: 6) {
+                    KeyboardKey("⌘↵")
+                    Text("Valider")
+                }
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!state.canValidate)
+        }
+        .padding(12)
     }
 
     // MARK: - Result

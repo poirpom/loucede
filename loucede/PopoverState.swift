@@ -53,6 +53,25 @@ final class PopoverState: ObservableObject {
     /// `enterGeneratorMode(prefilled:)`, éditable par l'utilisateur.
     @Published var generatorInputText: String = ""
 
+    // K.2-B lot 2b — Champs édités de l'action en cours d'élaboration.
+    // Peuplés depuis le `GeneratedAction` au moment où on entre en
+    // `.resultEditable`, éditables nativement par l'utilisateur via
+    // bindings SwiftUI. En cas de regénération, ils sont écrasés par la
+    // nouvelle proposition (décision actée). Vidés à la sortie du mode
+    // générateur (Esc, validation, `reset()`).
+    /// Titre éditable de l'action générée (mono-ligne).
+    @Published var editableTitle: String = ""
+    /// Emoji éditable de l'action générée (mono-ligne, généralement 1 char).
+    @Published var editableEmoji: String = ""
+    /// Description courte éditable (mono-ligne, ≤80 signes idéalement).
+    @Published var editableDescription: String = ""
+    /// Prompt éditable (multi-ligne, peut faire 30+ lignes).
+    @Published var editablePrompt: String = ""
+    /// Catégorie choisie pour l'action générée. `nil` = « Sans catégorie »
+    /// (choix par défaut et valide ; l'utilisateur peut catégoriser plus
+    /// tard via Réglages → Actions s'il laisse `nil`).
+    @Published var editableCategory: PromptCategory? = nil
+
     /// Token UUID renouvelé à chaque déclenchement de génération. Sert à
     /// l'annulation LOGIQUE d'une génération en cours (Esc pendant
     /// loading) : à la fin du Task, on vérifie que le token n'a pas
@@ -104,8 +123,20 @@ final class PopoverState: ObservableObject {
         searchQuery = ""
         generatorPhase = nil
         generatorInputText = ""
+        clearEditableFields()
         showTrialExpiredModal = false
         openCounter &+= 1
+    }
+
+    /// K.2-B lot 2b — vide les 4 champs éditables + le sélecteur de
+    /// catégorie. Appelé par `reset()`, `exitGeneratorMode()`, et par
+    /// `validateAndRun()` après ajout au catalogue.
+    private func clearEditableFields() {
+        editableTitle = ""
+        editableEmoji = ""
+        editableDescription = ""
+        editablePrompt = ""
+        editableCategory = nil
     }
 
     /// Annule le streaming LLM en cours et libère les ressources liées
@@ -166,7 +197,28 @@ final class PopoverState: ObservableObject {
 
             switch result {
             case .success(let action):
-                self.generatorPhase = .resultReadOnly(action)
+                // K.2-B lot 2b — peuple les 4 champs éditables depuis la
+                // proposition IA. En regénération (lot 2b : bouton
+                // « Regénérer » côté UI), ce code écrase les éditions
+                // manuelles de l'utilisateur — comportement « Regénérer
+                // = recommence », décision actée.
+                self.editableTitle = action.title
+                self.editableEmoji = action.emoji
+                self.editableDescription = action.description
+                self.editablePrompt = action.prompt
+                // Catégorie remise à « Sans catégorie » à chaque
+                // (re)génération — l'IA ne catégorise pas, l'utilisateur
+                // choisit (ou laisse nil pour catégoriser plus tard).
+                self.editableCategory = nil
+                // K.2-B lot 2b — synchronisation animation : le NSWindow
+                // resize est piloté par NSAnimationContext 0.25s côté
+                // AppDelegate (`.onChange(generatorPhase)` → `resizePopover`).
+                // Le withAnimation SwiftUI synchrone côté state permet
+                // au contenu interne de cross-fade pendant que la fenêtre
+                // s'agrandit — passage compact → éditable plus doux.
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.generatorPhase = .resultEditable(action)
+                }
             case .failure(let error):
                 let msg = Self.userFacingErrorMessage(for: error)
                 self.generatorPhase = .error(message: msg)
@@ -177,7 +229,7 @@ final class PopoverState: ObservableObject {
     /// Esc en mode Générateur — comportement dépendant de la phase :
     /// - `.loading` → annule + retour à `.compact` (préserve l'input pour
     ///   retry rapide).
-    /// - `.compact` / `.resultReadOnly` / `.error` → quitte le mode
+    /// - `.compact` / `.resultEditable` / `.error` → quitte le mode
     ///   Générateur entièrement, retour à `mainView`.
     func handleEscapeInGeneratorMode() {
         guard let phase = generatorPhase else { return }
@@ -185,10 +237,22 @@ final class PopoverState: ObservableObject {
         switch phase {
         case .loading:
             generatorPhase = .compact
-        case .compact, .resultReadOnly, .error:
-            generatorPhase = nil
-            generatorInputText = ""
+        case .compact, .resultEditable, .error:
+            exitGeneratorMode()
         }
+    }
+
+    /// K.2-B lot 2b — sortie franche du mode générateur. Vide tous les
+    /// champs (input + edits + catégorie) et met `generatorPhase = nil`.
+    /// Appelé par le bouton Annuler de la bottom bar, par Esc en phases
+    /// `.compact` / `.resultEditable` / `.error` (via
+    /// `handleEscapeInGeneratorMode`), et par `validateAndRun()` après
+    /// ajout au catalogue.
+    func exitGeneratorMode() {
+        cancelOngoingGeneration()
+        generatorPhase = nil
+        generatorInputText = ""
+        clearEditableFields()
     }
 
     /// Invalide le token (annulation logique d'un résultat en cours) et
@@ -210,6 +274,85 @@ final class PopoverState: ObservableObject {
             return "Aucun fournisseur IA configuré. Va dans les Réglages pour en configurer un."
         case .providerUnavailable, .emptyResponse, .invalidJSON, .incompleteFields:
             return "La génération a échoué. Réessaie."
+        }
+    }
+
+    // MARK: - K.2-B lot 2b — Validation et ajout au catalogue
+
+    /// Les 4 champs (Titre/Emoji/Description/Prompt) sont non-vides
+    /// après trim. `editableCategory == nil` (« Sans catégorie ») est un
+    /// choix valide, pas une absence. Le bouton ⌘↵ Valider de la bottom
+    /// bar lit cette propriété via `.disabled(!state.canValidate)`.
+    var canValidate: Bool {
+        !editableTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !editableEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !editableDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Convertit les 4 champs édités + la catégorie choisie en une
+    /// `Action` complète, l'ajoute au catalogue via
+    /// `ActionsStore.addAction()`, puis :
+    /// - Si du texte a été capturé à l'ouverture du popup
+    ///   (`CapturedTextManager.shared.hasSelection`) → lance l'action
+    ///   immédiatement via `runAction(_:)`. Le popup bascule en mode
+    ///   résultat compact via `.onChange(activeAction)` côté
+    ///   PopoverView.
+    /// - Sinon (ouverture sans sélection — cas
+    ///   `showPopover(requireSelection: false)`) → l'action est ajoutée
+    ///   au catalogue mais pas lancée (pas de texte cible). Le popup
+    ///   se ferme proprement via `hidePopover()`.
+    ///
+    /// La sélection capturée est figée à l'ouverture du popup
+    /// (cf. `AppDelegate.captureSelectedText()` appelée uniquement
+    /// dans `showPopover` / `showPopoverWithAction`), donc la lecture
+    /// de `hasSelection` ici est stable — pas besoin de snapshot.
+    ///
+    /// Ordre des opérations critique : `runAction` D'ABORD (set
+    /// `activeAction`), `generatorPhase = nil` APRÈS — le
+    /// `.onChange(of: generatorPhase)` côté PopoverView lit
+    /// `state.activeAction != nil` au moment du retour à nil pour
+    /// décider de NE PAS resize vers `.list` (le `.onChange(activeAction)`
+    /// resize vers `.resultCompact` à la place).
+    func validateAndRun() {
+        guard canValidate else { return }
+
+        let store = ActionsStore.shared
+        // K.2-B lot 2b — `displayOrder` en queue de catalogue : max
+        // existant + 1. Évite la collision avec les actions au
+        // `displayOrder = 0` par défaut et place l'action générée à
+        // la fin (cohérent avec « action ajoutée »).
+        let nextDisplayOrder = (store.actions.map(\.displayOrder).max() ?? 0) + 1
+        let newAction = Action(
+            id: UUID(),
+            name: editableTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+            icon: editableEmoji.trimmingCharacters(in: .whitespacesAndNewlines),
+            prompt: editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines),
+            actionType: .ai,
+            shortDescription: editableDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+            originTemplateName: nil,
+            isFavorite: false,
+            isHidden: false,
+            displayOrder: nextDisplayOrder,
+            category: editableCategory
+        )
+        store.addAction(newAction)
+
+        let hasText = CapturedTextManager.shared.hasSelection
+        if hasText {
+            // Lance l'action immédiatement — la popup bascule en mode
+            // résultat via `.onChange(activeAction)`. Ordre :
+            // runAction d'abord (set activeAction), nettoyage et
+            // generatorPhase = nil ensuite.
+            runAction(newAction)
+            generatorInputText = ""
+            clearEditableFields()
+            generatorPhase = nil
+        } else {
+            // Pas de texte cible : action ajoutée au catalogue, popup
+            // fermé sans lancement (pas d'erreur, pas de plantage).
+            exitGeneratorMode()
+            globalAppDelegate?.hidePopover()
         }
     }
 
@@ -361,7 +504,7 @@ final class PopoverState: ObservableObject {
     }
 }
 
-// MARK: - GeneratorPhase (K.2-B lot 2a)
+// MARK: - GeneratorPhase (K.2-B lot 2a, étendu lot 2b)
 
 /// Phase courante du popover Générateur d'actions AI. Stockée dans
 /// `PopoverState.generatorPhase: GeneratorPhase?` ; `nil` signifie
@@ -371,14 +514,17 @@ final class PopoverState: ObservableObject {
 ///   « Générer » actif.
 /// - `.loading` : appel `ActionGenerator.generate` en cours. UI affiche
 ///   un spinner. TextField désactivé.
-/// - `.resultReadOnly(GeneratedAction)` : génération réussie. Les 4
-///   champs (titre/emoji/description/prompt) affichés en lecture seule.
-///   Lot 2b les rendra éditables + ajoutera barre Annuler/Valider.
+/// - `.resultEditable(GeneratedAction)` (K.2-B lot 2b) : génération
+///   réussie. Les 4 champs (titre/emoji/description/prompt) sont
+///   éditables nativement via les `editable*` de `PopoverState` +
+///   sélecteur de catégorie + barre Annuler/Valider. Le payload
+///   `GeneratedAction` est la proposition initiale (peuplée dans les
+///   `editable*` au moment de la transition vers cette phase).
 /// - `.error(message: String)` : génération échouée. Message affiché,
 ///   bouton Générer prêt à relancer. Popover reste compact.
 enum GeneratorPhase: Equatable {
     case compact
     case loading
-    case resultReadOnly(GeneratedAction)
+    case resultEditable(GeneratedAction)
     case error(message: String)
 }
