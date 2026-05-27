@@ -469,11 +469,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// K.2-B lot 2b — hauteur du popover générateur en mode résultat
     /// ÉDITABLE (les 4 champs Titre/Emoji/Description/Prompt + champ
     /// « Action à générer » + bouton Regénérer + sélecteur de catégorie
-    /// + barre Annuler/Valider). Calibrage runtime. Décomposition :
+    /// + barre Annuler/Valider). Post-fignolage 2b : Emoji devient
+    /// EmojiPickerButton (carré 36×36, identique à l'éditeur de Réglages)
+    /// FUSIONNÉ avec Titre sur la même ligne — espace libéré reversé au
+    /// Prompt (plafond 200→250pt). Décomposition recalculée :
     /// top bar 52 + divider 1 + padTop 10 + section « Action à générer »
-    /// (~68) + spacing 16 + 3 champs mono (~174) + Prompt scrollable
-    /// (~230) + catégorie (~48) + padBottom 12 + divider + bottom bar
-    /// (~53) ≈ 664pt → buffer 16pt = 680pt.
+    /// (68) + spacing 14 + ligne Emoji+Titre (56) + spacing 14 +
+    /// Description (48) + spacing 14 + Prompt label+TextEditor 250 (270)
+    /// + spacing 14 + Catégorie (48) + padBottom 12 + divider + bottom
+    /// bar (52) ≈ 674pt → buffer 6pt = 680pt. ScrollView interne
+    /// absorbe les variabilités de rendu.
     static let popoverGeneratorEditableHeight: CGFloat = 680
 
     /// Phase du popover générateur, sert à dimensionner la fenêtre.

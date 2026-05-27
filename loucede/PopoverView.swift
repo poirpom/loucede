@@ -1078,11 +1078,42 @@ struct PopoverView: View {
                 }
 
                 // --- Section B : 4 champs éditables ---
-                editableSingleLineField(label: "Titre",
-                                        text: $state.editableTitle,
-                                        focusBinding: $isEditableTitleFocused)
-                editableSingleLineField(label: "Emoji",
-                                        text: $state.editableEmoji)
+                // Emoji + Titre sur la MÊME ligne. EmojiPickerButton à
+                // gauche (carré 36×36, identique à l'éditeur de Réglages
+                // → Actions — pattern unifié), Titre prend tout le reste.
+                // alignment: .top → les 2 labels alignés en haut ; les 2
+                // champs (carré 36pt + TextField forcé à 36pt via
+                // .frame(height: 36)) alignés top ET bottom, pas de
+                // déséquilibre visuel.
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Emoji")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        // Composant réutilisable de IconPickerView.swift :
+                        // clic ouvre la palette emoji système macOS (cf.
+                        // ActionsView.swift:855 pour l'usage modèle).
+                        EmojiPickerButton(icon: $state.editableEmoji,
+                                          boxSize: 36,
+                                          fontSize: 24)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Titre")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        TextField("", text: $state.editableTitle)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .frame(height: 36)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.primary.opacity(0.06))
+                            )
+                            .focused($isEditableTitleFocused)
+                    }
+                }
                 editableSingleLineField(label: "Description",
                                         text: $state.editableDescription)
                 editablePromptField
@@ -1096,35 +1127,12 @@ struct PopoverView: View {
         }
     }
 
-    /// Champ éditable mono-ligne — version avec focus binding (Titre).
-    /// Label 12pt secondary + TextField primary sur fond
-    /// `Color.primary.opacity(0.06)` radius 8 (cohérent avec le champ de
-    /// recherche du popup, V3 du brief).
-    private func editableSingleLineField(label: String,
-                                         text: Binding<String>,
-                                         focusBinding: FocusState<Bool>.Binding) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            TextField("", text: text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.06))
-                )
-                .focused(focusBinding)
-        }
-    }
-
-    /// Champ éditable mono-ligne — version sans focus binding (Emoji,
-    /// Description). Même styling visuel que la version avec focus.
-    /// Surcharge plutôt que paramètre optionnel pour éviter le mélange
-    /// de types View dans un ViewBuilder.
+    /// Champ éditable mono-ligne (utilisé pour Description). Label 12pt
+    /// secondary + TextField primary sur fond `Color.primary.opacity(0.06)`
+    /// radius 8 (cohérent avec le champ de recherche du popup, V3 du
+    /// brief). Le champ Titre est inliné dans `generatorEditableContent`
+    /// car il partage sa ligne avec EmojiPickerButton (hauteur forcée à
+    /// 36pt pour alignement).
     private func editableSingleLineField(label: String,
                                          text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1144,10 +1152,12 @@ struct PopoverView: View {
         }
     }
 
-    /// Champ Prompt — multi-ligne via TextEditor. Plafonné à 200pt
-    /// (au-delà, scroll interne natif). ↵ insère un saut de ligne — pas
-    /// de risque de validation accidentelle, la validation passe par ⌘↵
-    /// sur la bottom bar.
+    /// Champ Prompt — multi-ligne via TextEditor. Plafonné à 250pt
+    /// (au-delà, scroll interne natif). Plafond augmenté de 200 → 250
+    /// dans le fignolage 2b post-fusion Emoji+Titre (espace vertical
+    /// libéré reversé au Prompt — champ de loin le plus long en usage).
+    /// ↵ insère un saut de ligne — pas de risque de validation
+    /// accidentelle, la validation passe par ⌘↵ sur la bottom bar.
     private var editablePromptField: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Prompt")
@@ -1159,7 +1169,7 @@ struct PopoverView: View {
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
-                .frame(maxHeight: 200)
+                .frame(maxHeight: 250)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.primary.opacity(0.06))
