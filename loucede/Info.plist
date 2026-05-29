@@ -4,6 +4,8 @@
 <dict>
 	<key>ATSApplicationFontsPath</key>
 	<string>Fonts</string>
+	<key>LoucedeAppSecret</key>
+	<string>$(LOUCEDE_APP_SECRET)</string>
 	<key>CFBundleName</key>
 	<string>loucedé</string>
 	<key>LSApplicationCategoryType</key>

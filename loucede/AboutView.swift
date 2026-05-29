@@ -8,15 +8,6 @@ import AppKit
 
 struct AboutView: View {
     @StateObject private var updateChecker = UpdateChecker.shared
-    /// Phase 6.2 (2026-04-27) : observation explicite du LicenseManager
-    /// pour que le bouton « Envoyer une suggestion » se mette à jour
-    /// automatiquement quand `hasLicense` change (activation,
-    /// désactivation, basculement online ↔ offline). Avant on lisait
-    /// `LicenseManager.shared.hasLicense` directement, ce qui marchait
-    /// au premier rendu mais ne réagissait pas aux changements.
-    @StateObject private var licenseManager = LicenseManager.shared
-    /// Phase 6.16 (2026-04-26) : sheet d'envoi de suggestion.
-    @State private var showSuggestionSheet: Bool = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -77,14 +68,13 @@ struct AboutView: View {
                     .font(.system(size: 12))
             }
 
-            // Phase 6.16 : bouton d'envoi de suggestion. License-gated
-            // (cf. `LicenseManager.hasLicense`) — grisé tant que
-            // l'utilisateur n'a pas de licence active. En Debug,
-            // `hasLicense` est forcé à `true` par le `#if DEBUG` pour
-            // ne pas bloquer le dev. Réactivité assurée par le
-            // `@StateObject licenseManager` ci-dessus.
+            // Bouton d'envoi de suggestion (2026-05-29). Ouvre un
+            // `mailto:` pré-rempli vers salut@loucede.app via le client
+            // mail par défaut. Plus de formulaire ni de webhook (cf.
+            // décision n°4) : infra minimale, transparence pour
+            // l'utilisateur, pas de license-gating.
             Button {
-                showSuggestionSheet = true
+                openSuggestionMail()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "lightbulb")
@@ -96,17 +86,27 @@ struct AboutView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.bordered)
-            .disabled(!licenseManager.hasLicense)
-            .help(licenseManager.hasLicense
-                  ? "Partage une idée ou une remarque"
-                  : "Disponible après activation de la licence")
+            .help("Partage une idée ou une remarque par email")
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
-        .sheet(isPresented: $showSuggestionSheet) {
-            SuggestionFormView()
+    }
+
+    /// Ouvre le client mail par défaut sur un brouillon pré-rempli vers
+    /// salut@loucede.app. `URLComponents` gère l'encodage (sauts de ligne
+    /// en %0A, UTF-8 pour les accents du sujet).
+    private func openSuggestionMail() {
+        var comps = URLComponents()
+        comps.scheme = "mailto"
+        comps.path = "salut@loucede.app"
+        comps.queryItems = [
+            URLQueryItem(name: "subject", value: "À propos de loucedé"),
+            URLQueryItem(name: "body", value: "Salut Fabrice,\n\nJ'utilise loucedé et je voulais te dire :")
+        ]
+        if let url = comps.url {
+            NSWorkspace.shared.open(url)
         }
     }
 }

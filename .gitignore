@@ -17,6 +17,9 @@ xcuserdata/
 # Secrets (DO NOT commit real credentials)
 loucede/Secrets.swift
 
+# Secret de build (xcconfig) — cf. Secrets.xcconfig.example
+Secrets.xcconfig
+
 # Claude Code worktrees / local metadata
 .claude/
 

@@ -33,9 +33,14 @@ enum LicenseConfig {
     /// serveur), juste possibilité de spammer le proxy — mitigeable via
     /// rate limit Scaleway si ça arrivait jamais.
     ///
-    /// À remplir par l'utilisateur via `openssl rand -hex 32` (même valeur
-    /// que `LOUCEDE_APP_SECRET` côté Scaleway env vars).
-    static let appSecret = "a3db99a06ea8d9b5a2f9733be6c38935caf03d4cb8c8800353c9f8894fe38d63"
+    /// Plus stocké en clair dans le code source : injecté au build depuis
+    /// `Secrets.xcconfig` (gitignoré, cf. `Secrets.xcconfig.example`) →
+    /// `Info.plist` (clé `LoucedeAppSecret = $(LOUCEDE_APP_SECRET)`) → lu
+    /// ici via `Bundle.main`. Si la clé est absente (pas de
+    /// `Secrets.xcconfig`), on retombe sur `""` que `assertConfigured()`
+    /// rejette dès le premier appel réseau.
+    static let appSecret: String =
+        (Bundle.main.object(forInfoDictionaryKey: "LoucedeAppSecret") as? String) ?? ""
 
     /// URL de checkout Polar.sh publique pour le produit loucedé.
     /// Ouverte dans une WKWebView embarquée (`LicenseCheckoutView`,
@@ -63,7 +68,7 @@ enum LicenseConfig {
                 && !lower.contains("remplacer")
                 && !lower.contains("todo")
                 && !lower.contains("xxx"),
-            "LicenseConfig.appSecret semble invalide ou non renseigné. Mets ta valeur de `openssl rand -hex 32` (la même que côté Scaleway LOUCEDE_APP_SECRET)."
+            "LicenseConfig.appSecret semble invalide ou non renseigné. Crée `Secrets.xcconfig` à la racine (cf. `Secrets.xcconfig.example`) avec `LOUCEDE_APP_SECRET = <openssl rand -hex 32>` (la même valeur que côté Scaleway LOUCEDE_APP_SECRET)."
         )
     }
 }
