@@ -231,9 +231,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let statusItem = statusItem else { return }
             menuBarMenuController.showMenu(
                 relativeTo: statusItem,
-                onOpenLoucede: { [weak self] in
-                    self?.showPopover()
-                },
                 onSettings: { [weak self] in
                     self?.openSettings()
                 },
@@ -320,18 +317,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         installOutsideClickMonitor()
         pendingAction = nil
-    }
-
-    @objc func togglePopover() {
-        if popoverWindow?.isVisible == true {
-            hidePopover()
-        } else {
-            showPopover()
-        }
-    }
-
-    @objc func showPopover() {
-        showPopover(requireSelection: false)
     }
 
     func showPopover(requireSelection: Bool) {

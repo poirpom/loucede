@@ -298,10 +298,12 @@ final class PopoverState: ObservableObject {
     ///   immédiatement via `runAction(_:)`. Le popup bascule en mode
     ///   résultat compact via `.onChange(activeAction)` côté
     ///   PopoverView.
-    /// - Sinon (ouverture sans sélection — cas
-    ///   `showPopover(requireSelection: false)`) → l'action est ajoutée
-    ///   au catalogue mais pas lancée (pas de texte cible). Le popup
-    ///   se ferme proprement via `hidePopover()`.
+    /// - Sinon (aucun texte capturé) → l'action est ajoutée au
+    ///   catalogue mais pas lancée (pas de texte cible). Le popup se
+    ///   ferme proprement via `hidePopover()`. Garde défensive : le
+    ///   popup s'ouvre désormais uniquement sur sélection
+    ///   (`showPopover(requireSelection: true)`), mais le cas reste
+    ///   couvert sans risque.
     ///
     /// La sélection capturée est figée à l'ouverture du popup
     /// (cf. `AppDelegate.captureSelectedText()` appelée uniquement

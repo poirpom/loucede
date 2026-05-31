@@ -12,7 +12,6 @@ struct MenuBarMenuView: View {
     @State private var isVisible = false
     @State private var hoveredItem: String? = nil
 
-    var onOpenLoucede: () -> Void
     var onSettings: () -> Void
     var onQuit: () -> Void
     var onDismiss: () -> Void
@@ -29,18 +28,6 @@ struct MenuBarMenuView: View {
         VStack(spacing: 0) {
             // Menu items
             VStack(spacing: 2) {
-                MenuBarMenuItemWithAsset(
-                    assetName: "MenuBarIcon",
-                    title: "Ouvrir loucedé",
-                    isHovered: hoveredItem == "open",
-                    delay: 0.05
-                ) {
-                    onOpenLoucede()
-                }
-                .onHover { hovering in
-                    hoveredItem = hovering ? "open" : nil
-                }
-
                 MenuBarMenuItem(
                     icon: "gearshape",
                     title: "Réglages",
@@ -166,75 +153,12 @@ struct MenuBarMenuItem: View {
     }
 }
 
-// Menu item with asset image instead of SF Symbol
-struct MenuBarMenuItemWithAsset: View {
-    let assetName: String
-    let title: String
-    let isHovered: Bool
-    var isDestructive: Bool = false
-    let delay: Double
-    let action: () -> Void
-
-    @Environment(\.colorScheme) var colorScheme
-    @State private var isVisible = false
-
-    var textColor: Color {
-        if isDestructive && isHovered { return .white }
-        return colorScheme == .dark ? .white : Color(white: 0.15)
-    }
-
-    var iconColor: Color {
-        if isDestructive && isHovered { return .white }
-        return colorScheme == .dark ? Color(white: 0.7) : Color(white: 0.4)
-    }
-
-    var hoverBackground: Color {
-        if isDestructive { return Color.red.opacity(0.85) }
-        return colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06)
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(assetName)
-                    .resizable()
-                    .renderingMode(.template)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 14, height: 14)
-                    .foregroundColor(iconColor)
-                    .frame(width: 18)
-
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(textColor)
-
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovered ? hoverBackground : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .offset(y: isVisible ? 0 : -8)
-        .opacity(isVisible ? 1 : 0)
-        .onAppear {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7).delay(delay)) {
-                isVisible = true
-            }
-        }
-    }
-}
-
 // Window controller for the menu
 class MenuBarMenuWindowController: NSObject {
     private var menuWindow: NSWindow?
     private var eventMonitor: Any?
 
-    func showMenu(relativeTo statusItem: NSStatusItem, onOpenLoucede: @escaping () -> Void, onSettings: @escaping () -> Void, onQuit: @escaping () -> Void) {
+    func showMenu(relativeTo statusItem: NSStatusItem, onSettings: @escaping () -> Void, onQuit: @escaping () -> Void) {
         guard let button = statusItem.button else { return }
 
         // Close existing menu if any
@@ -247,10 +171,6 @@ class MenuBarMenuWindowController: NSObject {
 
         // Create the menu view
         let menuView = MenuBarMenuView(
-            onOpenLoucede: { [weak self] in
-                self?.closeMenu()
-                onOpenLoucede()
-            },
             onSettings: { [weak self] in
                 self?.closeMenu()
                 onSettings()

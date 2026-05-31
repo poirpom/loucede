@@ -33,7 +33,7 @@ struct ActivationStep: View {
             // template `MenuBarIcon` dans la status bar (asset partagé
             // avec `loucedeApp.setupMenuBar`) et le bouton « Réglages »
             // dans le popup (SF Symbol `gearshape` partagé avec
-            // `MenuBarMenuView.swift:45` + `PopoverView.swift:592`).
+            // `MenuBarMenuView.swift:32` + `PopoverView.swift:592`).
             //
             // Concaténation Text + Text(Image(...)) : les icônes
             // héritent automatiquement de la taille de police et de la
