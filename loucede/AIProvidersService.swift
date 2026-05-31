@@ -1,5 +1,5 @@
 //
-//  OpenAIService.swift
+//  AIProvidersService.swift
 //  loucede
 //
 //  Service d'appel aux API IA.
