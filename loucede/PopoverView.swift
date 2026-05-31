@@ -830,6 +830,11 @@ struct PopoverView: View {
             Text(name)
                 .font(.system(size: 13))
             Spacer()
+            // Indice de découvrabilité : ⏎ déclenche l'item sélectionné.
+            // Affiché sur la seule row sélectionnée (action ou Générateur).
+            if isSelected {
+                KeyboardKey("↵", onAccent: true)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -1430,22 +1435,27 @@ struct PopoverView: View {
 
 struct KeyboardKey: View {
     let text: String
+    /// Variante posée sur un fond d'accent (row sélectionnée bleue
+    /// #3F84F7) : blanc translucide pour contraste, au lieu du gris
+    /// `.secondary` sur fond `controlBackgroundColor`.
+    var onAccent: Bool = false
 
-    init(_ text: String) {
+    init(_ text: String, onAccent: Bool = false) {
         self.text = text
+        self.onAccent = onAccent
     }
 
     var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.secondary)
+            .foregroundColor(onAccent ? .white : .secondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(onAccent ? Color.white.opacity(0.2) : Color(NSColor.controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    .stroke(onAccent ? Color.white.opacity(0.4) : Color.gray.opacity(0.3), lineWidth: 1)
             )
     }
 }
