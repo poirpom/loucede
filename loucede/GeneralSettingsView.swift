@@ -640,11 +640,17 @@ struct CostEstimateCard: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // Ligne « Coût total estimé » — toujours présente (label gauche,
-            // valeur droite, 14px semibold/bold .primary).
-            HStack {
+            // Ligne « Coût total estimé » — toujours présente. Typo + icône
+            // fournisseur calquées sur le nom de modèle de ModelSpecsCard
+            // (Image 18×18 + spacing 8, 14px bold .primary) pour cohérence
+            // visuelle avec le cadre voisin.
+            HStack(spacing: 8) {
+                Image(provider.iconName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 18, height: 18)
                 Text("Coût total estimé")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(formatCost(total))
