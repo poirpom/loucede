@@ -47,7 +47,10 @@ struct AIModel: Identifiable, Hashable, Codable {
                                   description: "Le plus capable d'OpenAI")),
 
         // Anthropic
-        AIModel(id: "claude-haiku-4-5", name: "🚀 Claude Haiku 4.5", provider: .anthropic,
+        // Fallback A_O.2 : l'alias court `claude-haiku-4-5` est absent de
+        // GET /v1/models (auto-heal le masquait) → on câble le modelId daté.
+        // L'affichage utilisateur (`name`) reste stable.
+        AIModel(id: "claude-haiku-4-5-20251001", name: "🚀 Claude Haiku 4.5", provider: .anthropic,
                 specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 4,
                                   description: "Ultra-léger pour tâches simples")),
         AIModel(id: "claude-sonnet-4-6", name: "⚖️ Claude Sonnet 4.6", provider: .anthropic,
@@ -96,7 +99,7 @@ enum AIProvider: String, CaseIterable, Codable {
     var defaultModelId: String {
         switch self {
         case .openai:    return "gpt-4o-mini"
-        case .anthropic: return "claude-haiku-4-5"
+        case .anthropic: return "claude-haiku-4-5-20251001"  // fallback A_O.2 (alias court refusé)
         case .mistral:   return "mistral-small-latest"
         }
     }
