@@ -284,16 +284,22 @@ final class PopoverState: ObservableObject {
     }
 
     /// Mappe un `GeneratorError` vers le message user-facing affiché dans
-    /// la phase `.error`. K.2-B lot 2a : 2 messages (pas un par cas — le
-    /// polish fin viendra en K.3). Un actionnable pour `noApiKey`, un
-    /// générique pour les autres cas (providerUnavailable, emptyResponse,
-    /// invalidJSON, incompleteFields).
+    /// la phase `.error`. K.3 (polish) : 4 messages ciblés (le Lot 2a n'en
+    /// avait que 2, en attendant ce polish). `noApiKey` actionnable ·
+    /// `timeout` dédié · `providerUnavailable` (réseau/5xx) · le trio
+    /// emptyResponse/invalidJSON/incompleteFields regroupé sous « réponse
+    /// inattendue » (même cause vécue côté utilisateur : l'IA n'a pas
+    /// renvoyé ce qu'on attendait).
     private static func userFacingErrorMessage(for error: GeneratorError) -> String {
         switch error {
         case .noApiKey:
             return "Aucun fournisseur IA configuré. Va dans les Réglages pour en configurer un."
-        case .providerUnavailable, .emptyResponse, .invalidJSON, .incompleteFields:
-            return "La génération a échoué. Réessaie."
+        case .timeout:
+            return "Délai dépassé. Réessaie."
+        case .providerUnavailable:
+            return "Service IA momentanément indisponible. Réessaie."
+        case .emptyResponse, .invalidJSON, .incompleteFields:
+            return "Réponse inattendue de l'IA. Réessaie."
         }
     }
 

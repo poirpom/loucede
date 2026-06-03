@@ -42,6 +42,9 @@ enum GeneratorError: LocalizedError {
     /// `ActionsStore.hasUsableProvider` (même gating que l'emptyState
     /// du popup).
     case noApiKey
+    /// Délai dépassé : la requête réseau a expiré (`URLError.timedOut`).
+    /// Distingué de `providerUnavailable` pour un message dédié.
+    case timeout
     /// Erreur réseau / HTTP / provider — wrap du message d'`AIError`.
     case providerUnavailable(String)
     /// L'IA a renvoyé une réponse vide ou whitespace-seul.
@@ -57,6 +60,8 @@ enum GeneratorError: LocalizedError {
         switch self {
         case .noApiKey:
             return "Aucune clé API configurée pour le provider sélectionné."
+        case .timeout:
+            return "Délai dépassé : la requête au provider a expiré."
         case .providerUnavailable(let detail):
             return "Provider indisponible : \(detail)"
         case .emptyResponse:
@@ -126,6 +131,13 @@ enum ActionGenerator {
                 model: model
             )
         } catch {
+            // Timeout distingué via le code URLError (locale-indépendant,
+            // pas de matching sur localizedDescription). Le cas .cancelled
+            // (Esc) n'arrive jamais jusqu'à un message : le garde
+            // `currentGenerationToken` côté PopoverState jette le résultat.
+            if let urlError = error as? URLError, urlError.code == .timedOut {
+                return .failure(.timeout)
+            }
             return .failure(.providerUnavailable(error.localizedDescription))
         }
 
