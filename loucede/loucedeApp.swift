@@ -721,10 +721,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // menu ou bouton ne l'ouvrait).
 
     func hidePopover() {
-        // Annule tout stream LLM en cours (le résultat ne sera plus visible)
-        // et libère le timer de flush des chunks (Phase 6.8g).
+        // Annule tout stream LLM en cours et nettoie le contenu transitoire
+        // (mode résultat + générateur) pour qu'il ne flashe pas à la
+        // réouverture. Dispatché en Task @MainActor (async) : tombe donc
+        // APRÈS l'orderOut synchrone ci-dessous → fenêtre déjà masquée, pas
+        // de flash-liste avant disparition.
         Task { @MainActor in
-            PopoverState.shared.endStream()
+            PopoverState.shared.clearTransientContent()
         }
         popoverWindow?.orderOut(nil)
         if let monitor = eventMonitor {
@@ -752,6 +755,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func performPasteInPreviousApp() {
         // Cerrar el popup
         popoverWindow?.orderOut(nil)
+        // Même nettoyage qu'à la fermeture normale : ce chemin (⌘↵ Coller)
+        // ne passe pas par hidePopover(), donc sans ça l'état résultat
+        // resterait en mémoire et flasherait à la réouverture suivante.
+        Task { @MainActor in
+            PopoverState.shared.clearTransientContent()
+        }
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil

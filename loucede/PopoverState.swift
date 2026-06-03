@@ -160,6 +160,23 @@ final class PopoverState: ObservableObject {
         resultText = ""
     }
 
+    /// Nettoie le contenu transitoire affiché (mode résultat + mode
+    /// générateur) à la fermeture du popup, pour éviter que l'état du
+    /// mode précédent ne « flashe » à la réouverture — le `reset()` côté
+    /// ouverture étant dispatché async (Task @MainActor), il arrive trop
+    /// tard, après que la fenêtre a déjà été affichée.
+    /// NE TOUCHE PAS searchQuery/selectedIndex (état liste) ni openCounter
+    /// (incrémenté uniquement à l'ouverture).
+    func clearTransientContent() {
+        endStream()
+        cancelOngoingGeneration()
+        activeAction = nil
+        resultText = ""
+        generatorPhase = nil
+        generatorInputText = ""
+        clearEditableFields()
+    }
+
     // MARK: - Générateur — méthodes (K.2-B lot 2a)
 
     /// Active le mode Générateur. Affecte `generatorInputText` à la valeur
