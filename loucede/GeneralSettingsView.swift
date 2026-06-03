@@ -153,7 +153,11 @@ struct GeneralSettingsView: View {
                             }
                         }
 
-                        Spacer()
+                        // L.5 — carte « Coût estimé » dans l'espace droit
+                        // jusqu'ici vide (ancien Spacer). Alignée en haut
+                        // (HStack alignment: .top), occupe la largeur restante.
+                        CostEstimateCard(provider: selectedProvider)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                     }
 
                     HStack {
@@ -574,6 +578,116 @@ struct SpecsBar: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Carte « Coût estimé » (Phase L.5)
+
+/// Affiche le coût IA estimé cumulé pour le fournisseur sélectionné, à
+/// partir des tokens enregistrés par `UsageTracker` (L.3) et de la grille
+/// `modelPricing` (L.4). Réactive via `@ObservedObject` sur le tracker.
+///
+/// Bascule mono ↔ multi selon le nombre de modèles du fournisseur ayant un
+/// usage > 0 : 0 ou 1 → layout centré (total seul) ; ≥ 2 → total à gauche +
+/// détail par modèle à droite (trié par coût décroissant).
+struct CostEstimateCard: View {
+    let provider: AIProvider
+    @ObservedObject private var usage = UsageTracker.shared
+    @Environment(\.colorScheme) var colorScheme
+
+    private var appBlue: Color {
+        Color(red: 0.0, green: 0.584, blue: 1.0)
+    }
+
+    private struct ModelCost: Identifiable {
+        let id: String
+        let name: String
+        let cost: Double?   // nil = modelId absent de la grille (--,-- €)
+    }
+
+    /// Modèles du fournisseur avec usage > 0, triés par coût décroissant.
+    private var costs: [ModelCost] {
+        AIModel.models(for: provider)
+            .compactMap { model -> ModelCost? in
+                guard let counts = usage.tokensByModel[model.id],
+                      counts.input + counts.output > 0 else { return nil }
+                let cost = estimatedCostEUR(modelId: model.id,
+                                            inputTokens: counts.input,
+                                            outputTokens: counts.output)
+                return ModelCost(id: model.id, name: model.name, cost: cost)
+            }
+            .sorted { ($0.cost ?? -1) > ($1.cost ?? -1) }
+    }
+
+    private var total: Double {
+        costs.compactMap { $0.cost }.reduce(0, +)
+    }
+
+    /// Format FR : virgule, « X,XX € ». `0,00 €` pour un zéro réel,
+    /// `< 0,01 €` pour un coût non nul sous le centime, `--,-- €` pour nil.
+    private func formatCost(_ value: Double?) -> String {
+        guard let value else { return "--,-- €" }
+        if value == 0 { return "0,00 €" }
+        if value < 0.01 { return "< 0,01 €" }
+        let fmt = NumberFormatter()
+        fmt.locale = Locale(identifier: "fr_FR")
+        fmt.numberStyle = .currency
+        fmt.currencyCode = "EUR"
+        return fmt.string(from: NSNumber(value: value)) ?? "--,-- €"
+    }
+
+    private var totalLabel: some View {
+        VStack(alignment: costs.count >= 2 ? .leading : .center, spacing: 2) {
+            Text(formatCost(total))
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.primary)
+            Text("Coût estimé")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if costs.count >= 2 {
+                // Multi-modèles : total à gauche, détail à droite.
+                HStack(alignment: .center, spacing: 16) {
+                    totalLabel
+                        .frame(minWidth: 90, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(costs) { entry in
+                            Text("• \(entry.name) : \(formatCost(entry.cost))")
+                                .font(.system(size: 12))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                // Mono-modèle ou état initial : total centré.
+                totalLabel
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            Divider()
+
+            if let url = URL(string: provider.billingURL) {
+                Link("afficher le coût réel →", destination: url)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(appBlue)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.gray.opacity(colorScheme == .dark ? 0.10 : 0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+        )
     }
 }
 

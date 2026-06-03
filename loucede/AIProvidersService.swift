@@ -131,6 +131,16 @@ enum AIProvider: String, CaseIterable, Codable {
         case .mistral:   return "mistral"
         }
     }
+
+    /// Page de facturation/usage officielle du fournisseur — lien « afficher
+    /// le coût réel → » de la carte Coût estimé (L.5). URL absolue (https).
+    var billingURL: String {
+        switch self {
+        case .openai:    return "https://platform.openai.com/settings/organization/usage"
+        case .anthropic: return "https://platform.claude.com/settings/billing"
+        case .mistral:   return "https://admin.mistral.ai/organization/billing"
+        }
+    }
 }
 
 // MARK: - AI Service
