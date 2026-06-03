@@ -23,6 +23,13 @@
 import Foundation
 import Combine
 
+/// Tokens cumulés (entrée + sortie) pour un modèle donné. Persisté en JSON
+/// dans `tokensByModel` (Phase L.3). Accumulatif, sans reset en V1.
+struct TokenCounts: Codable {
+    var input: Int
+    var output: Int
+}
+
 @MainActor
 final class UsageTracker: ObservableObject {
 
@@ -34,12 +41,21 @@ final class UsageTracker: ObservableObject {
         static let count       = "loucede.usage.count"
         static let firstUseDate = "loucede.usage.firstUseDate"
         static let perAction   = "loucede.usage.perAction"   // K.4-lot3 (L2)
+        static let tokensByModel = "loucede.usage.tokensByModel" // Phase L.3
     }
 
     // MARK: - État publié
 
     @Published private(set) var count: Int
     @Published private(set) var firstUseDate: Date?
+
+    // MARK: - L.3 : tokens cumulés par modèle (Phase L)
+
+    /// Tokens cumulés par modelId (clé = `AIModel.id`). `@Published` (à la
+    /// différence de `perActionCount`) car la carte « Coût estimé » des
+    /// Réglages (L.5) en dépend et doit réagir en temps réel. Persisté JSON
+    /// sous `Keys.tokensByModel`.
+    @Published private(set) var tokensByModel: [String: TokenCounts] = [:]
 
     // MARK: - L2 : comptage par action (K.4-lot3)
 
@@ -66,6 +82,12 @@ final class UsageTracker: ObservableObject {
             perActionCount = decoded
         } else {
             perActionCount = [:]
+        }
+
+        // L.3 : chargement des tokens par modèle (vide si absent/illisible).
+        if let data = UserDefaults.standard.data(forKey: Keys.tokensByModel),
+           let decoded = try? JSONDecoder().decode([String: TokenCounts].self, from: data) {
+            tokensByModel = decoded
         }
     }
 
@@ -134,6 +156,22 @@ final class UsageTracker: ObservableObject {
         perActionCount[actionID.uuidString, default: 0] += 1
         if let data = try? JSONEncoder().encode(perActionCount) {
             UserDefaults.standard.set(data, forKey: Keys.perAction)
+        }
+    }
+
+    // MARK: - L.3 : tokens par modèle (Phase L)
+
+    /// Accumule les tokens d'un stream réussi pour `modelId` (crée l'entrée
+    /// à 0 si absente), puis persiste. Appelé via le callback `onUsage` de
+    /// `chatStream` (L.2), une seule fois par stream terminé. La mutation de
+    /// `tokensByModel` (@Published) déclenche le re-render de la carte coût.
+    func recordTokens(modelId: String, input: Int, output: Int) {
+        var counts = tokensByModel[modelId] ?? TokenCounts(input: 0, output: 0)
+        counts.input += input
+        counts.output += output
+        tokensByModel[modelId] = counts
+        if let data = try? JSONEncoder().encode(tokensByModel) {
+            UserDefaults.standard.set(data, forKey: Keys.tokensByModel)
         }
     }
 }
