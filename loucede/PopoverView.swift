@@ -957,6 +957,7 @@ struct PopoverView: View {
                     .foregroundStyle(.secondary)
                 Text("Ex. : traduis en russe")
                     .font(.system(size: 11))
+                    .italic()
                     .foregroundStyle(.secondary)
             }
 
@@ -1051,6 +1052,7 @@ struct PopoverView: View {
                             .foregroundStyle(.secondary)
                         Text("Ex. : traduis en russe")
                             .font(.system(size: 11))
+                            .italic()
                             .foregroundStyle(.secondary)
                     }
 
@@ -1076,6 +1078,11 @@ struct PopoverView: View {
                             Text("Regénérer")
                                 .font(.system(size: 13))
                                 .padding(.horizontal, 6)
+                                // Épouse la hauteur du TextField voisin (le
+                                // .bordered intrinsèque est plus court). Pas
+                                // de nombre magique : s'aligne sur la hauteur
+                                // du HStack = celle du champ.
+                                .frame(maxHeight: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .disabled(state.generatorInputText.trimmingCharacters(in: .whitespaces).isEmpty)
