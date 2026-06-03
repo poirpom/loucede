@@ -488,14 +488,23 @@ final class PopoverState: ObservableObject {
                     messages: [(role: "user", content: fullPrompt)],
                     apiKey: apiKey,
                     provider: provider,
-                    model: model
-                ) { [weak self] chunk in
-                    // Le chunk callback est invoqué via `await MainActor.run`
-                    // côté AIService — on est donc bien sur MainActor ici.
-                    // On accumule plutôt que de modifier `resultText`
-                    // directement : un seul re-render par frame.
-                    self?.pendingChunkBuffer += chunk
-                }
+                    model: model,
+                    onChunk: { [weak self] chunk in
+                        // Le chunk callback est invoqué via `await MainActor.run`
+                        // côté AIService — on est donc bien sur MainActor ici.
+                        // On accumule plutôt que de modifier `resultText`
+                        // directement : un seul re-render par frame.
+                        self?.pendingChunkBuffer += chunk
+                    },
+                    onUsage: { modelId, inputTokens, outputTokens in
+                        // L.2 — invoqué via MainActor.run côté AIService, une
+                        // seule fois en fin de stream réussi. UsageTracker est
+                        // @MainActor → recordTokens sûr ici.
+                        UsageTracker.shared.recordTokens(modelId: modelId,
+                                                         input: inputTokens,
+                                                         output: outputTokens)
+                    }
+                )
                 streamSucceeded = true
             } catch {
                 // Vide d'abord le tampon (ne pas perdre le partiel) puis

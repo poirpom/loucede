@@ -172,7 +172,8 @@ class AIService {
         apiKey: String,
         provider: AIProvider,
         model: AIModel,
-        onChunk: @escaping (String) -> Void
+        onChunk: @escaping (String) -> Void,
+        onUsage: ((_ modelId: String, _ inputTokens: Int, _ outputTokens: Int) -> Void)? = nil
     ) async throws {
         guard !apiKey.isEmpty else {
             onChunk("Aucune clé API renseignée. Va dans les réglages (dans la barre de menus) pour arranger ça :)")
@@ -181,9 +182,9 @@ class AIService {
 
         switch provider {
         case .anthropic:
-            try await streamAnthropicChat(messages: messages, apiKey: apiKey, model: model, onChunk: onChunk)
+            try await streamAnthropicChat(messages: messages, apiKey: apiKey, model: model, onChunk: onChunk, onUsage: onUsage)
         case .openai, .mistral:
-            try await streamOpenAICompatibleChat(messages: messages, apiKey: apiKey, provider: provider, model: model, onChunk: onChunk)
+            try await streamOpenAICompatibleChat(messages: messages, apiKey: apiKey, provider: provider, model: model, onChunk: onChunk, onUsage: onUsage)
         }
     }
 
@@ -193,7 +194,8 @@ class AIService {
         apiKey: String,
         provider: AIProvider,
         model: AIModel,
-        onChunk: @escaping (String) -> Void
+        onChunk: @escaping (String) -> Void,
+        onUsage: ((_ modelId: String, _ inputTokens: Int, _ outputTokens: Int) -> Void)? = nil
     ) async throws {
         let url = URL(string: provider.baseURL)!
 
@@ -272,9 +274,12 @@ class AIService {
             await MainActor.run { onChunk(content) }
         }
 
-        #if DEBUG
-        print("[usage] OpenAI/Mistral captured=\(usageCaptured) in=\(inputTokens) out=\(outputTokens)")
-        #endif
+        // L.2 — usage rapporté une seule fois, en fin de stream réussi
+        // (jamais atteint sur throw/cancel → sémantique « tous ou rien »).
+        // Skip si la capture a échoué (pas d'incrément sur usage absent).
+        if usageCaptured {
+            await MainActor.run { onUsage?(model.id, inputTokens, outputTokens) }
+        }
     }
 
     // MARK: - Anthropic streaming
@@ -282,7 +287,8 @@ class AIService {
         messages: [(role: String, content: String)],
         apiKey: String,
         model: AIModel,
-        onChunk: @escaping (String) -> Void
+        onChunk: @escaping (String) -> Void,
+        onUsage: ((_ modelId: String, _ inputTokens: Int, _ outputTokens: Int) -> Void)? = nil
     ) async throws {
         let url = URL(string: AIProvider.anthropic.baseURL)!
 
@@ -360,9 +366,11 @@ class AIService {
             if eventType == "message_stop" { break }
         }
 
-        #if DEBUG
-        print("[usage] Anthropic captured=\(usageCaptured) in=\(inputTokens) out=\(outputTokens)")
-        #endif
+        // L.2 — cf. streamOpenAICompatibleChat : usage rapporté une fois en
+        // fin de stream réussi, skip si capture échouée.
+        if usageCaptured {
+            await MainActor.run { onUsage?(model.id, inputTokens, outputTokens) }
+        }
     }
 
     // MARK: - OpenAI-compatible chat (non-streaming)
