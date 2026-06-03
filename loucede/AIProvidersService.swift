@@ -214,7 +214,11 @@ class AIService {
             "messages": apiMessages,
             "max_tokens": 4000,
             "temperature": 0.7,
-            "stream": true
+            "stream": true,
+            // L.1 : demande le chunk usage final (choices vide + usage).
+            // Mistral est OpenAI-compatible mais peut ignorer cette option
+            // → dégradation gracieuse (usage non capté, stream texte intact).
+            "stream_options": ["include_usage": true]
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -234,13 +238,32 @@ class AIService {
             throw AIError.httpError(httpResponse.statusCode)
         }
 
+        // L.1 — accumulateurs de tokens (cumulés sur le stream). Capture
+        // 100% défensive : tout échec laisse `usageCaptured == false` et
+        // n'interrompt jamais le flux texte.
+        var inputTokens = 0
+        var outputTokens = 0
+        var usageCaptured = false
+
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }
             let data = String(line.dropFirst(6))
             if data == "[DONE]" { break }
+            // Parse une seule fois, puis 2 usages distincts du même `json` :
+            // (a) capter le chunk `usage` (choices vide), (b) extraire le
+            // texte. Avant : un seul gros guard qui skippait le chunk usage.
             guard let jsonData = data.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
+                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                continue
+            }
+            // (a) Chunk usage final (OpenAI/Mistral avec include_usage).
+            if let usage = json["usage"] as? [String: Any] {
+                if let p = usage["prompt_tokens"] as? Int { inputTokens = p }
+                if let c = usage["completion_tokens"] as? Int { outputTokens = c }
+                usageCaptured = true
+            }
+            // (b) Texte du delta — inchangé.
+            guard let choices = json["choices"] as? [[String: Any]],
                   let firstChoice = choices.first,
                   let delta = firstChoice["delta"] as? [String: Any],
                   let content = delta["content"] as? String else {
@@ -248,6 +271,10 @@ class AIService {
             }
             await MainActor.run { onChunk(content) }
         }
+
+        #if DEBUG
+        print("[usage] OpenAI/Mistral captured=\(usageCaptured) in=\(inputTokens) out=\(outputTokens)")
+        #endif
     }
 
     // MARK: - Anthropic streaming
@@ -295,6 +322,13 @@ class AIService {
             throw AIError.httpError(httpResponse.statusCode)
         }
 
+        // L.1 — accumulateurs de tokens (cf. streamOpenAICompatibleChat).
+        // input_tokens vient de `message_start`, output_tokens (cumulé final)
+        // du dernier `message_delta`. Capture 100% défensive.
+        var inputTokens = 0
+        var outputTokens = 0
+        var usageCaptured = false
+
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }
             let data = String(line.dropFirst(6))
@@ -308,8 +342,27 @@ class AIService {
                let text = delta["text"] as? String {
                 await MainActor.run { onChunk(text) }
             }
+            // message_start : usage.input_tokens (output_tokens y vaut ~1,
+            // ignoré). message_delta : usage.output_tokens cumulé final.
+            if eventType == "message_start",
+               let message = json["message"] as? [String: Any],
+               let usage = message["usage"] as? [String: Any],
+               let i = usage["input_tokens"] as? Int {
+                inputTokens = i
+                usageCaptured = true
+            }
+            if eventType == "message_delta",
+               let usage = json["usage"] as? [String: Any],
+               let o = usage["output_tokens"] as? Int {
+                outputTokens = o
+                usageCaptured = true
+            }
             if eventType == "message_stop" { break }
         }
+
+        #if DEBUG
+        print("[usage] Anthropic captured=\(usageCaptured) in=\(inputTokens) out=\(outputTokens)")
+        #endif
     }
 
     // MARK: - OpenAI-compatible chat (non-streaming)
