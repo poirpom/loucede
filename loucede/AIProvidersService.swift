@@ -14,7 +14,7 @@ import Foundation
 struct ModelSpecs: Hashable, Codable {
     let speed: Int          // 1-5
     let intelligence: Int   // 1-5
-    let tokenUsage: Int     // 1-5 (plus bas = moins cher)
+    let tokenUsage: Int     // 1-5 (plus HAUT = moins cher — rendu inversé en « Coût tokens »)
     let description: String
 
     static let `default` = ModelSpecs(speed: 3, intelligence: 3, tokenUsage: 3, description: "Modèle IA standard")
@@ -28,52 +28,45 @@ struct AIModel: Identifiable, Hashable, Codable {
     let provider: AIProvider
     let specs: ModelSpecs
 
+    // Phase O — catalogue 3 tiers × 3 providers (9 modèles). Par provider,
+    // ordre rapide → intermédiaire → puissant (le 1er = tier rapide, aligné sur
+    // `defaultModelId`). Préfixe emoji de tier dans `name` : 🚀 rapide /
+    // ⚖️ intermédiaire / 🧠 puissant. Aliases auto-évolutifs là où le provider
+    // le permet (Mistral `-latest` pleinement ; Anthropic/OpenAI = IDs figés à
+    // bumper aux ruptures de génération). Cf. decisions.md #6.
     static let allModels: [AIModel] = [
         // OpenAI
-        AIModel(id: "gpt-4o", name: "GPT-4o", provider: .openai,
-                specs: ModelSpecs(speed: 4, intelligence: 5, tokenUsage: 3,
-                                  description: "Modèle multimodal le plus capable")),
-        AIModel(id: "gpt-4o-mini", name: "GPT-4o Mini", provider: .openai,
+        AIModel(id: "gpt-4o-mini", name: "🚀 GPT-4o Mini", provider: .openai,
                 specs: ModelSpecs(speed: 5, intelligence: 4, tokenUsage: 5,
                                   description: "Rapide et économique")),
-        AIModel(id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: .openai,
-                specs: ModelSpecs(speed: 3, intelligence: 5, tokenUsage: 2,
-                                  description: "Large fenêtre de contexte")),
-        AIModel(id: "o1-mini", name: "o1 Mini", provider: .openai,
-                specs: ModelSpecs(speed: 2, intelligence: 4, tokenUsage: 2,
-                                  description: "Modèle de raisonnement compact")),
+        AIModel(id: "gpt-4o", name: "⚖️ GPT-4o", provider: .openai,
+                specs: ModelSpecs(speed: 4, intelligence: 4, tokenUsage: 2,
+                                  description: "Polyvalent, bon équilibre")),
+        AIModel(id: "gpt-4.1", name: "🧠 GPT-4.1", provider: .openai,
+                specs: ModelSpecs(speed: 4, intelligence: 5, tokenUsage: 3,
+                                  description: "Le plus capable d'OpenAI")),
 
         // Anthropic
-        AIModel(id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: .anthropic,
-                specs: ModelSpecs(speed: 2, intelligence: 5, tokenUsage: 1,
-                                  description: "Claude le plus avancé, raisonnement exceptionnel")),
-        AIModel(id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: .anthropic,
+        AIModel(id: "claude-haiku-4-5", name: "🚀 Claude Haiku 4.5", provider: .anthropic,
+                specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 4,
+                                  description: "Ultra-léger pour tâches simples")),
+        AIModel(id: "claude-sonnet-4-6", name: "⚖️ Claude Sonnet 4.6", provider: .anthropic,
                 specs: ModelSpecs(speed: 4, intelligence: 5, tokenUsage: 2,
                                   description: "Excellent rapport qualité/prix")),
-        AIModel(id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: .anthropic,
-                specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 5,
-                                  description: "Ultra-léger pour tâches simples")),
-        // Claude 3.5 Sonnet + Haiku (20241022) ont été retirés par Anthropic en 2025.
+        AIModel(id: "claude-opus-4-8", name: "🧠 Claude Opus 4.8", provider: .anthropic,
+                specs: ModelSpecs(speed: 2, intelligence: 5, tokenUsage: 1,
+                                  description: "Claude le plus avancé, raisonnement exceptionnel")),
 
         // Mistral
-        AIModel(id: "mistral-large-latest", name: "Mistral Large", provider: .mistral,
-                specs: ModelSpecs(speed: 3, intelligence: 5, tokenUsage: 2,
-                                  description: "Modèle phare de Mistral")),
-        AIModel(id: "mistral-medium-latest", name: "Mistral Medium", provider: .mistral,
-                specs: ModelSpecs(speed: 4, intelligence: 4, tokenUsage: 3,
-                                  description: "Équilibré pour la plupart des usages")),
-        AIModel(id: "mistral-small-latest", name: "Mistral Small", provider: .mistral,
+        AIModel(id: "mistral-small-latest", name: "🚀 Mistral Small", provider: .mistral,
                 specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 5,
                                   description: "Rapide et abordable")),
-        AIModel(id: "codestral-latest", name: "Codestral", provider: .mistral,
-                specs: ModelSpecs(speed: 4, intelligence: 4, tokenUsage: 3,
-                                  description: "Spécialisé pour le code")),
-        AIModel(id: "ministral-8b-latest", name: "Ministral 8B", provider: .mistral,
-                specs: ModelSpecs(speed: 5, intelligence: 3, tokenUsage: 5,
-                                  description: "Modèle compact, très rapide")),
-        AIModel(id: "ministral-3b-latest", name: "Ministral 3B", provider: .mistral,
-                specs: ModelSpecs(speed: 5, intelligence: 2, tokenUsage: 5,
-                                  description: "Ultra-léger pour tâches simples")),
+        AIModel(id: "mistral-medium-latest", name: "⚖️ Mistral Medium", provider: .mistral,
+                specs: ModelSpecs(speed: 4, intelligence: 4, tokenUsage: 4,
+                                  description: "Équilibré pour la plupart des usages")),
+        AIModel(id: "mistral-large-latest", name: "🧠 Mistral Large", provider: .mistral,
+                specs: ModelSpecs(speed: 3, intelligence: 5, tokenUsage: 3,
+                                  description: "Modèle phare de Mistral")),
     ]
 
     static func models(for provider: AIProvider) -> [AIModel] {
@@ -103,7 +96,7 @@ enum AIProvider: String, CaseIterable, Codable {
     var defaultModelId: String {
         switch self {
         case .openai:    return "gpt-4o-mini"
-        case .anthropic: return "claude-sonnet-4-20250514"
+        case .anthropic: return "claude-haiku-4-5"
         case .mistral:   return "mistral-small-latest"
         }
     }
