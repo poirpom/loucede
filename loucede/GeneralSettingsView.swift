@@ -154,10 +154,12 @@ struct GeneralSettingsView: View {
                         }
 
                         // L.5 — carte « Coût estimé » dans l'espace droit
-                        // jusqu'ici vide (ancien Spacer). Alignée en haut
-                        // (HStack alignment: .top), occupe la largeur restante.
+                        // jusqu'ici vide (ancien Spacer). maxHeight + alignment
+                        // .bottom = aimantée en bas du HStack (donc alignée sur
+                        // le bas de ModelSpecsCard) ; la carte grossit vers le
+                        // HAUT à mesure que des lignes modèle s'ajoutent.
                         CostEstimateCard(provider: selectedProvider)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
 
                     HStack {
@@ -636,38 +638,38 @@ struct CostEstimateCard: View {
         return fmt.string(from: NSNumber(value: value)) ?? "--,-- €"
     }
 
-    private var totalLabel: some View {
-        VStack(alignment: costs.count >= 2 ? .leading : .center, spacing: 2) {
-            Text(formatCost(total))
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.primary)
-            Text("Coût estimé")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.secondary)
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            // Ligne « Coût total estimé » — toujours présente (label gauche,
+            // valeur droite, 14px semibold/bold .primary).
+            HStack {
+                Text("Coût total estimé")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Text(formatCost(total))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.primary)
+            }
+
+            // Détail par modèle (tableau 2 colonnes) — affiché seulement à
+            // partir de 2 modèles utilisés ; vide en mono/initial (pas de
+            // bascule de layout, juste une liste vide).
             if costs.count >= 2 {
-                // Multi-modèles : total à gauche, détail à droite.
-                HStack(alignment: .center, spacing: 16) {
-                    totalLabel
-                        .frame(minWidth: 90, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(costs) { entry in
-                            Text("• \(entry.name) : \(formatCost(entry.cost))")
+                Divider()
+                VStack(spacing: 4) {
+                    ForEach(costs) { entry in
+                        HStack {
+                            Text(entry.name)
                                 .font(.system(size: 12))
-                                .foregroundColor(.primary)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(formatCost(entry.cost))
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
                         }
                     }
-                    Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                // Mono-modèle ou état initial : total centré.
-                totalLabel
-                    .frame(maxWidth: .infinity, alignment: .center)
             }
 
             Divider()
@@ -676,6 +678,7 @@ struct CostEstimateCard: View {
                 Link("afficher le coût réel →", destination: url)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(appBlue)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .padding(14)
