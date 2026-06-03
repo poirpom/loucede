@@ -105,15 +105,18 @@ struct ActionsSettingsView: View {
             let favs = sorted(store.actions.filter { $0.isFavorite && !$0.isHidden })
             // FAVORIS toujours affiché en mode .all pour permettre le drop initial.
             out.append(SidebarSection(id: "favorites", title: "FAVORIS", isFavoritesSection: true, actions: favs))
+            // SANS CATÉGORIE remontée juste après FAVORIS : les actions
+            // générées via le Générateur (popup) y atterrissent par défaut —
+            // l'utilisateur les retrouve sans scroller jusqu'en bas.
+            let uncat = sorted(store.actions.filter { $0.category == nil && !$0.isFavorite && !$0.isHidden })
+            if !uncat.isEmpty {
+                out.append(SidebarSection(id: "uncategorized", title: "SANS CATÉGORIE", isFavoritesSection: false, actions: uncat))
+            }
             for cat in PromptCategory.allCases where cat != .custom {
                 let inCat = sorted(store.actions.filter { $0.category == cat && !$0.isFavorite && !$0.isHidden })
                 if !inCat.isEmpty {
                     out.append(SidebarSection(id: "category-\(cat.rawValue)", title: cat.rawValue.uppercased(), isFavoritesSection: false, actions: inCat))
                 }
-            }
-            let uncat = sorted(store.actions.filter { $0.category == nil && !$0.isFavorite && !$0.isHidden })
-            if !uncat.isEmpty {
-                out.append(SidebarSection(id: "uncategorized", title: "SANS CATÉGORIE", isFavoritesSection: false, actions: uncat))
             }
             return out
 
