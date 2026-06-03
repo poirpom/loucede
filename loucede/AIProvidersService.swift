@@ -318,6 +318,11 @@ class AIService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // K.3 : timeout dédié au Générateur (chat non-streaming, exclusif au
+        // Générateur — les actions normales utilisent chatStream). 30s suffit
+        // largement pour un JSON court ; feedback d'échec plus rapide que le
+        // défaut 60s.
+        request.timeoutInterval = 30
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -363,6 +368,8 @@ class AIService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // K.3 : timeout dédié au Générateur (cf. callOpenAICompatibleChat).
+        request.timeoutInterval = 30
         request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
