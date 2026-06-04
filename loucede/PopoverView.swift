@@ -130,6 +130,14 @@ struct PopoverView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: state.showTrialExpiredModal)
+        // L'overlay trial (boutons .defaultAction/.cancelAction) doit posséder
+        // le clavier : sinon le champ de recherche focalisé capte ⏎ via son
+        // `.onKeyPress(.return)` (renvoie `.handled`) et « Acheter » ne se
+        // déclenche jamais. On retire le focus à l'affichage, on le rend à la
+        // fermeture (« Plus tard » → reprise de la frappe).
+        .onChange(of: state.showTrialExpiredModal) { _, shown in
+            isSearchFocused = !shown
+        }
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale. K.0 : en mode liste, le focus va au TextField de
@@ -568,6 +576,10 @@ struct PopoverView: View {
                             return .handled
                         }
                         .onKeyPress(.return) {
+                            // Renfort anti-timing : si l'overlay trial est
+                            // affiché, laisser ⏎ filer vers son bouton par
+                            // défaut (« Acheter ») plutôt que de l'avaler.
+                            if state.showTrialExpiredModal { return .ignored }
                             let sel = selectableItems
                             if sel.indices.contains(state.selectedIndex) {
                                 activate(sel[state.selectedIndex])
