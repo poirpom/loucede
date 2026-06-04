@@ -196,29 +196,42 @@ struct ActionsSettingsView: View {
         }
     }
 
-    /// Drop d'une action sur une autre row dans la même section.
-    /// Réordonne via `displayOrder`. Si la cible est dans FAVORIS et
-    /// que la source ne l'est pas, marque favori (drag-to-favorite).
+    /// Drop d'une action sur une autre row. Réordonne via `displayOrder`
+    /// et, si la cible est dans une autre section, **reclasse** l'action
+    /// déposée pour qu'elle adopte la section visuelle de la cible
+    /// (drag-to-recategorize).
     ///
     /// K.unify.2-fix-3 : la condition « même section » utilise
     /// `inSameSection(_:_:)` (favoris ignorent category) au lieu du
     /// filtre `category ==` qui empêchait le décalage correct entre
     /// favoris de catégories différentes. Normalisation post-drop pour
     /// re-compacter les displayOrder en 0,1,2,...
+    ///
+    /// Reclassement inter-sections : l'action déposée adopte la section
+    /// de la CIBLE avant le calcul de section, ce qui réutilise toute la
+    /// mécanique d'insertion/`displayOrder` existante.
+    /// - Drop dans FAVORIS → devient favori, catégorie inchangée (les
+    ///   favoris ignorent la catégorie).
+    /// - Drop hors FAVORIS → quitte les favoris ET adopte la catégorie de
+    ///   la cible (`nil` = « Sans catégorie »).
+    /// La réaffectation est idempotente sur un drop intra-section (mêmes
+    /// `isFavorite`/`category` que la cible) → réordonnancement inchangé.
     fileprivate func handleDrop(droppedID: UUID, ontoActionID: UUID, inFavoritesSection: Bool) {
         guard let fromIdx = store.actions.firstIndex(where: { $0.id == droppedID }),
               let toIdx = store.actions.firstIndex(where: { $0.id == ontoActionID }),
               fromIdx != toIdx else { return }
 
-        // Drag-to-favorite : si on drop dans FAVORIS depuis non-favori,
-        // marquer favori AVANT le calcul de section (sinon
-        // `inSameSection(from, to)` retournerait false).
-        if inFavoritesSection && !store.actions[fromIdx].isFavorite {
+        // Adopter la section visuelle de la cible AVANT le calcul de
+        // section (sinon `inSameSection(from, to)` resterait false sur un
+        // drop inter-sections et le déplacement n'aurait pas lieu).
+        if inFavoritesSection {
             store.actions[fromIdx].isFavorite = true
+        } else {
+            store.actions[fromIdx].isFavorite = false
+            store.actions[fromIdx].category = store.actions[toIdx].category
         }
 
-        // Vérification post-favorisation : source et cible doivent être
-        // dans la même section visuelle pour autoriser le drop.
+        // Source et cible sont désormais dans la même section visuelle.
         guard inSameSection(store.actions[fromIdx], store.actions[toIdx]) else { return }
 
         // Décalage « drop BEFORE target » : la source prend le
