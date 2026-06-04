@@ -24,6 +24,10 @@ struct LicenseSettingsView: View {
     /// global).
     @State private var keyInput: String = ""
 
+    /// Focus du champ de saisie de clé. Posé par `consumeFocusRequest()`
+    /// quand `manager.focusKeyFieldRequest` est levé après un achat (D.6).
+    @FocusState private var keyFieldFocused: Bool
+
     /// Spinners locaux pour les opérations en cours (évite que le bouton
     /// soit cliquable deux fois).
     @State private var isActivating: Bool = false
@@ -143,6 +147,13 @@ struct LicenseSettingsView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 40)
             .padding(.bottom, 24)
+        }
+        // D.6 — focus du champ clé après un achat réussi. `.onAppear`
+        // couvre la fenêtre neuve + le switch d'onglet (remount via `.id`),
+        // `.onChange` couvre « déjà sur l'onglet Licence ».
+        .onAppear { if manager.focusKeyFieldRequest { consumeFocusRequest() } }
+        .onChange(of: manager.focusKeyFieldRequest) { _, new in
+            if new { consumeFocusRequest() }
         }
         .alert("Désactiver cet appareil ?", isPresented: $showDeactivateConfirm) {
             Button("Annuler", role: .cancel) { }
@@ -550,6 +561,7 @@ struct LicenseSettingsView: View {
     private var activationForm: some View {
         VStack(spacing: 8) {
             TextField("Colle ta clé licence ici", text: $keyInput)
+                .focused($keyFieldFocused)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 13, design: .monospaced))
                 .disabled(isActivating)
@@ -797,6 +809,15 @@ struct LicenseSettingsView: View {
     /// embarquée en WKWebView qui intercepte la clé après paiement.
     private func openCheckout() {
         NSWorkspace.shared.open(LicenseConfig.productCheckoutURL)
+    }
+
+    /// D.6 — consomme la demande de focus du champ clé. `async` pour poser
+    /// le focus une fois la fenêtre Réglages *key* + reset du flag.
+    private func consumeFocusRequest() {
+        DispatchQueue.main.async {
+            keyFieldFocused = true
+            manager.focusKeyFieldRequest = false
+        }
     }
 
     /// Lance la génération du heroName via le provider IA configuré.

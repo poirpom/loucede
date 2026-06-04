@@ -105,6 +105,12 @@ final class LicenseManager: ObservableObject {
     /// d'afficher un spinner sur le bouton et d'éviter les double-clics.
     @Published private(set) var isGeneratingHeroName: Bool = false
 
+    // MARK: UI coordination
+    /// Demande de focus du champ de saisie de clé dans `LicenseSettingsView`,
+    /// posée après un achat réussi (cf. `PurchaseWindowController.presentCheckout`).
+    /// La vue la consomme puis la remet à `false`.
+    @Published var focusKeyFieldRequest: Bool = false
+
     #if DEBUG
     /// Clé UserDefaults de persistance de l'override licence Debug
     /// (survit aux relances de l'app).
