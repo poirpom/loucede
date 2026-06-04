@@ -630,6 +630,16 @@ struct LicenseSettingsView: View {
             }
             .controlSize(.small)
 
+            // D.3 — test isolé de la fenêtre d'achat Polar (avant que D.4
+            // ne câble les vrais boutons « Acheter »).
+            Button("🛠 Ouvrir checkout Polar (test isolé)") {
+                PurchaseWindowController.present(
+                    onSuccess: { print("✅ [D.3] onSuccess — success URL Polar interceptée") },
+                    onClose:   { print("✋ [D.3] onClose — fenêtre fermée sans achat") }
+                )
+            }
+            .controlSize(.small)
+
             // Lecture live de l'effet courant.
             Text("override: \(manager.debugLicenseOverride.label)  ·  trial: \(manager.trialUsageCount)/\(LicenseManager.trialLimit)  ·  hasLicense: \(manager.hasLicense ? "true" : "false")  ·  canRunAction: \(manager.canRunAction ? "true" : "false")")
                 .font(.system(size: 10, design: .monospaced))
