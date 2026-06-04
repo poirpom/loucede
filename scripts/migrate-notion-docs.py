@@ -157,7 +157,7 @@ def find_csv(export_dir: Path) -> Path:
     """Find the complete CSV (header contains 'Catégorie' OR 'Emoji').
 
     Notion exports 2 CSVs:
-        - filtered view (4 cols: Titre/État/N°/Effort) — to ignore
+        - filtered view (4 cols: Titre/État/N°/Emoji) — to ignore
         - complete view '_all.csv' (13 cols inc. Catégorie + Emoji) — to use
 
     Raises ValueError if no complete CSV is found.
@@ -168,7 +168,7 @@ def find_csv(export_dir: Path) -> Path:
             with open(csv_file, encoding="utf-8-sig") as f:
                 reader = csv.reader(f)
                 header = next(reader, [])
-            if "Catégorie" in header or "Emoji" in header:
+            if "Catégorie" in header:
                 return csv_file
     raise ValueError(
         "CSV complet (avec colonne Catégorie/Emoji) introuvable. "
