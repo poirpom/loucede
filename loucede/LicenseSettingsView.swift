@@ -133,6 +133,11 @@ struct LicenseSettingsView: View {
                         .padding(.top, 8)
                 }
 
+                #if DEBUG
+                debugLicenseSection
+                    .padding(.top, 12)
+                #endif
+
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -597,6 +602,52 @@ struct LicenseSettingsView: View {
         }
         .padding(.top, 12)
     }
+
+    #if DEBUG
+    // MARK: - Panneau Debug (simulation états licence/trial) — Debug only
+
+    /// Panneau dev pour simuler les états licence/trial sans dépendre de
+    /// Polar ni du Keychain. Strictement `#if DEBUG` → absent en Release.
+    /// Cf. `DebugLicenseState` + `LicenseManager.debugLicenseOverride`.
+    private var debugLicenseSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider().frame(width: 280)
+
+            Text("🛠 DEBUG — Simulation licence")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            Picker("État simulé", selection: $manager.debugLicenseOverride) {
+                ForEach(DebugLicenseState.allCases, id: \.self) { state in
+                    Text(state.label).tag(state)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 320)
+
+            Button("Reset trial counter (→ 0)") {
+                manager.debugResetTrialUsage()
+            }
+            .controlSize(.small)
+
+            // Lecture live de l'effet courant.
+            Text("override: \(manager.debugLicenseOverride.label)  ·  trial: \(manager.trialUsageCount)/\(LicenseManager.trialLimit)  ·  hasLicense: \(manager.hasLicense ? "true" : "false")  ·  canRunAction: \(manager.canRunAction ? "true" : "false")")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: 420, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+    }
+    #endif
 
     // MARK: - Usage counter (licences actives uniquement)
 

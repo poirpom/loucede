@@ -21,6 +21,34 @@ import Foundation
 import Combine
 import AppKit
 
+#if DEBUG
+/// États licence simulables en build Debug, pilotés depuis le panneau
+/// Debug de Réglages → Licence. Remplace l'ancien override binaire
+/// (`hasLicense` forcé `true`) par un override paramétrable, pour rendre
+/// les écrans trial testables sans dépendre de Polar ni du Keychain.
+/// Mécanisme permanent (pas éphémère) : sert à tous les tests trial
+/// présents et futurs. Absorbe l'item backlog `dev-license.md`.
+enum DebugLicenseState: String, CaseIterable {
+    /// `hasLicense = true` — défaut, préserve le confort dev (pas
+    /// d'incrément de trial en dev).
+    case licensed
+    /// `hasLicense = false`, compteur trial réel (incréments observables ;
+    /// combiner avec « Reset trial counter » pour repartir de 0).
+    case trialActive
+    /// `hasLicense = false` + trial forcé épuisé (non destructif : ne
+    /// touche pas au compteur Keychain) → affiche `TrialExpiredOverlay`.
+    case trialExpired
+
+    var label: String {
+        switch self {
+        case .licensed:     return "Licencié"
+        case .trialActive:  return "Trial actif"
+        case .trialExpired: return "Trial épuisé"
+        }
+    }
+}
+#endif
+
 @MainActor
 final class LicenseManager: ObservableObject {
     static let shared = LicenseManager()
@@ -77,6 +105,21 @@ final class LicenseManager: ObservableObject {
     /// d'afficher un spinner sur le bouton et d'éviter les double-clics.
     @Published private(set) var isGeneratingHeroName: Bool = false
 
+    #if DEBUG
+    /// Clé UserDefaults de persistance de l'override licence Debug
+    /// (survit aux relances de l'app).
+    private static let debugOverrideKey = "loucede.debug.licenseOverride"
+
+    /// État licence simulé en Debug (cf. `DebugLicenseState`). Persisté en
+    /// UserDefaults via `didSet`. Lu par `hasLicense`/`hasTrialRemaining`.
+    /// Défaut `.licensed` → comportement Debug historique préservé.
+    @Published var debugLicenseOverride: DebugLicenseState = .licensed {
+        didSet {
+            UserDefaults.standard.set(debugLicenseOverride.rawValue, forKey: Self.debugOverrideKey)
+        }
+    }
+    #endif
+
     /// Limite du trial gratuit. Au-delà, `hasTrialRemaining = false`
     /// et l'utilisateur sans licence voit un modal d'achat.
     static let trialLimit: Int = 12
@@ -131,7 +174,10 @@ final class LicenseManager: ObservableObject {
     /// override paramétrable au runtime.
     var hasLicense: Bool {
         #if DEBUG
-        return true
+        switch debugLicenseOverride {
+        case .licensed:                   return true
+        case .trialActive, .trialExpired: return false
+        }
         #else
         switch status {
         case .active, .offline:
@@ -145,7 +191,13 @@ final class LicenseManager: ObservableObject {
     /// `true` si l'utilisateur n'a pas encore atteint la limite des
     /// 12 essais gratuits.
     var hasTrialRemaining: Bool {
-        trialUsageCount < Self.trialLimit
+        #if DEBUG
+        // Override « trial épuisé » non destructif : force l'épuisement
+        // sans écrire dans le Keychain (réversible en re-sélectionnant un
+        // autre état). Les autres cas retombent sur le compteur réel.
+        if debugLicenseOverride == .trialExpired { return false }
+        #endif
+        return trialUsageCount < Self.trialLimit
     }
 
     /// Source de vérité pour `runAction` : peut-il lancer une action LLM ?
@@ -165,6 +217,12 @@ final class LicenseManager: ObservableObject {
     }
 
     private init() {
+        #if DEBUG
+        if let raw = UserDefaults.standard.string(forKey: Self.debugOverrideKey),
+           let state = DebugLicenseState(rawValue: raw) {
+            debugLicenseOverride = state
+        }
+        #endif
         loadFromKeychain()
     }
 
@@ -353,6 +411,16 @@ final class LicenseManager: ObservableObject {
         trialUsageCount = next
         KeychainService.License.trialUsageCount = next
     }
+
+    #if DEBUG
+    /// Debug : remet le compteur de trial réel à 0 (mémoire + Keychain).
+    /// Permet de rejouer les transitions « depuis 0 » en `.trialActive`.
+    /// Orthogonal à `debugLicenseOverride` (qui simule l'état brut).
+    func debugResetTrialUsage() {
+        trialUsageCount = 0
+        KeychainService.License.trialUsageCount = 0
+    }
+    #endif
 
     /// Récupère la liste détaillée des activations chez Polar et met à
     /// jour `activationsUsed` (compteur X) et `activations[]`. Silent
