@@ -662,6 +662,13 @@ struct LicenseSettingsView: View {
             }
             .controlSize(.small)
 
+            // HeroName auto — regénère un sobriquet (ignore le cache) pour
+            // itérer le design sans réactiver une licence.
+            Button("Regénérer HeroName") {
+                Task { try? await manager.generateHeroName() }
+            }
+            .controlSize(.small)
+
             // Lecture live de l'effet courant.
             Text("override: \(manager.debugLicenseOverride.label)  ·  trial: \(manager.trialUsageCount)/\(LicenseManager.trialLimit)  ·  hasLicense: \(manager.hasLicense ? "true" : "false")  ·  canRunAction: \(manager.canRunAction ? "true" : "false")")
                 .font(.system(size: 10, design: .monospaced))
