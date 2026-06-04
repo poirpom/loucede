@@ -1539,14 +1539,20 @@ private struct TrialExpiredOverlay: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 10) {
-                    Button("Plus tard") {
-                        onDismiss()
+                    Button(action: { onDismiss() }) {
+                        HStack(spacing: 6) {
+                            Text("Plus tard")
+                            KeyboardKey("esc")
+                        }
                     }
                     .buttonStyle(.bordered)
                     .keyboardShortcut(.cancelAction)
 
-                    Button("Acheter") {
-                        onPurchase()
+                    Button(action: { onPurchase() }) {
+                        HStack(spacing: 6) {
+                            Text("Acheter")
+                            KeyboardKey("↵")
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
