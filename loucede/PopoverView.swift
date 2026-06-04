@@ -122,8 +122,8 @@ struct PopoverView: View {
                     onDismiss: { state.showTrialExpiredModal = false },
                     onPurchase: {
                         state.showTrialExpiredModal = false
-                        NSWorkspace.shared.open(LicenseConfig.productCheckoutURL)
-                        onClose()
+                        onClose()   // ferme le popup (la fenêtre Polar ne reste pas derrière)
+                        PurchaseWindowController.presentCheckout()
                     }
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))

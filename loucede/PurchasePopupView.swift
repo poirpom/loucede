@@ -125,6 +125,30 @@ final class PurchaseWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Ouvre le checkout Polar avec le **flux post-achat standard** de
+    /// l'app : à la détection du succès → Réglages → Licence (onglet 2) +
+    /// demande de focus du champ de saisie de clé. Point d'entrée unique
+    /// des 3 boutons « Acheter » (overlay trial + Réglages → Licence).
+    static func presentCheckout() {
+        present(
+            onSuccess: {
+                // `openSettings` puis flag, sur le main : pour une fenêtre
+                // neuve ou un switch d'onglet, le flag est posé avant que
+                // `.onAppear` (tick suivant) ne le lise ; pour l'onglet déjà
+                // actif, `.onChange` le capte.
+                DispatchQueue.main.async {
+                    globalAppDelegate?.openSettings(tab: 2)   // 2 = onglet Licence
+                    LicenseManager.shared.focusKeyFieldRequest = true
+                }
+            },
+            onClose: {
+                #if DEBUG
+                print("✋ [D.4] checkout fermé sans achat")
+                #endif
+            }
+        )
+    }
+
     private init(onSuccess: @escaping () -> Void, onClose: (() -> Void)?) {
         self.onSuccess = onSuccess
         self.onClose = onClose

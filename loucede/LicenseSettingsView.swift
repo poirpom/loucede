@@ -804,11 +804,11 @@ struct LicenseSettingsView: View {
         otherDeviceToDeactivate = nil
     }
 
-    /// Ouvre le checkout Polar dans le navigateur par défaut.
-    /// Étape 6 (à venir) remplacera ça par une `LicenseCheckoutView`
-    /// embarquée en WKWebView qui intercepte la clé après paiement.
+    /// Ouvre le checkout Polar dans la fenêtre embarquée (WKWebView).
+    /// À l'achat réussi, `presentCheckout` ramène sur Réglages → Licence
+    /// avec focus sur le champ de saisie de clé.
     private func openCheckout() {
-        NSWorkspace.shared.open(LicenseConfig.productCheckoutURL)
+        PurchaseWindowController.presentCheckout()
     }
 
     /// D.6 — consomme la demande de focus du champ clé. `async` pour poser
