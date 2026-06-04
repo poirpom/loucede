@@ -270,7 +270,7 @@ struct LicenseSettingsView: View {
             // formulaire d'activation, affiché uniquement après un achat
             // réussi (pas dans « activer une autre licence »).
             if manager.postPurchaseHintActive {
-                VStack(spacing: 10) {
+                VStack(spacing: 16) {
                     VStack(spacing: 2) {
                         Text("✅ Achat réussi")
                             .font(.system(size: 13, weight: .bold))
@@ -280,7 +280,7 @@ struct LicenseSettingsView: View {
                     }
                     activationForm
                 }
-                .padding(12)
+                .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.green.opacity(0.08))
