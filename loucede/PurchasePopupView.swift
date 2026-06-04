@@ -139,6 +139,7 @@ final class PurchaseWindowController: NSWindowController, NSWindowDelegate {
                 DispatchQueue.main.async {
                     globalAppDelegate?.openSettings(tab: 2)   // 2 = onglet Licence
                     LicenseManager.shared.focusKeyFieldRequest = true
+                    LicenseManager.shared.postPurchaseHintActive = true
                 }
             },
             onClose: {

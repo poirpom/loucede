@@ -111,6 +111,19 @@ final class LicenseManager: ObservableObject {
     /// La vue la consomme puis la remet à `false`.
     @Published var focusKeyFieldRequest: Bool = false
 
+    /// Clé UserDefaults de persistance du hint post-achat.
+    private static let postPurchaseHintKey = "loucede.license.postPurchaseHint"
+    /// Hint « Achat réussi / La licence est dans ta boîte mail » affiché dans
+    /// `unlicensedView`. Posé à `true` à l'achat
+    /// (`PurchaseWindowController.presentCheckout`), remis à `false` à
+    /// l'activation réussie d'une clé. Persisté (survit aux quit/relance
+    /// avant saisie de la clé).
+    @Published var postPurchaseHintActive: Bool = false {
+        didSet {
+            UserDefaults.standard.set(postPurchaseHintActive, forKey: Self.postPurchaseHintKey)
+        }
+    }
+
     #if DEBUG
     /// Clé UserDefaults de persistance de l'override licence Debug
     /// (survit aux relances de l'app).
@@ -229,6 +242,7 @@ final class LicenseManager: ObservableObject {
             debugLicenseOverride = state
         }
         #endif
+        postPurchaseHintActive = UserDefaults.standard.bool(forKey: Self.postPurchaseHintKey)
         loadFromKeychain()
     }
 
@@ -287,6 +301,9 @@ final class LicenseManager: ObservableObject {
 
             // Update state
             updateStateFrom(licenseKey: result.licenseKey)
+
+            // Activation réussie → le hint post-achat n'a plus lieu d'être.
+            postPurchaseHintActive = false
 
             // Rafraîchit la liste des activations en background : elle
             // vient de gagner cette nouvelle entrée, l'UI veut le X/Y à

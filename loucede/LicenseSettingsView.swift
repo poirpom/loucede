@@ -266,7 +266,32 @@ struct LicenseSettingsView: View {
     @ViewBuilder
     private var unlicensedView: some View {
         VStack(spacing: 14) {
-            activationForm
+            // Hint post-achat (D.6 polish) : encadré vert englobant le
+            // formulaire d'activation, affiché uniquement après un achat
+            // réussi (pas dans « activer une autre licence »).
+            if manager.postPurchaseHintActive {
+                VStack(spacing: 10) {
+                    VStack(spacing: 2) {
+                        Text("✅ Achat réussi")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("📧 La licence est dans ta boîte mail")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    activationForm
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.green.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                )
+            } else {
+                activationForm
+            }
 
             Text("Pas encore de clé ?")
                 .font(.system(size: 13))
@@ -649,6 +674,13 @@ struct LicenseSettingsView: View {
                     onSuccess: { print("✅ [D.3] onSuccess — success URL Polar interceptée") },
                     onClose:   { print("✋ [D.3] onClose — fenêtre fermée sans achat") }
                 )
+            }
+            .controlSize(.small)
+
+            // D.6 polish — bascule le hint post-achat pour itérer le design
+            // sans refaire un achat VIPDEV.
+            Button("Toggle post-purchase hint") {
+                manager.postPurchaseHintActive.toggle()
             }
             .controlSize(.small)
 
