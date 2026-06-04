@@ -349,6 +349,21 @@ struct LicenseSettingsView: View {
             // Phase 6.2 (devenu redondant avec la ligne du device courant).
             devicesSection
 
+            // Lien vers le Customer Portal Polar (gérer clé / licences /
+            // appareils côté web). Visible uniquement ici (licence active).
+            // Style aligné sur le lien « afficher le coût réel → » de la
+            // carte coût (Phase L). Ouverture navigateur par défaut.
+            Button {
+                NSWorkspace.shared.open(LicenseConfig.customerPortalURL)
+            } label: {
+                Text("Gérer ma clé et mes licences →")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(red: 0.0, green: 0.584, blue: 1.0))  // appBlue (cf. Phase L)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+
             // Compteur d'utilisations total (visible uniquement si au
             // moins un usage enregistré).
             if usageTracker.count > 0 {

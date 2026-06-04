@@ -50,6 +50,12 @@ enum LicenseConfig {
     /// la clé manuellement).
     static let productCheckoutURL = URL(string: "https://buy.polar.sh/polar_cl_NyddnsIaqM7gVRKFinwyIhM8iHqzoRrJaZfDi2HN0SO")!
 
+    /// Customer Portal Polar — page web où le client gère sa clé, ses
+    /// licences et ses appareils. Ouverte dans le navigateur par défaut
+    /// depuis Réglages → Licence (« Gérer ma clé et mes licences »).
+    /// Référencée par le tuto 08 « Que se passe-t-il si je change de Mac ».
+    static let customerPortalURL = URL(string: "https://polar.sh/loucede/portal/overview")!
+
     /// Prix de la licence loucedé en euros (valeur entière). Source unique
     /// pour tout affichage de prix dans l'app — évite les littéraux prix
     /// dispersés (cf. ancien « 8€ » en dur dans `TrialExpiredOverlay`).
