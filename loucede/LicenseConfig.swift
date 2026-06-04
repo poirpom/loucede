@@ -50,6 +50,25 @@ enum LicenseConfig {
     /// la clé manuellement).
     static let productCheckoutURL = URL(string: "https://buy.polar.sh/polar_cl_NyddnsIaqM7gVRKFinwyIhM8iHqzoRrJaZfDi2HN0SO")!
 
+    /// Prix de la licence loucedé en euros (valeur entière). Source unique
+    /// pour tout affichage de prix dans l'app — évite les littéraux prix
+    /// dispersés (cf. ancien « 8€ » en dur dans `TrialExpiredOverlay`).
+    static let price: Int = 10
+
+    /// Libellé prêt à afficher (« 10€ »), dérivé de `price`.
+    static var priceLabel: String { "\(price)€" }
+
+    /// Détection de l'achat réussi (mode A — récupération clé par email).
+    /// Après paiement, Polar redirige vers une page Carrd
+    /// `https://<successURLHost>/#<successURLFragment>`. La WKWebView (D.3)
+    /// intercepte cette navigation via le **host** (`successURLHost`) dans
+    /// `WKNavigationDelegate.decidePolicyFor` ; le fragment sert la page
+    /// Carrd côté web, pas la logique Swift. Externalisés ici car le slug
+    /// peut bouger sans toucher à la logique de détection — les mettre à
+    /// jour ici si le slug de retour Polar change.
+    static let successURLHost: String = "checkout.loucede.app"
+    static let successURLFragment: String = "tcheam"
+
     /// Filet de sécurité côté dev : si quelqu'un oublie de remplacer
     /// `appSecret` avant de build pour la prod, on lève dès le premier
     /// appel réseau. À appeler en début de chaque méthode de

@@ -1520,7 +1520,7 @@ private struct TrialExpiredOverlay: View {
                     .font(.system(size: 24, weight: .bold))
                     .multilineTextAlignment(.center)
 
-                Text("Pour continuer à utiliser loucedé en douce, c'est 8€ 💸")
+                Text("Pour continuer à utiliser loucedé en douce, c'est \(LicenseConfig.priceLabel) 💸")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
