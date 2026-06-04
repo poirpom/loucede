@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-11T19:59:00Z",
-  "source_zip": "9c37b667-78d2-448f-a933-407d5d20ebb9_ExportBlock-632d8042-2032-4fd7-8aa2-58749f913b24.zip",
+  "generated_at": "2026-06-04T19:36:10Z",
+  "source_zip": "843cf671-c80f-4c97-a18a-3f61223487c1_ExportBlock-7142a007-731d-43c4-846b-211402ae8b72.zip",
   "categories": [
     {
       "id": "demarrer",
@@ -46,18 +46,6 @@
       "images": []
     },
     {
-      "id": "02-installer-loucede",
-      "sequence": 2,
-      "notion_number": "02",
-      "title": "Installer loucedé",
-      "emoji": "💻",
-      "category_id": "demarrer",
-      "file": "tutos/02-installer-loucede.md",
-      "images": [
-        "images/02-installer-loucede-barre-des-menus.webp"
-      ]
-    },
-    {
       "id": "03-obtenir-et-configurer-ta-cle-api-ia",
       "sequence": 3,
       "notion_number": "04",
@@ -70,13 +58,13 @@
       ]
     },
     {
-      "id": "04-ouvrir-loucede",
+      "id": "04-declencher-loucede",
       "sequence": 4,
       "notion_number": "05",
-      "title": "Ouvrir loucedé",
+      "title": "Déclencher loucedé",
       "emoji": "🚀",
       "category_id": "demarrer",
-      "file": "tutos/04-ouvrir-loucede.md",
+      "file": "tutos/04-declencher-loucede.md",
       "images": []
     },
     {
@@ -100,6 +88,60 @@
       "category_id": "compte-et-licence",
       "file": "tutos/06-combien-coute-loucede.md",
       "images": []
+    },
+    {
+      "id": "07-acheter-et-activer-ta-licence",
+      "sequence": 7,
+      "notion_number": "21",
+      "title": "Acheter et activer ta licence",
+      "emoji": "🎉",
+      "category_id": "compte-et-licence",
+      "file": "tutos/07-acheter-et-activer-ta-licence.md",
+      "images": [
+        "images/07-acheter-et-activer-ta-licence-cleanshot-2026-06-04-20-28-29.png",
+        "images/07-acheter-et-activer-ta-licence-cleanshot-2026-06-04-20-29-13.png",
+        "images/07-acheter-et-activer-ta-licence-mail-polar.png",
+        "images/07-acheter-et-activer-ta-licence-dashboard-polar.png",
+        "images/07-acheter-et-activer-ta-licence-licence-active.png"
+      ]
+    },
+    {
+      "id": "08-que-se-passe-t-il-si-je-change-de-mac",
+      "sequence": 8,
+      "notion_number": "22",
+      "title": "Que se passe-t-il si je change de Mac",
+      "emoji": "🔀",
+      "category_id": "compte-et-licence",
+      "file": "tutos/08-que-se-passe-t-il-si-je-change-de-mac.md",
+      "images": [
+        "images/08-que-se-passe-t-il-si-je-change-de-mac-cleanshot-2026-06-04-19-54-56.png",
+        "images/08-que-se-passe-t-il-si-je-change-de-mac-cleanshot-2026-06-04-21-04-40.png"
+      ]
+    },
+    {
+      "id": "09-loucede-ne-se-lance-pas-au-demarrage-de-mon-ordi",
+      "sequence": 9,
+      "notion_number": "23",
+      "title": "loucedé ne se lance pas au démarrage de mon ordi",
+      "emoji": "❌",
+      "category_id": "resolution-de-problemes",
+      "file": "tutos/09-loucede-ne-se-lance-pas-au-demarrage-de-mon-ordi.md",
+      "images": [
+        "images/09-loucede-ne-se-lance-pas-au-demarrage-de-mon-ordi-lancer-demarrage.png",
+        "images/09-loucede-ne-se-lance-pas-au-demarrage-de-mon-ordi-ouverture-macos-comment.png"
+      ]
+    },
+    {
+      "id": "10-le-raccourci-ne-fonctionne-pas",
+      "sequence": 10,
+      "notion_number": "24",
+      "title": "Le raccourci ne fonctionne pas",
+      "emoji": "⁉️",
+      "category_id": "resolution-de-problemes",
+      "file": "tutos/10-le-raccourci-ne-fonctionne-pas.md",
+      "images": [
+        "images/10-le-raccourci-ne-fonctionne-pas-raccourci.png"
+      ]
     }
   ]
 }

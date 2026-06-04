@@ -1,6 +1,6 @@
 # Combien coûte loucedé ?
 
-***loucedé* coûte 8€ à l'achat**, après 12 utilisations gratuites. C'est un paiement unique, *pas* un abonnement. 
+***loucedé* coûte 10€ à l'achat**, après 12 utilisations gratuites. C'est un paiement unique, *pas* un abonnement. 
 
 Ensuite, le coût d'utilisation dépend de l'IA (Mistral, Anthropic ou OpenAI au choix), du modèle utilisé et du nombre de fois que tu utilises l'appli. En pratique : quelques euros à débourser par an grand max, que tu payes au fournisseur d'IA, aucun rapport avec ***loucedé***.
 
