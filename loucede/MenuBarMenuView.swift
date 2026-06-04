@@ -16,6 +16,11 @@ struct MenuBarMenuView: View {
     var onQuit: () -> Void
     var onDismiss: () -> Void
 
+    /// Observe l'état licence pour afficher/masquer dynamiquement l'item
+    /// d'achat (réactif : si l'utilisateur active une licence pendant que
+    /// le menu est ouvert, l'item disparaît live).
+    @StateObject private var license = LicenseManager.shared
+
     // Phase 6.7b revertée (2026-04-29) : isDarkMode retiré, les sous-vues
     // lisent colorScheme via @Environment directement.
     @Environment(\.colorScheme) var colorScheme
@@ -28,6 +33,33 @@ struct MenuBarMenuView: View {
         VStack(spacing: 0) {
             // Menu items
             VStack(spacing: 2) {
+                // Trial épuisé sans licence → item d'achat en haut (l'emoji
+                // 🎉 occupe la gouttière d'icône, exception au pattern SF
+                // Symbol). Disparaît dès que canRunAction redevient true.
+                if !license.canRunAction {
+                    MenuBarMenuItem(
+                        emoji: "🎉",
+                        title: "Acheter loucedé",
+                        isHovered: hoveredItem == "purchase",
+                        delay: 0.05
+                    ) {
+                        onDismiss()                                 // ferme le menu
+                        PurchaseWindowController.presentCheckout()  // ouvre la fenêtre Polar
+                    }
+                    .onHover { hovering in
+                        hoveredItem = hovering ? "purchase" : nil
+                    }
+
+                    // Separator
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .opacity(isVisible ? 1 : 0)
+                        .animation(.easeOut(duration: 0.2).delay(0.1), value: isVisible)
+                }
+
                 MenuBarMenuItem(
                     icon: "gearshape",
                     title: "Réglages",
@@ -95,7 +127,11 @@ struct MenuBarMenuView: View {
 }
 
 struct MenuBarMenuItem: View {
-    let icon: String
+    /// SF Symbol affiché dans la gouttière. `nil` si on utilise `emoji`.
+    var icon: String? = nil
+    /// Emoji affiché dans la gouttière à la place du SF Symbol (item
+    /// d'achat). Prioritaire sur `icon`.
+    var emoji: String? = nil
     let title: String
     let isHovered: Bool
     var isDestructive: Bool = false
@@ -123,10 +159,17 @@ struct MenuBarMenuItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(iconColor)
-                    .frame(width: 18)
+                Group {
+                    if let emoji {
+                        Text(emoji)
+                            .font(.system(size: 14))
+                    } else if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(iconColor)
+                    }
+                }
+                .frame(width: 18)
 
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
