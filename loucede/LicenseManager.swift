@@ -274,6 +274,14 @@ final class LicenseManager: ObservableObject {
         } else {
             status = .unlicensed
         }
+
+        // Migration : un user déjà licencié mais sans HeroName (installé
+        // avant cette feature) en reçoit un au load. `heroName != nil`
+        // (réel ou fallback) après une tentative → pas de re-génération
+        // aux launches suivants.
+        if heroName == nil, KeychainService.License.key != nil {
+            Task { await assignHeroNameOnActivation() }
+        }
     }
 
     /// Active une nouvelle clé sur cet appareil.
@@ -304,6 +312,10 @@ final class LicenseManager: ObservableObject {
 
             // Activation réussie → le hint post-achat n'a plus lieu d'être.
             postPurchaseHintActive = false
+
+            // Auto-attribution du HeroName (non-bloquant, comme
+            // refreshActivations). Régénère à chaque activation.
+            Task { await assignHeroNameOnActivation() }
 
             // Rafraîchit la liste des activations en background : elle
             // vient de gagner cette nouvelle entrée, l'UI veut le X/Y à
@@ -615,14 +627,27 @@ final class LicenseManager: ObservableObject {
     /// (PATCH /v1/customers/{id}) pour extraction newsletter future.
     /// Nécessite un nouveau endpoint dans le proxy Scaleway, pas
     /// implémenté en V1.
+    /// Fallback attribué quand la génération IA échoue ou qu'aucune clé
+    /// API n'est configurée. Anglais assumé (rupture de voix éditoriale
+    /// volontaire — c'est le sobriquet du « héros anonyme »).
+    static let heroNameFallback = "Anonymous Hero"
+
+    /// Génération manuelle (bouton debug « Regénérer HeroName »).
+    /// Throwing : pas de fallback. Gère le flag `isGeneratingHeroName`.
     func generateHeroName() async throws {
+        isGeneratingHeroName = true
+        defer { isGeneratingHeroName = false }
+        try await generateHeroNameCore()
+    }
+
+    /// Cœur de la génération, sans gestion du flag `isGeneratingHeroName`
+    /// (géré par les appelants) — permet au wrapper auto de garder un
+    /// spinner stable à travers ses retries.
+    private func generateHeroNameCore() async throws {
         let store = ActionsStore.shared
         guard !store.apiKey.isEmpty else {
             throw HeroNameError.noApiKey
         }
-
-        isGeneratingHeroName = true
-        defer { isGeneratingHeroName = false }
 
         // Tentative #1 avec prompt strict. Si le LLM renvoie un nom
         // collé en un seul mot (« Shadowstrike »), on retry une fois
@@ -635,6 +660,36 @@ final class LicenseManager: ObservableObject {
 
         heroName = name
         KeychainService.License.heroName = name
+    }
+
+    /// Auto-attribution du heroName à l'activation. Non-throwing : retry
+    /// silencieux (2 tentatives) puis fallback « Anonymous Hero ». Résout
+    /// TOUJOURS en `heroName != nil` — ce qui sert de marqueur
+    /// « tentative faite » (pas de re-génération opportuniste au load
+    /// ensuite). Régénère à chaque activation (overwrite assumé).
+    func assignHeroNameOnActivation() async {
+        isGeneratingHeroName = true
+        defer { isGeneratingHeroName = false }
+
+        // Pas de clé API → retry inutile, fallback direct.
+        if ActionsStore.shared.apiKey.isEmpty {
+            setFallbackHeroName()
+            return
+        }
+
+        for attempt in 1...2 {
+            do {
+                try await generateHeroNameCore()
+                return
+            } catch {
+                if attempt == 2 { setFallbackHeroName() }
+            }
+        }
+    }
+
+    private func setFallbackHeroName() {
+        heroName = Self.heroNameFallback
+        KeychainService.License.heroName = Self.heroNameFallback
     }
 
     /// Appel HTTP one-shot vers le provider IA pour générer un nom de

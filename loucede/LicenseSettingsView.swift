@@ -41,10 +41,6 @@ struct LicenseSettingsView: View {
     /// formulaire d'activation.
     @State private var activationError: String?
 
-    /// Erreur transitoire lors de la génération du heroName via LLM.
-    /// Affichée brièvement sous la liste des appareils.
-    @State private var heroNameError: String?
-
     /// Popover explicatif sur le sobriquet (clic sur le `info.circle`).
     /// Doublon du `.help()` (tooltip natif au survol) — certains
     /// utilisateurs cliquent sans attendre le tooltip, le popover
@@ -358,14 +354,6 @@ struct LicenseSettingsView: View {
             if usageTracker.count > 0 {
                 usageCounter
             }
-
-            // Erreur de génération du heroName (réseau down, etc.)
-            if let error = heroNameError {
-                Text(error)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: 320, alignment: .leading)
-            }
         }
     }
 
@@ -463,10 +451,11 @@ struct LicenseSettingsView: View {
         .padding(.vertical, 4)
     }
 
-    /// Ligne « Activée pour » avec deux modes :
-    /// - hero name déjà généré → affiche le nom + ℹ️ explicatif
-    /// - pas de nom → bouton « Obtenir mon nom » (disabled si pas de
-    ///   clé API configurée)
+    /// Ligne « Activée pour ». Le HeroName est attribué automatiquement à
+    /// l'activation (cf. `LicenseManager.assignHeroNameOnActivation`) :
+    /// - génération en cours → spinner + « Attribution du sobriquet… » ;
+    /// - nom disponible (réel ou fallback) → nom + ℹ️ explicatif ;
+    /// - sinon → rien (cas transitoire / pré-feature avant migration).
     @ViewBuilder
     private var heroNameRow: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -474,7 +463,14 @@ struct LicenseSettingsView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
-            if let hero = manager.heroName {
+            if manager.isGeneratingHeroName {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.small)
+                    Text("Attribution du sobriquet…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else if let hero = manager.heroName {
                 HStack(spacing: 4) {
                     Text(hero)
                         .font(.system(size: 12, weight: .medium))
@@ -498,24 +494,6 @@ struct LicenseSettingsView: View {
                             .frame(maxWidth: 240)
                     }
                 }
-            } else {
-                Button {
-                    Task { await performGenerateHeroName() }
-                } label: {
-                    HStack(spacing: 4) {
-                        if manager.isGeneratingHeroName {
-                            ProgressView().controlSize(.small)
-                        }
-                        Text(manager.isGeneratingHeroName ? "Génération…" : "Obtenir mon nom")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(ActionsStore.shared.apiKey.isEmpty || manager.isGeneratingHeroName)
-                .help(ActionsStore.shared.apiKey.isEmpty
-                      ? "Configure d'abord ta clé API dans Général"
-                      : "Génère un sobriquet via le LLM configuré (une seule fois)")
             }
         }
         .frame(maxWidth: 320)
@@ -852,24 +830,6 @@ struct LicenseSettingsView: View {
         }
     }
 
-    /// Lance la génération du heroName via le provider IA configuré.
-    /// Stocke en Keychain en cas de succès (LicenseManager s'en charge).
-    /// Affiche brièvement l'erreur en cas d'échec (réseau down, clé API
-    /// invalide, réponse LLM vide…). Auto-clear l'erreur après 4 s.
-    private func performGenerateHeroName() async {
-        heroNameError = nil
-        do {
-            try await manager.generateHeroName()
-        } catch {
-            heroNameError = error.localizedDescription
-            // Auto-clear l'erreur après 4 secondes pour ne pas
-            // l'afficher en permanence si l'utilisateur ne réessaie pas.
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            if heroNameError == error.localizedDescription {
-                heroNameError = nil
-            }
-        }
-    }
 }
 
 #Preview {
