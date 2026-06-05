@@ -525,7 +525,11 @@ private struct ProviderCard: View {
                 .frame(width: 36, height: 36)
             Text(name)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.primary)
+                // Couleur sombre FIXE : la card a un fond blanc translucide
+                // fixe dans les 2 modes ; `.primary` passerait en blanc en
+                // dark mode → illisible. On force du noir indépendamment du
+                // Color Scheme.
+                .foregroundStyle(Color.black)
         }
         .frame(width: 88, height: 98)
         .background(
