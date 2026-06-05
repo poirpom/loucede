@@ -163,15 +163,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showOnboarding() {
-        let onboardingView = OnboardingView(onComplete: { [weak self] in
-            // Persiste AVANT toute autre action : si setupApp() plante,
-            // la complétion est quand même enregistrée et l'onboarding
-            // ne se réaffichera pas au prochain lancement.
+        // Finalisation commune : persiste AVANT toute autre action (si
+        // setupApp() plante, la complétion est quand même enregistrée et
+        // l'onboarding ne se réaffichera pas au prochain lancement).
+        let finalize: () -> Void = { [weak self] in
             OnboardingManager.shared.completeOnboarding()
             self?.onboardingWindow?.close()
             self?.onboardingWindow = nil
             self?.setupApp()
-        })
+        }
+
+        let onboardingView = OnboardingView(
+            onComplete: finalize,
+            // M.1 : « Faire le tuto » finalise comme « Pas de tuto ». En M.2,
+            // remplacer ce corps par l'ouverture de la fenêtre tuto WKWebView
+            // (puis finalize au besoin) — aucun changement d'UI requis.
+            onStartTutorial: finalize
+        )
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 520),

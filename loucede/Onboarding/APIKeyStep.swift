@@ -103,7 +103,7 @@ struct APIKeyStep: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Spacer().frame(height: 16)
+                Spacer().frame(height: 24)
 
                 skipButton
 
@@ -117,7 +117,7 @@ struct APIKeyStep: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
 
-                Spacer().frame(height: 4)
+                Spacer().frame(height: 14)
 
                 Text("Modifiable à tout moment dans les réglages.")
                     .font(.system(size: 11))
@@ -240,7 +240,7 @@ struct APIKeyStep: View {
     /// primaire « Valider ». Content-sized, ferré gauche via le parent
     /// VStack(.leading).
     private var skipButton: some View {
-        Button("Configurer plus tard", action: { onNext() })
+        Button("Configurer plus tard →", action: { onNext() })
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.secondary)

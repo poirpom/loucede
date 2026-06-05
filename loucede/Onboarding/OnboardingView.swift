@@ -9,6 +9,10 @@ struct OnboardingView: View {
     @State private var currentStep = 0
 
     var onComplete: () -> Void
+    /// Déclenché par « Faire le tuto » (écran 7). En M.1, câblé au même
+    /// finalize que `onComplete` côté `showOnboarding` ; rebranché en M.2
+    /// vers l'ouverture du tuto interactif.
+    var onStartTutorial: () -> Void
 
     /// Phase 7.2 (2026-04-29) : ajout de `APIKeyStep` entre Shortcut (3)
     /// et LaunchAtLogin (5). Séquence finale : 7 écrans.
@@ -32,6 +36,7 @@ struct OnboardingView: View {
             case 6:
                 ActivationStep(
                     onComplete: onComplete,
+                    onStartTutorial: onStartTutorial,
                     onBack: previousStep
                 )
             default:
@@ -59,5 +64,5 @@ struct OnboardingView: View {
 }
 
 #Preview {
-    OnboardingView(onComplete: {})
+    OnboardingView(onComplete: {}, onStartTutorial: {})
 }

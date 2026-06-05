@@ -16,22 +16,22 @@ struct FeaturesStep: View {
         VStack(spacing: 28) {
             Spacer().frame(height: 20)
 
-            Text("Comment ça marche")
+            Text("Ce que tu vas faire")
                 .font(.system(size: 32, weight: .black))
 
             VStack(alignment: .leading, spacing: 20) {
-                featureRow(icon: "text.cursor",
-                           title: "Sélectionne du texte",
-                           detail: "Dans n'importe quelle app macOS.")
+                featureRow(icon: "checkmark.shield.fill",
+                           title: "Autoriser l'accessibilité à loucedé",
+                           detail: "Pour fonctionner correctement")
                 featureRow(icon: "keyboard",
-                           title: "Déclenche le raccourci",
-                           detail: "La popup s'ouvre instantanément.")
-                featureRow(icon: "wand.and.stars",
-                           title: "Applique un prompt",
-                           detail: "La réponse arrive en streaming.")
-                featureRow(icon: "arrow.down.doc",
-                           title: "Copie ou colle",
-                           detail: "Le résultat retourne dans l'app active.")
+                           title: "Configurer le raccourci clavier",
+                           detail: "Ou conserver celui par défaut (qui est très bien)")
+                featureRow(icon: "key.fill",
+                           title: "Configurer ta clé API",
+                           detail: "Pour que loucedé puisse utiliser l'IA")
+                featureRow(icon: "power",
+                           title: "Autoriser loucedé à se lancer au démarrage de ton ordi",
+                           detail: "Pour l'avoir toujours à dispo")
             }
             .frame(maxWidth: 420)
             .frame(maxWidth: .infinity)

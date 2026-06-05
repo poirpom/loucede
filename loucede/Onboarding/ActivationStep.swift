@@ -9,7 +9,12 @@
 import SwiftUI
 
 struct ActivationStep: View {
+    /// « Pas de tuto » — finalise l'onboarding.
     var onComplete: () -> Void
+    /// « Faire le tuto » — en M.1, câblé au même finalize que `onComplete`
+    /// (cf. `OnboardingView` / `showOnboarding`). En M.2, sera rebranché
+    /// vers l'ouverture de la fenêtre tuto WKWebView, sans toucher à cette UI.
+    var onStartTutorial: () -> Void
     var onBack: () -> Void
 
     var body: some View {
@@ -23,7 +28,7 @@ struct ActivationStep: View {
             Text("loucedé est prêt")
                 .font(.system(size: 28, weight: .bold))
 
-            Text("Utilise le raccourci configuré pour ouvrir la popup\nsur une sélection de texte dans n'importe quelle app.")
+            Text("Toi, tu devrais faire le tuto. Il est rapide, interactif et tu seras une vraie flèche après. #protip")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -46,7 +51,7 @@ struct ActivationStep: View {
             // ne nécessite pas d'offset (alignment baseline natif).
             // Valeur négative = décalage vers le bas (convention
             // SwiftUI documentée).
-            (Text("Tes réglages sont accessibles depuis la barre des menus ")
+            (Text("Les réglages sont accessibles depuis la barre des menus ")
              + Text(Image("MenuBarIcon")).baselineOffset(-4)
              + Text(" comme depuis l'appli ")
              + Text(Image(systemName: "gearshape"))
@@ -61,7 +66,10 @@ struct ActivationStep: View {
                 Button("Retour", action: onBack)
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
-                Button("Terminer", action: onComplete)
+                Button("Pas de tuto", action: onComplete)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                Button("Faire le tuto", action: onStartTutorial)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
             }
@@ -74,6 +82,6 @@ struct ActivationStep: View {
 }
 
 #Preview {
-    ActivationStep(onComplete: {}, onBack: {})
+    ActivationStep(onComplete: {}, onStartTutorial: {}, onBack: {})
         .frame(width: 800, height: 520)
 }
