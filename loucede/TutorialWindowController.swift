@@ -95,6 +95,8 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         // M.2.5-fix-2 — coches « close » (Esc) et « generator » (lancement géné).
         state.tutorialClosedHandler = { [weak self] in self?.tick("close") }
         state.tutorialGeneratorOpenedHandler = { [weak self] in self?.tick("generator") }
+        // M.2.5-fix-3 — coche « search » (champ recherche non vide).
+        state.tutorialSearchHandler = { [weak self] in self?.tick("search") }
         globalAppDelegate?.tutorialShortcutHandler = { [weak self] in self?.handleTutorialShortcut() }
 
         // Chargement de la page bundlée. Folder reference `Tutorial` →
@@ -191,6 +193,7 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialCopyHandler = nil
         state.tutorialClosedHandler = nil
         state.tutorialGeneratorOpenedHandler = nil
+        state.tutorialSearchHandler = nil
         globalAppDelegate?.tutorialShortcutHandler = nil
 
         // Retire le handler (rompt proprement la chaîne ucc → bridge).

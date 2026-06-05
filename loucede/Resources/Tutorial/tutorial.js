@@ -91,7 +91,14 @@
         // Active le prochain milestone encore "upcoming".
         let next = li.nextElementSibling;
         while (next && next.dataset.state !== "upcoming") next = next.nextElementSibling;
-        if (next) next.dataset.state = "active";
+        if (next) {
+          next.dataset.state = "active";
+        } else {
+          // M.2.5-fix-3 — dernier milestone de la section coché → révèle la
+          // notice contextuelle (écran 3 ; no-op si la section n'en a pas).
+          const notice = sec.querySelector(".tuto-notice");
+          if (notice) notice.classList.add("visible");
+        }
       }
       return true;
     },

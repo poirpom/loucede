@@ -47,6 +47,8 @@ final class PopoverState: ObservableObject {
     var tutorialClosedHandler: (() -> Void)?
     /// M.2.5-fix-2 — notifie le lancement du Générateur (→ coche « generator »).
     var tutorialGeneratorOpenedHandler: (() -> Void)?
+    /// M.2.5-fix-3 — notifie l'usage du champ recherche (→ coche « search »).
+    var tutorialSearchHandler: (() -> Void)?
 
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,

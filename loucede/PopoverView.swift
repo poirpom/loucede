@@ -518,6 +518,9 @@ struct PopoverView: View {
         .onChange(of: state.searchQuery) { _, newValue in
             state.selectedIndex = 0
             globalAppDelegate?.resizePopover(to: .list, searchQuery: newValue)
+            // M.2.5-fix-3 — coche « search » dès que le champ devient non vide
+            // (option permissive : quel que soit le texte). No-op ailleurs.
+            if state.tutorialMode && !newValue.isEmpty { state.tutorialSearchHandler?() }
         }
         // 2026-05-07 : recalcule la taille de la fenêtre quand le provider
         // bascule de « pas utilisable » à « utilisable » (ou inverse) sans
