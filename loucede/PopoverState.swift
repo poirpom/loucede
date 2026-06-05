@@ -39,6 +39,8 @@ final class PopoverState: ObservableObject {
     var tutorialPasteHandler: ((String) -> Void)?
     /// Notifie le lancement d'une action (→ coche « action ») en mode tuto.
     var tutorialActionRunHandler: (() -> Void)?
+    /// M.2.5 — notifie la FIN d'un stream réussi (→ coche « magic ») en mode tuto.
+    var tutorialStreamDoneHandler: (() -> Void)?
 
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,
@@ -490,9 +492,6 @@ final class PopoverState: ObservableObject {
             ? (AIModel.models(for: provider).first ?? store.selectedModel)
             : store.selectedModel
         let inputText = textManager.capturedText
-        #if DEBUG
-        if tutorialMode { print("🧪 [tuto] inputText au run [\(inputText.count)] = \(inputText.debugDescription)") }
-        #endif
         let fullPrompt = inputText.isEmpty ? action.prompt : "\(action.prompt)\n\n\(inputText)"
 
         // Snapshot du `hasLicense` au lancement : si l'utilisateur
@@ -560,6 +559,9 @@ final class PopoverState: ObservableObject {
                 UsageTracker.shared.recordSuccessfulUse()
                 UsageTracker.shared.recordActionUse(actionID: action.id)
             }
+
+            // M.2.5 — coche « magic » côté tuto quand le stream a réussi.
+            if self.tutorialMode && streamSucceeded { self.tutorialStreamDoneHandler?() }
         }
     }
 }

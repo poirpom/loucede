@@ -85,8 +85,11 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialPasteHandler = { [weak self] text in
             self?.injectResult(text)
             self?.refocusEdit()
+            self?.tick("paste")   // M.2.5 — coche « paste » (écran 2 ; no-op ailleurs)
         }
         state.tutorialActionRunHandler = { [weak self] in self?.tick("action") }
+        // M.2.5 — coche « magic » à la fin d'un stream réussi.
+        state.tutorialStreamDoneHandler = { [weak self] in self?.tick("magic") }
         globalAppDelegate?.tutorialShortcutHandler = { [weak self] in self?.handleTutorialShortcut() }
 
         // Chargement de la page bundlée. Folder reference `Tutorial` →
@@ -118,6 +121,10 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         switch type {
         case "ready":
             tick("ready")
+        case "close":
+            // M.2.5 — bouton « Fermer » de l'écran final → ferme la fenêtre
+            // (déclenche le cleanup unique windowWillClose).
+            window?.close()
         default:
             break
         }
@@ -136,9 +143,6 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         webView?.evaluateJavaScript("window.tuto ? window.tuto.lastSelection() : ''") { [weak self] result, _ in
             guard let self else { return }
             let selection = (result as? String) ?? ""
-            #if DEBUG
-            print("🧪 [tuto] sélection reçue [\(selection.count)] = \(selection.debugDescription)")
-            #endif
             guard !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 // Pas de sélection → no-op (équivalent du requireSelection normal).
                 return
@@ -178,6 +182,7 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialMode = false
         state.tutorialPasteHandler = nil
         state.tutorialActionRunHandler = nil
+        state.tutorialStreamDoneHandler = nil
         globalAppDelegate?.tutorialShortcutHandler = nil
 
         // Retire le handler (rompt proprement la chaîne ucc → bridge).

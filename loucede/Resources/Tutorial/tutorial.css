@@ -1,9 +1,9 @@
 /*
-  tutorial.css — Tuto loucedé (Phase M.2.4)
-  Layout HTML/CSS de la fenêtre tuto : 4 sections navigables, grille 40/60.
-  Esthétique reprise du site (anim hero) : .lc3-appwin, .lc3-key, traffic
-  lights. Accent #4b7bff (cohérence site). Contenu = placeholders/textes de
-  test ; le wording réel arrive en M.2.5.
+  tutorial.css — Tuto loucedé (Phases M.2.4 + M.2.5)
+  Layout 40/60, 4 sections navigables, esthétique site (.lc3-appwin, .lc3-key,
+  traffic lights, .lc3-kbd). Accent #4b7bff (cohérence site).
+  M.2.5 : badges d'action (.tuto-action #FFE4CC), distinction visuelle
+  milestone/info dans la checklist, anim clavier + bouton Fermer (écran final).
 */
 
 /* ─────────────────────────── Tokens ─────────────────────────── */
@@ -23,6 +23,10 @@
   --tuto-done:          #2EA66B;            /* coche faite (repris de l'actuel)    */
   --tuto-done-text:     #98989d;            /* texte d'une sous-étape faite (grisé) */
   --tuto-hairline:      rgba(0,0,0,0.08);
+
+  /* badge d'action (imite un chip loucedé) — apparence claire dans les 2 modes */
+  --tuto-action-bg:     #FFE4CC;            /* orange pâle (palette site)          */
+  --tuto-action-border: rgba(180,110,50,0.30);
 
   /* fake-window macOS (site .lc3-appwin) */
   --lc3-win-bg:         #ffffff;
@@ -178,6 +182,25 @@ body {
 }
 .tuto-steps li[data-state="done"] .tuto-check::after { content: "✓"; }
 
+/* Ligne info (non traçable) : indentée, gris pâle, marqueur ↳ statique.
+   Écart visuel volontairement marqué vs les milestones (« c'est une info,
+   pas une étape — normal que ça ne s'anime pas »). */
+.tuto-steps li.tuto-info {
+  margin-left: 28px;
+  padding: 7px 0;
+  border-bottom: none;
+  font-size: 13px;
+  color: var(--tuto-dim);
+}
+.tuto-info-marker {
+  flex: 0 0 auto;
+  order: -1;                 /* marqueur à gauche, comme la coche */
+  width: 16px;
+  text-align: center;
+  color: var(--tuto-dim);
+  opacity: 0.7;
+}
+
 /* Navigation */
 .tuto-nav {
   margin-top: 20px;
@@ -264,6 +287,23 @@ body {
   margin: 0 1px;
 }
 
+/* ───────────────────── Badge d'action (mention d'une action loucedé) ───────────────────── */
+/* Imite un chip loucedé : orange pâle, bordure fine (esprit .lc3-key), statique
+   (pas de hover → pas de « dois-je cliquer ? »). Texte noir dans les 2 modes. */
+.tuto-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--tuto-action-bg);
+  border: 0.5px solid var(--tuto-action-border);
+  color: #1d1d1f;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 /* ─────────────────────────── Section finale ─────────────────────────── */
 /* Écran final : plein cadre — couvre toute la fenêtre (déborde le padding du
    body), pas de coins arrondis. Le fond final remplace entièrement --tuto-bg. */
@@ -287,27 +327,62 @@ body {
   margin: 0 0 12px;
   color: var(--tuto-text);
 }
-.tuto-final-text {
+.tuto-final-subtitle {
   font-size: 15px;
   line-height: 1.55;
   color: var(--tuto-muted);
-  margin: 0 0 24px;
+  margin: 0 0 28px;
 }
-.tuto-kbd-anim-slot { min-height: 64px; } /* réservé anim ⌥& (M.2.5/M.2.8) */
+.tuto-final-chute {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--tuto-text);
+  margin: 0 0 28px;
+}
 
-/* ─────────────────────────── Instrumentation 🧪 (retirée M.2.5) ─────────────────────────── */
-.tuto-debug {
-  flex: 0 0 auto;
-  margin-top: 16px;
-  font: 11px ui-monospace, "SF Mono", monospace;
-  background: rgba(0,0,0,0.06);
-  color: var(--tuto-muted);
-  border-radius: 8px;
-  padding: 8px 10px;
-  height: 96px;
-  overflow: auto;
-  white-space: pre-wrap;
+/* Anim clavier ⌥& (site .lc3-kbd) — entrée séquentielle ⌥ puis &, puis figée
+   sur « 2 touches visibles » (fill-mode forwards). Se rejoue à chaque fois que
+   l'écran final devient visible. Pas de loop infini (attire l'œil puis statique). */
+.tuto-kbd-anim {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 0 0 28px;
 }
-@media (prefers-color-scheme: dark) {
-  .tuto-debug { background: rgba(255,255,255,0.06); }
+.lc3-kbd {
+  width: 56px; height: 56px;
+  border-radius: 10px;
+  background: var(--lc3-key-bg);
+  border: 0.5px solid var(--lc3-key-border);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08),
+              0 6px 14px rgba(15,23,42,0.18),
+              0 2px 4px rgba(15,23,42,0.10),
+              0 0.5px 0 rgba(0,0,0,0.06);
+  display: grid; place-items: center;
+  font-size: 24px; font-weight: 500;
+  color: var(--tuto-text);
+  opacity: 0;
+  animation: tuto-kbd-in 0.5s ease forwards;
 }
+.lc3-k1 { animation-delay: 0.25s; }
+.lc3-k2 { animation-delay: 0.65s; }
+@keyframes tuto-kbd-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.85); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* Bouton « Fermer » (clôture cérémoniale → ferme la fenêtre via bridge) */
+.tuto-close {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--tuto-accent);
+  border: none;
+  border-radius: 10px;
+  padding: 11px 30px;
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+.tuto-close:hover  { filter: brightness(1.06); }
+.tuto-close:active { filter: brightness(0.94); }

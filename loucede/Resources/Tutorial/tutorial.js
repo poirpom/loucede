@@ -1,5 +1,5 @@
 /*
-  tutorial.js — Tuto loucedé (Phase M.2.4)
+  tutorial.js — Tuto loucedé (Phases M.2.4 + M.2.5)
 
   Navigation entre les 4 sections + contrat bridge JS↔Swift INTACT.
 
@@ -10,29 +10,19 @@
   section active). La sélection (`_lastSelection`/`_lastRange`) reste globale.
 
   Swift appelle : window.tuto.lastSelection() / tick(step) / injectResult(text)
-  / refocusEdit(). Côté page → window.webkit.messageHandlers.tutoBridge.
+  / refocusEdit(). La page poste vers Swift via tutoBridge : { type:"ready" } au
+  chargement, { type:"close" } au clic sur « Fermer » (écran final).
+
+  M.2.5 : instrumentation (#log / log()) retirée ; bouton Fermer câblé.
 */
 
 (function () {
   "use strict";
 
-  // ─────────────────────────── Log instrumenté (🧪, retiré M.2.5) ───────────────────────────
-  const logEl = document.getElementById("log");
-  function log(dir, msg) {
-    if (!logEl) return;
-    const t = new Date().toISOString().substr(11, 12);
-    logEl.textContent += "[" + t + "] " + dir + " " + msg + "\n";
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
   // ─────────────────────────── JS → Swift ───────────────────────────
   function send(payload) {
-    try {
-      window.webkit.messageHandlers.tutoBridge.postMessage(payload);
-      log("JS->Swift", JSON.stringify(payload));
-    } catch (e) {
-      log("ERR", "bridge indisponible " + e);
-    }
+    try { window.webkit.messageHandlers.tutoBridge.postMessage(payload); }
+    catch (e) { /* bridge indisponible (page ouverte hors app) — no-op */ }
   }
 
   // ─────────────────────────── Résolution de la section active ───────────────────────────
@@ -59,7 +49,6 @@
       progressEl.style.display = isFinal ? "none" : "";
       if (!isFinal) progressEl.textContent = "Étape " + index + " / " + STEPS;
     }
-    log("nav", "section " + index);
     // Focus l'éditable de la nouvelle section (si présent — seule la section 2 en a).
     const edit = activeEdit();
     if (edit) edit.focus();
@@ -72,6 +61,11 @@
     });
   });
 
+  // Bouton « Fermer » (écran final) → ferme la fenêtre via le bridge
+  // (Swift : case "close" → window.close() → cleanup windowWillClose).
+  const closeBtn = document.querySelector(".tuto-close");
+  if (closeBtn) closeBtn.addEventListener("click", () => send({ type: "close" }));
+
   // ─────────────────────────── API Swift → JS (window.tuto.*) ───────────────────────────
   window.tuto = {
     // M.2.3-fix BUG 2 — dernière sélection NON VIDE mémorisée (texte + Range),
@@ -81,35 +75,33 @@
     _lastRange: null,
 
     /// Lue par Swift (handleTutorialShortcut) à la place de getSelection live.
-    lastSelection() {
-      log("Swift->JS", "lastSelection() -> [" + this._lastSelection.length + "] " + JSON.stringify(this._lastSelection));
-      return this._lastSelection;
-    },
+    lastSelection() { return this._lastSelection; },
 
-    /// Coche une sous-étape DANS LA SECTION ACTIVE (stratégie A). No-op gracieux
-    /// si la sous-étape n'existe pas (ex. tick("ready") au load global).
-    /// Passe la sous-étape suivante en `active`.
+    /// Coche un milestone DANS LA SECTION ACTIVE (stratégie A). No-op gracieux
+    /// si le milestone n'existe pas (ex. tick("magic") sur l'écran 3).
+    /// Passe le milestone suivant en `active` (saute les lignes info, qui n'ont
+    /// pas de data-state).
     tick(step) {
       const sec = activeSection();
       const li = sec ? sec.querySelector('[data-tick="' + step + '"]') : null;
-      // Garde anti-réavance : ne rejoue pas si déjà cochée (sinon un re-tick
-      // ferait avancer indûment la sous-étape suivante).
+      // Garde anti-réavance : ne rejoue pas si déjà coché (sinon un re-tick
+      // ferait avancer indûment le milestone suivant).
       if (li && li.dataset.state !== "done") {
         li.dataset.state = "done";
-        // Active la prochaine sous-étape encore "upcoming".
+        // Active le prochain milestone encore "upcoming".
         let next = li.nextElementSibling;
         while (next && next.dataset.state !== "upcoming") next = next.nextElementSibling;
         if (next) next.dataset.state = "active";
       }
-      log("Swift->JS", "tick(" + step + ")" + (li ? "" : " [no-op]"));
       return true;
     },
 
     /// Injecte le résultat IA dans l'éditable de la SECTION ACTIVE (remplace le
-    /// paste système). Texte échappé côté Swift via JSON.
+    /// paste système). Texte échappé côté Swift via JSON. No-op gracieux sur les
+    /// sections sans contenteditable (1 et 3).
     injectResult(text) {
       const edit = activeEdit();
-      if (!edit) { log("Swift->JS", "injectResult() [no edit]"); return false; }
+      if (!edit) return false;
       edit.focus();
       // M.2.3-fix BUG 1 (bonus) — restaure la Range d'origine si elle est dans
       // CET éditable, pour REMPLACER la sélection (sinon insert au caret).
@@ -124,35 +116,30 @@
       window._tutoInjecting = true;
       document.execCommand("insertText", false, text);
       window._tutoInjecting = false;
-      log("Swift->JS", "injectResult(" + JSON.stringify(text).slice(0, 60) + ")");
       return true;
     },
 
     /// Restaure le focus de l'éditable actif après fermeture du popover.
     refocusEdit() {
       const edit = activeEdit();
-      if (!edit) { log("Swift->JS", "refocusEdit() [no edit]"); return false; }
+      if (!edit) return false;
       edit.focus();
-      log("Swift->JS", "refocusEdit()");
       return document.activeElement === edit;
     }
   };
 
-  // ─────────────────────────── JS → Swift : signaux ───────────────────────────
+  // ─────────────────────────── JS → Swift : handshake ───────────────────────────
   window.addEventListener("load", () => send({ type: "ready" }));
 
-  // Sélection globale (toutes sections) → mémorise la dernière non vide.
+  // Sélection globale (toutes sections) → mémorise la dernière non vide ET coche
+  // le milestone « selection » en interne (Swift n'est pas notifié des
+  // sélections). Logique JS pure — le contrat Swift reste intact.
   document.addEventListener("selectionchange", () => {
     const sel = document.getSelection();
     const s = String(sel);
     if (s.length) {
       window.tuto._lastSelection = s;
       if (sel.rangeCount) window.tuto._lastRange = sel.getRangeAt(0).cloneRange();
-      send({ type: "selection", text: s, len: s.length });
-      // Fix M.2.4 #3 — coche « selection » EN INTERNE : Swift n'est pas notifié
-      // des sélections utilisateur. Si la sélection tombe dans la fake-window
-      // de la section active, on coche nous-mêmes la sous-étape correspondante.
-      // (Logique JS pure — le contrat Swift reste intact.)
       const sec = activeSection();
       const stage = sec ? sec.querySelector(".tuto-stage") : null;
       if (stage && sel.anchorNode && stage.contains(sel.anchorNode)) {
@@ -164,14 +151,14 @@
   // M.2.3 — pas de listener JS ⌥& : le hotkey Carbon de loucedé consomme la
   // touche au niveau système (cf. TutorialWindowController.handleTutorialShortcut).
 
-  // Garde : bloque la saisie clavier ordinaire dans TOUS les contenteditable
-  // [data-edit], sauf paste / injection programmatique (flag _tutoInjecting).
+  // Garde : bloque la saisie clavier ordinaire dans le(s) contenteditable
+  // [data-edit] (section 2), sauf paste / injection programmatique (_tutoInjecting).
   document.querySelectorAll("[data-edit]").forEach((edit) => {
     edit.addEventListener("beforeinput", (e) => {
       const allowed = window._tutoInjecting
         || e.inputType === "insertFromPaste"
         || e.inputType === "insertReplacementText";
-      if (!allowed) { e.preventDefault(); send({ type: "blockedInput", inputType: e.inputType }); }
+      if (!allowed) e.preventDefault();
     });
   });
 })();
