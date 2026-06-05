@@ -56,19 +56,44 @@
 
     // --- API Swift -> JS (window.tuto.*) ---
     window.tuto = {
+      // M.2.3-fix BUG 2 — dernière sélection NON VIDE mémorisée (texte + Range).
+      // On ne lit plus la sélection « live » au moment du ⌥& (timing fragile :
+      // la sélection d'un contenteditable peut collapser avant l'éval async).
+      _lastSelection: "",
+      _lastRange: null,
+
+      /// Lue par Swift (handleTutorialShortcut) à la place de getSelection live.
+      lastSelection() { return this._lastSelection; },
+
       tick(step) {
         const el = document.getElementById("tick-" + step);
         if (el) el.classList.add("on");
         log("Swift->JS", "tick(" + step + ")");
         return true;
       },
+
       injectResult(text) {
         const edit = document.getElementById("edit");
         edit.focus();
+        // M.2.3-fix BUG 1 (bonus) — restaure la Range d'origine si elle est
+        // dans le contenteditable, pour REMPLACER la sélection (sinon insert
+        // au caret). Sélection perdue quand le popover avait pris le focus.
+        const r = this._lastRange;
+        if (r && edit.contains(r.commonAncestorContainer)) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+        // M.2.3-fix BUG 1 — flag d'injection : la garde beforeinput laisse
+        // passer execCommand('insertText') (inputType non listé) le temps de
+        // l'écriture programmatique.
+        window._tutoInjecting = true;
         document.execCommand("insertText", false, text);
+        window._tutoInjecting = false;
         log("Swift->JS", "injectResult(" + JSON.stringify(text).slice(0, 60) + ")");
         return true;
       },
+
       refocusEdit() {
         const edit = document.getElementById("edit");
         edit.focus();
@@ -81,8 +106,15 @@
     window.addEventListener("load", () => send({ type: "ready" }));
 
     document.addEventListener("selectionchange", () => {
-      const s = String(document.getSelection());
-      if (s.length) send({ type: "selection", text: s });
+      const sel = document.getSelection();
+      const s = String(sel);
+      if (s.length) {
+        // Mémorise la dernière sélection non vide (texte + Range cloné). Non
+        // effacée au collapse → fiable au moment du ⌥& même si elle disparaît.
+        window.tuto._lastSelection = s;
+        if (sel.rangeCount) window.tuto._lastRange = sel.getRangeAt(0).cloneRange();
+        send({ type: "selection", text: s });
+      }
     });
 
     // M.2.3 — listener JS ⌥& RETIRÉ : le hotkey Carbon de loucedé consomme la
@@ -90,10 +122,12 @@
     // le handler Carbon branché sur tutorialMode (cf. TutorialWindowController).
 
     // Garde : bloque la saisie clavier ordinaire dans le contenteditable,
-    // sauf paste / injection programmatique.
+    // sauf paste / injection programmatique (flag _tutoInjecting).
     const edit = document.getElementById("edit");
     edit.addEventListener("beforeinput", (e) => {
-      const allowed = e.inputType === "insertFromPaste" || e.inputType === "insertReplacementText";
+      const allowed = window._tutoInjecting
+        || e.inputType === "insertFromPaste"
+        || e.inputType === "insertReplacementText";
       if (!allowed) { e.preventDefault(); send({ type: "blockedInput", inputType: e.inputType }); }
     });
   </script>

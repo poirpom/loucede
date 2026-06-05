@@ -130,7 +130,10 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
     /// `CapturedTextManager`, puis ouvre le popover programmatiquement. Coche
     /// « raccourci » au passage.
     private func handleTutorialShortcut() {
-        webView?.evaluateJavaScript("document.getSelection().toString()") { [weak self] result, _ in
+        // M.2.3-fix BUG 2 — lit la sélection MÉMORISÉE (dernière non vide) plutôt
+        // que le live `getSelection` (qui peut être collapsé au moment du ⌥&
+        // pour un contenteditable). cf. window.tuto._lastSelection.
+        webView?.evaluateJavaScript("window.tuto ? window.tuto.lastSelection() : ''") { [weak self] result, _ in
             guard let self else { return }
             let selection = (result as? String) ?? ""
             guard !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
