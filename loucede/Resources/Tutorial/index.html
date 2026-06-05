@@ -3,32 +3,103 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tuto loucedé</title>
+  <title>Tuto loucedé — bridge (M.2.2)</title>
   <style>
     :root { color-scheme: light dark; }
     html, body { height: 100%; margin: 0; }
-    body {
-      font: 15px -apple-system, system-ui, sans-serif;
-      display: flex; align-items: center; justify-content: center;
-      color: #222; background: #f4f4f6;
-    }
-    @media (prefers-color-scheme: dark) {
-      body { color: #eee; background: #1e1e20; }
-    }
-    .card { text-align: center; opacity: .85; }
-    h1 { font-size: 20px; margin: 0 0 6px; }
-    p  { font-size: 13px; margin: 0; opacity: .7; }
+    body { font: 14px -apple-system, system-ui, sans-serif; color: #222; background: #f4f4f6; padding: 28px 34px; }
+    @media (prefers-color-scheme: dark) { body { color: #eee; background: #1e1e20; } }
+    h1 { font-size: 16px; margin: 0 0 2px; }
+    .sub { font-size: 12px; opacity: .6; margin: 0 0 20px; }
+    h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; margin: 20px 0 6px; }
+    .free { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px; line-height: 1.5; }
+    .edit { background: #fff; color: #111; border: 1px dashed #bbb; padding: 12px 14px; border-radius: 8px;
+            min-height: 44px; line-height: 1.5; outline: none; caret-color: #3F84F7; }
+    .edit:focus { border-color: #3F84F7; }
+    .ticks span { display:inline-block; margin-right:14px; opacity:.4; font-size:13px; }
+    .ticks span.on { opacity:1; color:#2EA66B; font-weight:600; }
+    #log { margin-top: 18px; font: 11px ui-monospace, monospace; background: rgba(127,127,127,.10);
+           border-radius: 8px; padding: 10px 12px; height: 150px; overflow:auto; white-space: pre-wrap; }
+    code { background: rgba(127,127,127,.18); padding: 1px 5px; border-radius: 4px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Tuto loucedé</h1>
-    <p>Coquille M.2.1 — contenu interactif à venir (M.2.4 / M.2.5).</p>
-  </div>
+  <h1>Bridge JS &harr; Swift — harnais M.2.2</h1>
+  <p class="sub">Round-trip de test. Sélectionne du texte, presse <code>&#8997;&amp;</code>, tape dans la zone éditable.</p>
+
+  <h2>Texte libre (sélection &rarr; &#8997;&amp;)</h2>
+  <p class="free">Sélectionne une partie de cette phrase puis presse &#8997;&amp; : le bridge envoie la sélection à Swift, qui répond en cochant « raccourci ✓ ».</p>
+
+  <h2>Contenteditable (cible injectResult + garde beforeinput)</h2>
+  <p class="edit" contenteditable="true" id="edit">Tape ici (bloqué sauf paste). injectResult écrira dans cette zone.</p>
+
+  <h2>Coches (pilotées par Swift via window.tuto.tick)</h2>
+  <p class="ticks">
+    <span id="tick-ready">● prêt</span>
+    <span id="tick-shortcut">● raccourci</span>
+    <span id="tick-action">● action</span>
+  </p>
+
+  <div id="log"></div>
+
   <script>
-    // Ping bridge si présent (le handler complet arrive en M.2.2).
-    try { window.webkit.messageHandlers.tutoBridge.postMessage({ type: "ready" }); }
-    catch (e) { /* pas de bridge en M.2.1, normal */ }
+    const logEl = document.getElementById("log");
+    function log(dir, msg) {
+      const t = new Date().toISOString().substr(11, 12);
+      logEl.textContent += "[" + t + "] " + dir + " " + msg + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function send(payload) {
+      try { window.webkit.messageHandlers.tutoBridge.postMessage(payload); log("JS->Swift", JSON.stringify(payload)); }
+      catch (e) { log("ERR", "bridge indisponible " + e); }
+    }
+
+    // --- API Swift -> JS (window.tuto.*) ---
+    window.tuto = {
+      tick(step) {
+        const el = document.getElementById("tick-" + step);
+        if (el) el.classList.add("on");
+        log("Swift->JS", "tick(" + step + ")");
+        return true;
+      },
+      injectResult(text) {
+        const edit = document.getElementById("edit");
+        edit.focus();
+        document.execCommand("insertText", false, text);
+        log("Swift->JS", "injectResult(" + JSON.stringify(text).slice(0, 60) + ")");
+        return true;
+      },
+      refocusEdit() {
+        const edit = document.getElementById("edit");
+        edit.focus();
+        log("Swift->JS", "refocusEdit()");
+        return document.activeElement === edit;
+      }
+    };
+
+    // --- JS -> Swift ---
+    window.addEventListener("load", () => send({ type: "ready" }));
+
+    document.addEventListener("selectionchange", () => {
+      const s = String(document.getSelection());
+      if (s.length) send({ type: "selection", text: s });
+    });
+
+    // Option+& (AZERTY : & = touche 1 -> code Digit1). Déclencheur loucedé.
+    document.addEventListener("keydown", (e) => {
+      if (e.altKey && (e.key === "&" || e.code === "Digit1")) {
+        e.preventDefault();
+        send({ type: "shortcutPressed", selection: String(document.getSelection()) });
+      }
+    }, true);
+
+    // Garde : bloque la saisie clavier ordinaire dans le contenteditable,
+    // sauf paste / injection programmatique.
+    const edit = document.getElementById("edit");
+    edit.addEventListener("beforeinput", (e) => {
+      const allowed = e.inputType === "insertFromPaste" || e.inputType === "insertReplacementText";
+      if (!allowed) { e.preventDefault(); send({ type: "blockedInput", inputType: e.inputType }); }
+    });
   </script>
 </body>
 </html>
