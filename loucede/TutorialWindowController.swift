@@ -79,6 +79,16 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
 
         bridge.onMessage = { [weak self] body in self?.handleBridgeMessage(body) }
 
+        // M.2.3 — active le mode tuto + branche loucedé dessus.
+        let state = PopoverState.shared
+        state.tutorialMode = true
+        state.tutorialPasteHandler = { [weak self] text in
+            self?.injectResult(text)
+            self?.refocusEdit()
+        }
+        state.tutorialActionRunHandler = { [weak self] in self?.tick("action") }
+        globalAppDelegate?.tutorialShortcutHandler = { [weak self] in self?.handleTutorialShortcut() }
+
         // Chargement de la page bundlée. Folder reference `Tutorial` →
         // sous-répertoire préservé dans le bundle ; fallback flat au cas où.
         if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Tutorial")
@@ -98,8 +108,8 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - Bridge JS → Swift
 
     /// Reçoit les messages de la page (`window.webkit.messageHandlers.tutoBridge`).
-    /// M.2.2 : log + démonstration round-trip (tick). L'orchestration réelle
-    /// (ouverture popover, modèle, paste) arrive en M.2.3.
+    /// Le trigger ⌥& ne passe PAS par ici (le hotkey Carbon consomme la touche
+    /// → cf. `handleTutorialShortcut`) ; ce handler couvre les autres signaux.
     private func handleBridgeMessage(_ body: [String: Any]) {
         let type = body["type"] as? String ?? "?"
         #if DEBUG
@@ -108,12 +118,29 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         switch type {
         case "ready":
             tick("ready")
-        case "shortcutPressed":
-            // Démo round-trip M.2.2 : on coche « raccourci ». (M.2.3 ouvrira
-            // réellement le popover avec `body["selection"]`.)
-            tick("shortcut")
         default:
             break
+        }
+    }
+
+    // MARK: - Trigger tuto (appelé par le hotkey Carbon via tutorialShortcutHandler)
+
+    /// ⌥& en mode tuto : lit la sélection RÉELLE de la page (le hotkey ayant
+    /// consommé la touche, pas de capture Cmd+C), la pose dans
+    /// `CapturedTextManager`, puis ouvre le popover programmatiquement. Coche
+    /// « raccourci » au passage.
+    private func handleTutorialShortcut() {
+        webView?.evaluateJavaScript("document.getSelection().toString()") { [weak self] result, _ in
+            guard let self else { return }
+            let selection = (result as? String) ?? ""
+            guard !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                // Pas de sélection → no-op (équivalent du requireSelection normal).
+                return
+            }
+            CapturedTextManager.shared.capturedText = selection
+            CapturedTextManager.shared.hasSelection = true
+            self.tick("shortcut")
+            globalAppDelegate?.presentPopoverForTutorial()
         }
     }
 
@@ -140,6 +167,13 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: NSWindowDelegate — point de sortie unique
     func windowWillClose(_ notification: Notification) {
+        // Désactive le mode tuto + débranche loucedé.
+        let state = PopoverState.shared
+        state.tutorialMode = false
+        state.tutorialPasteHandler = nil
+        state.tutorialActionRunHandler = nil
+        globalAppDelegate?.tutorialShortcutHandler = nil
+
         // Retire le handler (rompt proprement la chaîne ucc → bridge).
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: "tutoBridge")
         onClose?()

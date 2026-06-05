@@ -85,13 +85,9 @@
       if (s.length) send({ type: "selection", text: s });
     });
 
-    // Option+& (AZERTY : & = touche 1 -> code Digit1). Déclencheur loucedé.
-    document.addEventListener("keydown", (e) => {
-      if (e.altKey && (e.key === "&" || e.code === "Digit1")) {
-        e.preventDefault();
-        send({ type: "shortcutPressed", selection: String(document.getSelection()) });
-      }
-    }, true);
+    // M.2.3 — listener JS ⌥& RETIRÉ : le hotkey Carbon de loucedé consomme la
+    // touche au niveau système, le JS ne la voit jamais. Le trigger passe par
+    // le handler Carbon branché sur tutorialMode (cf. TutorialWindowController).
 
     // Garde : bloque la saisie clavier ordinaire dans le contenteditable,
     // sauf paste / injection programmatique.

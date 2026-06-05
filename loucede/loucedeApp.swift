@@ -76,6 +76,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var previousActiveApp: NSRunningApplication?
     var menuBarMenuController = MenuBarMenuWindowController()
 
+    /// M.2.3 — en mode tuto, le handler hotkey Carbon délègue ici (lecture
+    /// de la sélection via JS + ouverture programmatique du popover) au lieu
+    /// de la capture Cmd+C. Posé/retiré par `TutorialWindowController`.
+    var tutorialShortcutHandler: (() -> Void)?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         globalAppDelegate = self
 
@@ -328,6 +333,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showPopover(requireSelection: Bool) {
+        // M.2.3 — branchement tuto : le hotkey Carbon fire normalement (et
+        // consomme ⌥&), mais en mode tuto on délègue au flow tuto (sélection
+        // lue via JS, pas de capture Cmd+C) plutôt que la voie standard.
+        if PopoverState.shared.tutorialMode, let handler = tutorialShortcutHandler {
+            handler()
+            return
+        }
+
         // Mémoriser l'app active avant d'afficher le popup
         previousActiveApp = NSWorkspace.shared.frontmostApplication
 
@@ -340,6 +353,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        presentPopoverWindow()
+    }
+
+    /// Queue commune d'affichage du popover (reset état + positionnement +
+    /// présentation + monitor). Factorisé (M.2.3) pour être réutilisé par le
+    /// flow tuto (`presentPopoverForTutorial`), qui pose lui-même la sélection.
+    private func presentPopoverWindow() {
         // Reset de l'état (active action, result, selection, stream en cours)
         // — la fenêtre elle-même reste la même, préchargée au démarrage.
         Task { @MainActor in
@@ -352,6 +372,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         installOutsideClickMonitor()
+    }
+
+    /// M.2.3 — ouverture du popover en mode tuto. La sélection a déjà été
+    /// posée dans `CapturedTextManager` par le handler tuto (lue via JS dans
+    /// la WKWebView). Pas de capture Cmd+C, pas de dépendance à l'app active.
+    func presentPopoverForTutorial() {
+        presentPopoverWindow()
     }
 
     private func positionPopoverCentered(width: CGFloat, height: CGFloat) {

@@ -28,6 +28,18 @@ final class PopoverState: ObservableObject {
     /// en overlay. Reset à `false` au click « Plus tard » ou « Acheter ».
     @Published var showTrialExpiredModal: Bool = false
 
+    // MARK: - Mode tuto (M.2.3)
+    /// `true` quand la fenêtre tuto est active. Modifie 3 comportements,
+    /// gardés par ce flag (sinon comportement normal intact) :
+    /// trigger (popover ouvert programmatiquement), modèle (tier rapide),
+    /// paste (injection JS au lieu de Cmd+V système).
+    @Published var tutorialMode: Bool = false
+    /// Paste tuto : injecte le résultat dans le contenteditable de la
+    /// WKWebView (posé par `TutorialWindowController`).
+    var tutorialPasteHandler: ((String) -> Void)?
+    /// Notifie le lancement d'une action (→ coche « action ») en mode tuto.
+    var tutorialActionRunHandler: (() -> Void)?
+
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,
     // la liste est filtrée par substring case-insensitive sur le nom.
@@ -466,9 +478,17 @@ final class PopoverState: ObservableObject {
         isProcessing = true
         pendingChunkBuffer = ""
 
+        // M.2.3 — coche « action » côté tuto dès le lancement.
+        if tutorialMode { tutorialActionRunHandler?() }
+
         let apiKey = store.apiKey
         let provider = store.selectedProvider
-        let model = store.selectedModel
+        // M.2.3 — en mode tuto, force le tier 🚀 rapide du provider (1ᵉʳ par
+        // convention d'ordre dans `allModels`). Override transitoire, non
+        // persisté → le modèle par défaut de l'utilisateur reste intact.
+        let model = tutorialMode
+            ? (AIModel.models(for: provider).first ?? store.selectedModel)
+            : store.selectedModel
         let inputText = textManager.capturedText
         let fullPrompt = inputText.isEmpty ? action.prompt : "\(action.prompt)\n\n\(inputText)"
 

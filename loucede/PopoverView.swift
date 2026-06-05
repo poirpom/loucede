@@ -1390,10 +1390,21 @@ struct PopoverView: View {
                     // On attend que le toast "Collé" soit visible ~300 ms avant
                     // d'appeler performPasteInPreviousApp (qui orderOut le popup).
                     Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(state.resultText, forType: .string)
-                        showConfirmation("Collé", duration: 0.3) {
-                            globalAppDelegate?.performPasteInPreviousApp()
+                        if state.tutorialMode {
+                            // M.2.3 — paste tuto : injection JS dans le
+                            // contenteditable (pas de Cmd+V système). Ferme le
+                            // popover puis injecte (la fenêtre tuto reprend key).
+                            let text = state.resultText
+                            showConfirmation("Collé", duration: 0.3) {
+                                globalAppDelegate?.hidePopover()
+                                state.tutorialPasteHandler?(text)
+                            }
+                        } else {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(state.resultText, forType: .string)
+                            showConfirmation("Collé", duration: 0.3) {
+                                globalAppDelegate?.performPasteInPreviousApp()
+                            }
                         }
                     } label: {
                         HStack(spacing: 6) {
