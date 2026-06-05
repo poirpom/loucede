@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tuto loucedé</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 15px -apple-system, system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      color: #222; background: #f4f4f6;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { color: #eee; background: #1e1e20; }
+    }
+    .card { text-align: center; opacity: .85; }
+    h1 { font-size: 20px; margin: 0 0 6px; }
+    p  { font-size: 13px; margin: 0; opacity: .7; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Tuto loucedé</h1>
+    <p>Coquille M.2.1 — contenu interactif à venir (M.2.4 / M.2.5).</p>
+  </div>
+  <script>
+    // Ping bridge si présent (le handler complet arrive en M.2.2).
+    try { window.webkit.messageHandlers.tutoBridge.postMessage({ type: "ready" }); }
+    catch (e) { /* pas de bridge en M.2.1, normal */ }
+  </script>
+</body>
+</html>

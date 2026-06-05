@@ -684,6 +684,13 @@ struct LicenseSettingsView: View {
             }
             .controlSize(.small)
 
+            // M.2.1 — déclencheur temporaire du tuto (les vrais entry points
+            // — onboarding écran 7 + bouton À propos — arrivent en M.2.7).
+            Button("🛠 Ouvrir le tuto (M.2.1)") {
+                TutorialWindowController.present()
+            }
+            .controlSize(.small)
+
             // Lecture live de l'effet courant.
             Text("override: \(manager.debugLicenseOverride.label)  ·  trial: \(manager.trialUsageCount)/\(LicenseManager.trialLimit)  ·  hasLicense: \(manager.hasLicense ? "true" : "false")  ·  canRunAction: \(manager.canRunAction ? "true" : "false")")
                 .font(.system(size: 10, design: .monospaced))
