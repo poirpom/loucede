@@ -90,6 +90,8 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialActionRunHandler = { [weak self] in self?.tick("action") }
         // M.2.5 — coche « magic » à la fin d'un stream réussi.
         state.tutorialStreamDoneHandler = { [weak self] in self?.tick("magic") }
+        // M.2.5-fix — coche « copy » sur ⏎ Copier (écran 1 ; no-op ailleurs).
+        state.tutorialCopyHandler = { [weak self] in self?.tick("copy") }
         globalAppDelegate?.tutorialShortcutHandler = { [weak self] in self?.handleTutorialShortcut() }
 
         // Chargement de la page bundlée. Folder reference `Tutorial` →
@@ -183,6 +185,7 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialPasteHandler = nil
         state.tutorialActionRunHandler = nil
         state.tutorialStreamDoneHandler = nil
+        state.tutorialCopyHandler = nil
         globalAppDelegate?.tutorialShortcutHandler = nil
 
         // Retire le handler (rompt proprement la chaîne ucc → bridge).

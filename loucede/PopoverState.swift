@@ -41,6 +41,8 @@ final class PopoverState: ObservableObject {
     var tutorialActionRunHandler: (() -> Void)?
     /// M.2.5 — notifie la FIN d'un stream réussi (→ coche « magic ») en mode tuto.
     var tutorialStreamDoneHandler: (() -> Void)?
+    /// M.2.5-fix — notifie une copie (⏎) (→ coche « copy ») en mode tuto.
+    var tutorialCopyHandler: (() -> Void)?
 
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,

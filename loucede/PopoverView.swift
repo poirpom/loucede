@@ -1421,6 +1421,7 @@ struct PopoverView: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(state.resultText, forType: .string)
                         showConfirmation("Copié")
+                        if state.tutorialMode { state.tutorialCopyHandler?() }  // M.2.5-fix — coche « copy »
                     } label: {
                         HStack(spacing: 6) {
                             KeyboardKey("↵")

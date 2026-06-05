@@ -24,9 +24,10 @@
   --tuto-done-text:     #98989d;            /* texte d'une sous-étape faite (grisé) */
   --tuto-hairline:      rgba(0,0,0,0.08);
 
-  /* badge d'action (imite un chip loucedé) — apparence claire dans les 2 modes */
+  /* badge d'action (imite un chip loucedé) */
   --tuto-action-bg:     #FFE4CC;            /* orange pâle (palette site)          */
   --tuto-action-border: rgba(180,110,50,0.30);
+  --tuto-action-text:   #1d1d1f;
 
   /* fake-window macOS (site .lc3-appwin) */
   --lc3-win-bg:         #ffffff;
@@ -62,6 +63,12 @@
 
     --lc3-key-bg:       #2e2e33;
     --lc3-key-border:   rgba(255,255,255,0.16);
+
+    /* badge d'action en dark : orange désaturé sombre + texte chaud clair
+       (le #FFE4CC pur ressortait trop violemment sur le fond sombre) */
+    --tuto-action-bg:     #3a2a20;
+    --tuto-action-border: rgba(255,180,120,0.22);
+    --tuto-action-text:   #f0d9c4;
   }
 }
 
@@ -201,6 +208,21 @@ body {
   opacity: 0.7;
 }
 
+/* Notification contextuelle (écran 3) : hors flux des étapes — divider au-dessus
+   + icône ℹ️. Distincte des milestones ET des lignes info ↳. */
+.tuto-notice {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--tuto-hairline);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tuto-muted);
+}
+.tuto-notice-icon { flex: 0 0 auto; }
+
 /* Navigation */
 .tuto-nav {
   margin-top: 20px;
@@ -297,7 +319,7 @@ body {
   border-radius: 5px;
   background: var(--tuto-action-bg);
   border: 0.5px solid var(--tuto-action-border);
-  color: #1d1d1f;
+  color: var(--tuto-action-text);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -365,8 +387,9 @@ body {
   opacity: 0;
   animation: tuto-kbd-in 0.5s ease forwards;
 }
-.lc3-k1 { animation-delay: 0.25s; }
-.lc3-k2 { animation-delay: 0.65s; }
+/* Démarrage retardé : laisse lire titre + sous-titre avant l'entrée des touches. */
+.lc3-k1 { animation-delay: 0.8s; }
+.lc3-k2 { animation-delay: 1.2s; }
 @keyframes tuto-kbd-in {
   from { opacity: 0; transform: translateY(8px) scale(0.85); }
   to   { opacity: 1; transform: translateY(0)   scale(1); }

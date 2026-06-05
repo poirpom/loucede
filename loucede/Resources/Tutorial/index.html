@@ -34,13 +34,13 @@
             <span class="tuto-check" aria-hidden="true"></span>
             <span class="tuto-step-label">Laisse la magie se produire</span>
           </li>
-          <li class="tuto-info">
-            <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label">Appuie sur <span class="lc3-key">⏎</span> pour copier le texte</span>
+          <li class="tuto-milestone" data-tick="copy" data-state="upcoming">
+            <span class="tuto-check" aria-hidden="true"></span>
+            <span class="tuto-step-label"><span class="lc3-key">⏎</span> pour copier le texte</span>
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label"><span class="lc3-key">Esc.</span> pour fermer le popover loucedé</span>
+            <span class="tuto-step-label"><span class="lc3-key">Esc.</span> pour fermer</span>
           </li>
         </ul>
         <div class="tuto-nav">
@@ -65,7 +65,7 @@
     <!-- ─────────────── Section 2 — Agir puis coller ─────────────── -->
     <section class="tuto-section interactive" data-index="2">
       <aside class="tuto-instructions">
-        <h2 class="tuto-step-title">Agir puis coller</h2>
+        <h2 class="tuto-step-title">Agir puis <em>coller</em></h2>
         <ul class="tuto-steps">
           <li class="tuto-milestone" data-tick="selection" data-state="active">
             <span class="tuto-check" aria-hidden="true"></span>
@@ -81,7 +81,7 @@
           </li>
           <li class="tuto-milestone" data-tick="action" data-state="upcoming">
             <span class="tuto-check" aria-hidden="true"></span>
-            <span class="tuto-step-label">Sélectionne <span class="tuto-action">🕴️ Rends plus formel</span> avec <span class="lc3-key">↓</span> puis <span class="lc3-key">⏎</span></span>
+            <span class="tuto-step-label"><span class="tuto-action">🕴️ Rends plus formel</span> → <span class="lc3-key">⏎</span></span>
           </li>
           <li class="tuto-milestone" data-tick="magic" data-state="upcoming">
             <span class="tuto-check" aria-hidden="true"></span>
@@ -89,7 +89,7 @@
           </li>
           <li class="tuto-milestone" data-tick="paste" data-state="upcoming">
             <span class="tuto-check" aria-hidden="true"></span>
-            <span class="tuto-step-label">Appuie sur <span class="lc3-key">⌘</span><span class="lc3-key">⏎</span> pour coller le résultat à la place</span>
+            <span class="tuto-step-label"><span class="lc3-key">⌘</span><span class="lc3-key">⏎</span> pour coller le résultat</span>
           </li>
         </ul>
         <div class="tuto-nav">
@@ -126,7 +126,7 @@
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label">Recherche « haiku ». Pas d'action dispo 😟</span>
+            <span class="tuto-step-label">Recherche « haiku ». Pas d'action 😟</span>
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
@@ -134,7 +134,7 @@
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label"><span class="lc3-key">⏎</span> à nouveau pour lancer le générateur</span>
+            <span class="tuto-step-label"><span class="lc3-key">⏎</span> pour lancer le générateur</span>
           </li>
           <li class="tuto-milestone" data-tick="action" data-state="upcoming">
             <span class="tuto-check" aria-hidden="true"></span>
@@ -142,13 +142,14 @@
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label"><span class="tuto-action">🌸 Transforme en haiku</span> est désormais dispo dans tes actions</span>
-          </li>
-          <li class="tuto-info">
-            <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label"><span class="lc3-key">Esc.</span> pour fermer le popover loucedé</span>
+            <span class="tuto-step-label"><span class="lc3-key">Esc.</span> pour fermer</span>
           </li>
         </ul>
+        <!-- Notification contextuelle (hors flux des étapes) — divider + ℹ️ -->
+        <div class="tuto-notice">
+          <span class="tuto-notice-icon" aria-hidden="true">ℹ️</span>
+          <span><span class="tuto-action">🌸 Transforme en haiku</span> est désormais dispo dans tes actions</span>
+        </div>
         <div class="tuto-nav">
           <button type="button" class="tuto-next">Suivant →</button>
         </div>
@@ -177,8 +178,8 @@
           <div class="lc3-kbd lc3-k1">⌥</div>
           <div class="lc3-kbd lc3-k2">&amp;</div>
         </div>
-        <p class="tuto-final-chute">Va, envole-toi et loucedète. PARTOUT.</p>
-        <button type="button" class="tuto-close">Fermer</button>
+        <p class="tuto-final-chute">Va, envole-toi.</p>
+        <button type="button" class="tuto-close">Bye bye</button>
       </div>
     </section>
 
