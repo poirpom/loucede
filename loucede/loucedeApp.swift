@@ -777,6 +777,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         outsideClickMonitorResumeTask?.cancel()
         outsideClickMonitorResumeTask = nil
         outsideClickMonitorSuspended = false
+
+        // M.2.5-fix-2 — coche « close » côté tuto (Esc → fermeture popover ;
+        // no-op gracieux sur les écrans sans data-tick="close").
+        if PopoverState.shared.tutorialMode { PopoverState.shared.tutorialClosedHandler?() }
     }
 
     func hidePopoverAndRestoreFocus() {

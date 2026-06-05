@@ -92,6 +92,9 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialStreamDoneHandler = { [weak self] in self?.tick("magic") }
         // M.2.5-fix — coche « copy » sur ⏎ Copier (écran 1 ; no-op ailleurs).
         state.tutorialCopyHandler = { [weak self] in self?.tick("copy") }
+        // M.2.5-fix-2 — coches « close » (Esc) et « generator » (lancement géné).
+        state.tutorialClosedHandler = { [weak self] in self?.tick("close") }
+        state.tutorialGeneratorOpenedHandler = { [weak self] in self?.tick("generator") }
         globalAppDelegate?.tutorialShortcutHandler = { [weak self] in self?.handleTutorialShortcut() }
 
         // Chargement de la page bundlée. Folder reference `Tutorial` →
@@ -186,6 +189,8 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialActionRunHandler = nil
         state.tutorialStreamDoneHandler = nil
         state.tutorialCopyHandler = nil
+        state.tutorialClosedHandler = nil
+        state.tutorialGeneratorOpenedHandler = nil
         globalAppDelegate?.tutorialShortcutHandler = nil
 
         // Retire le handler (rompt proprement la chaîne ucc → bridge).

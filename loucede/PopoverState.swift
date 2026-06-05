@@ -43,6 +43,10 @@ final class PopoverState: ObservableObject {
     var tutorialStreamDoneHandler: (() -> Void)?
     /// M.2.5-fix — notifie une copie (⏎) (→ coche « copy ») en mode tuto.
     var tutorialCopyHandler: (() -> Void)?
+    /// M.2.5-fix-2 — notifie la fermeture du popover (Esc) (→ coche « close »).
+    var tutorialClosedHandler: (() -> Void)?
+    /// M.2.5-fix-2 — notifie le lancement du Générateur (→ coche « generator »).
+    var tutorialGeneratorOpenedHandler: (() -> Void)?
 
     // Phase 1.4g : champ de recherche dans la liste d'actions. Accumulé
     // via les frappes dans mainView (.onKeyPress générique). Quand non vide,
@@ -219,6 +223,9 @@ final class PopoverState: ObservableObject {
         let myToken = UUID()
         currentGenerationToken = myToken
         generatorPhase = .loading
+
+        // M.2.5-fix-2 — coche « generator » au lancement de la génération.
+        if tutorialMode { tutorialGeneratorOpenedHandler?() }
 
         // Annule un éventuel Task précédent (sécurité — il ne devrait pas
         // y avoir 2 générations simultanées).

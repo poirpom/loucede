@@ -38,8 +38,8 @@
             <span class="tuto-check" aria-hidden="true"></span>
             <span class="tuto-step-label"><span class="lc3-key">⏎</span> pour copier le texte</span>
           </li>
-          <li class="tuto-info">
-            <span class="tuto-info-marker" aria-hidden="true">↳</span>
+          <li class="tuto-milestone" data-tick="close" data-state="upcoming">
+            <span class="tuto-check" aria-hidden="true"></span>
             <span class="tuto-step-label"><span class="lc3-key">Esc.</span> pour fermer</span>
           </li>
         </ul>
@@ -89,7 +89,7 @@
           </li>
           <li class="tuto-milestone" data-tick="paste" data-state="upcoming">
             <span class="tuto-check" aria-hidden="true"></span>
-            <span class="tuto-step-label"><span class="lc3-key">⌘</span><span class="lc3-key">⏎</span> pour coller le résultat</span>
+            <span class="tuto-step-label"><span class="lc3-key">⌘</span><span class="lc3-key">⏎</span> pour <em>coller</em> le résultat</span>
           </li>
         </ul>
         <div class="tuto-nav">
@@ -126,14 +126,14 @@
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label">Recherche « haiku ». Pas d'action 😟</span>
+            <span class="tuto-step-label">Recherche « haiku ». Pas d'action</span>
           </li>
           <li class="tuto-info">
             <span class="tuto-info-marker" aria-hidden="true">↳</span>
-            <span class="tuto-step-label">Sélectionne <span class="tuto-action">✨ Générer cette action</span> avec <span class="lc3-key">⏎</span></span>
+            <span class="tuto-step-label"><span class="tuto-action">✨ Générer cette action</span> → <span class="lc3-key">⏎</span></span>
           </li>
-          <li class="tuto-info">
-            <span class="tuto-info-marker" aria-hidden="true">↳</span>
+          <li class="tuto-milestone" data-tick="generator" data-state="upcoming">
+            <span class="tuto-check" aria-hidden="true"></span>
             <span class="tuto-step-label"><span class="lc3-key">⏎</span> pour lancer le générateur</span>
           </li>
           <li class="tuto-milestone" data-tick="action" data-state="upcoming">
@@ -147,8 +147,12 @@
         </ul>
         <!-- Notification contextuelle (hors flux des étapes) — divider + ℹ️ -->
         <div class="tuto-notice">
-          <span class="tuto-notice-icon" aria-hidden="true">ℹ️</span>
-          <span><span class="tuto-action">🌸 Transforme en haiku</span> est désormais dispo dans tes actions</span>
+          <svg class="tuto-notice-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <line x1="12" y1="11" x2="12" y2="16"></line>
+            <circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none"></circle>
+          </svg>
+          <span><span class="tuto-action">🌸 Transforme en haiku</span> ajouté à tes actions</span>
         </div>
         <div class="tuto-nav">
           <button type="button" class="tuto-next">Suivant →</button>
@@ -163,7 +167,7 @@
             <span class="lc3-tl lc3-tl-g"></span>
           </div>
           <div class="lc3-appwin-body">
-            <p class="lc3-nx-quote">Z'avez d'la pâte ? Z'avez du suc' ? Bah avec la pâte vous faites une crêpe pi vous mettez du suc' dessus</p>
+            <p class="lc3-nx-quote">Moi, si je devais résumer ma vie aujourd'hui avec vous, je dirais que c'est d'abord des rencontres. Des gens qui m'ont tendu la main, peut-être à un moment où je ne pouvais pas, où j'étais seul chez moi. Et c'est assez curieux de se dire que les hasards, les rencontres, forgent une destinée…</p>
           </div>
         </div>
       </div>

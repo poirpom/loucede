@@ -221,7 +221,7 @@ body {
   line-height: 1.4;
   color: var(--tuto-muted);
 }
-.tuto-notice-icon { flex: 0 0 auto; }
+.tuto-notice-icon { flex: 0 0 auto; margin-top: 1px; color: var(--tuto-muted); }
 
 /* Navigation */
 .tuto-nav {
