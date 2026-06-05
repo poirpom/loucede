@@ -1,0 +1,301 @@
+/*
+  tutorial.css — Tuto loucedé (Phase M.2.4)
+  Layout HTML/CSS de la fenêtre tuto : 4 sections navigables, grille 40/60.
+  Esthétique reprise du site (anim hero) : .lc3-appwin, .lc3-key, traffic
+  lights. Accent #4b7bff (cohérence site). Contenu = placeholders/textes de
+  test ; le wording réel arrive en M.2.5.
+*/
+
+/* ─────────────────────────── Tokens ─────────────────────────── */
+:root {
+  color-scheme: light dark;
+
+  --tuto-bg:            #CAE9FF;            /* fond global fenêtre (brief)        */
+  --tuto-card-bg:       #FFFFFF;            /* encadré instructions (brief)        */
+  --tuto-card-shadow:   0 4px 12px rgba(0,0,0,0.08);
+  --tuto-final-bg:      #C8EDD8;            /* écran final (brief)                 */
+
+  --tuto-accent:        #4b7bff;            /* accent site                         */
+  --tuto-text:          #1d1d1f;            /* texte principal (site)              */
+  --tuto-muted:         #6e6e73;            /* texte secondaire (site)             */
+  --tuto-dim:           #8e8e93;            /* texte tertiaire (site)              */
+  --tuto-done:          #2EA66B;            /* coche faite (repris de l'actuel)    */
+  --tuto-hairline:      rgba(0,0,0,0.08);
+
+  /* fake-window macOS (site .lc3-appwin) */
+  --lc3-win-bg:         #ffffff;
+  --lc3-win-radius:     18px;
+  --lc3-win-shadow:     0 12px 32px rgba(15,23,42,0.10),
+                        0 4px 10px rgba(15,23,42,0.06),
+                        0 0 0 0.5px rgba(0,0,0,0.06);
+
+  /* touche clavier (site .lc3-key) */
+  --lc3-key-bg:         #ffffff;
+  --lc3-key-border:     rgba(0,0,0,0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tuto-bg:          #16242e;            /* bleu-nuit assombri                  */
+    --tuto-card-bg:     #2b2b30;            /* encadré gris ardoise                 */
+    --tuto-card-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    --tuto-final-bg:    #1c2e26;            /* vert assombri                        */
+
+    --tuto-accent:      #5b86ff;
+    --tuto-text:        #ececed;
+    --tuto-muted:       #a1a1a8;
+    --tuto-dim:         #8e8e93;
+    --tuto-done:        #45c98a;
+    --tuto-hairline:    rgba(255,255,255,0.10);
+
+    --lc3-win-bg:       #1e1e20;
+    --lc3-win-shadow:   0 12px 32px rgba(0,0,0,0.45),
+                        0 4px 10px rgba(0,0,0,0.30),
+                        0 0 0 0.5px rgba(255,255,255,0.06);
+
+    --lc3-key-bg:       #2e2e33;
+    --lc3-key-border:   rgba(255,255,255,0.16);
+  }
+}
+
+/* ─────────────────────────── Base ─────────────────────────── */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 14px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--tuto-text);
+  background: var(--tuto-bg);
+  /* place la titlebar transparente (fullSizeContentView) : on réserve du haut */
+  padding: 44px 28px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ───────────────────── Indicateur de progression ───────────────────── */
+.tuto-progress {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--tuto-muted);
+  margin-bottom: 16px;
+}
+
+/* ─────────────────────────── Sections ─────────────────────────── */
+.tuto-sections {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+.tuto-section { display: none; height: 100%; }
+.tuto-section.active { display: flex; }
+
+/* Sections interactives : grille 40 / 60 */
+.tuto-section.interactive {
+  gap: 24px;
+  align-items: stretch;
+}
+.tuto-instructions { flex: 0 0 40%; }
+.tuto-stage        { flex: 1 1 60%; min-width: 0; }
+
+/* ───────────────────── Encadré instructions (40%) ───────────────────── */
+.tuto-instructions {
+  background: var(--tuto-card-bg);
+  border-radius: 16px;
+  box-shadow: var(--tuto-card-shadow);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+}
+.tuto-step-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px;
+  color: var(--tuto-text);
+}
+
+/* Liste des sous-étapes + coches */
+.tuto-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+}
+.tuto-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 0.5px solid var(--tuto-hairline);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.tuto-steps li:last-child { border-bottom: none; }
+.tuto-step-label { flex: 1 1 auto; }
+
+/* Coche à droite — 3 états visuels via data-state */
+.tuto-check {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+/* upcoming : grisé, puce vide */
+.tuto-steps li[data-state="upcoming"] { color: var(--tuto-dim); }
+.tuto-steps li[data-state="upcoming"] .tuto-check {
+  border: 1.5px solid var(--tuto-dim);
+  background: transparent;
+}
+
+/* active : accent, puce pleine */
+.tuto-steps li[data-state="active"] { color: var(--tuto-text); font-weight: 500; }
+.tuto-steps li[data-state="active"] .tuto-check {
+  border: 1.5px solid var(--tuto-accent);
+  background: color-mix(in srgb, var(--tuto-accent) 16%, transparent);
+}
+
+/* done : vert + check ✓ */
+.tuto-steps li[data-state="done"] { color: var(--tuto-text); }
+.tuto-steps li[data-state="done"] .tuto-check {
+  border: 1.5px solid var(--tuto-done);
+  background: var(--tuto-done);
+  color: #fff;
+}
+.tuto-steps li[data-state="done"] .tuto-check::after { content: "✓"; }
+
+/* Navigation */
+.tuto-nav {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+.tuto-next {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--tuto-accent);
+  border: none;
+  border-radius: 9px;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+.tuto-next:hover  { filter: brightness(1.06); }
+.tuto-next:active { filter: brightness(0.94); }
+
+/* ───────────────────── Fake-window macOS (60%) — site .lc3-appwin ───────────────────── */
+.tuto-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lc3-appwin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--lc3-win-bg);
+  border-radius: var(--lc3-win-radius);
+  box-shadow: var(--lc3-win-shadow);
+  overflow: hidden;
+}
+.lc3-traffic {
+  position: absolute;
+  top: 14px; left: 16px;
+  display: flex; gap: 8px; z-index: 2;
+}
+.lc3-tl {
+  width: 12px; height: 12px; border-radius: 50%;
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.4), 0 0 0 0.5px rgba(0,0,0,0.18);
+}
+.lc3-tl-r { background: #ff5f57; }
+.lc3-tl-y { background: #febc2e; }
+.lc3-tl-g { background: #28c840; }
+.lc3-appwin-body {
+  width: 100%; height: 100%;
+  padding: 64px 40px 32px;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start;
+  gap: 28px;
+}
+.lc3-nx-quote {
+  font-size: clamp(15px, 1.8vw, 20px);
+  line-height: 1.5;
+  color: var(--tuto-text);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  margin: 0;
+  max-width: 420px;
+  caret-color: var(--tuto-accent);
+  outline: none;
+}
+/* contenteditable cible (data-edit) : focus discret */
+.lc3-nx-quote[data-edit]:focus {
+  outline: 2px solid color-mix(in srgb, var(--tuto-accent) 40%, transparent);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+/* ───────────────────── Touche clavier inline — site .lc3-key ───────────────────── */
+.lc3-key {
+  min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 4px;
+  background: var(--lc3-key-bg);
+  border: 0.5px solid var(--lc3-key-border);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  color: var(--tuto-text);
+  vertical-align: middle;
+  margin: 0 1px;
+}
+
+/* ─────────────────────────── Section finale ─────────────────────────── */
+.tuto-section.final {
+  align-items: center;
+  justify-content: center;
+  background: var(--tuto-final-bg);
+  border-radius: 18px;
+}
+.tuto-final-card {
+  text-align: center;
+  max-width: 460px;
+  padding: 40px;
+}
+.tuto-final-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--tuto-text);
+}
+.tuto-final-text {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--tuto-muted);
+  margin: 0 0 24px;
+}
+.tuto-kbd-anim-slot { min-height: 64px; } /* réservé anim ⌥& (M.2.5/M.2.8) */
+
+/* ─────────────────────────── Instrumentation 🧪 (retirée M.2.5) ─────────────────────────── */
+.tuto-debug {
+  flex: 0 0 auto;
+  margin-top: 16px;
+  font: 11px ui-monospace, "SF Mono", monospace;
+  background: rgba(0,0,0,0.06);
+  color: var(--tuto-muted);
+  border-radius: 8px;
+  padding: 8px 10px;
+  height: 96px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+@media (prefers-color-scheme: dark) {
+  .tuto-debug { background: rgba(255,255,255,0.06); }
+}

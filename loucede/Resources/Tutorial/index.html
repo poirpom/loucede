@@ -3,145 +3,143 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tuto loucedé — bridge (M.2.2)</title>
-  <style>
-    :root { color-scheme: light dark; }
-    html, body { height: 100%; margin: 0; }
-    body { font: 14px -apple-system, system-ui, sans-serif; color: #222; background: #f4f4f6; padding: 28px 34px; }
-    @media (prefers-color-scheme: dark) { body { color: #eee; background: #1e1e20; } }
-    h1 { font-size: 16px; margin: 0 0 2px; }
-    .sub { font-size: 12px; opacity: .6; margin: 0 0 20px; }
-    h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; margin: 20px 0 6px; }
-    .free { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px; line-height: 1.5; }
-    .edit { background: #fff; color: #111; border: 1px dashed #bbb; padding: 12px 14px; border-radius: 8px;
-            min-height: 44px; line-height: 1.5; outline: none; caret-color: #3F84F7; }
-    .edit:focus { border-color: #3F84F7; }
-    .ticks span { display:inline-block; margin-right:14px; opacity:.4; font-size:13px; }
-    .ticks span.on { opacity:1; color:#2EA66B; font-weight:600; }
-    #log { margin-top: 18px; font: 11px ui-monospace, monospace; background: rgba(127,127,127,.10);
-           border-radius: 8px; padding: 10px 12px; height: 150px; overflow:auto; white-space: pre-wrap; }
-    code { background: rgba(127,127,127,.18); padding: 1px 5px; border-radius: 4px; }
-  </style>
+  <title>Tuto loucedé</title>
+  <link rel="stylesheet" href="tutorial.css">
 </head>
-<body>
-  <h1>Bridge JS &harr; Swift — harnais M.2.2</h1>
-  <p class="sub">Round-trip de test. Sélectionne du texte, presse <code>&#8997;&amp;</code>, tape dans la zone éditable.</p>
+<body data-section="1">
 
-  <h2>Texte libre (sélection &rarr; &#8997;&amp;)</h2>
-  <p class="free">Sélectionne une partie de cette phrase puis presse &#8997;&amp; : le bridge envoie la sélection à Swift, qui répond en cochant « raccourci ✓ ».</p>
+  <!-- Indicateur de progression (M.2.4) -->
+  <div class="tuto-progress" id="progress">Étape 1 / 4</div>
 
-  <h2>Textes de test (sélectionner &rarr; &#8997;&amp; &rarr; action)</h2>
-  <p class="free" data-test="a">Le chat dort sur le canapé devant la cheminée.</p>
-  <p class="free" data-test="b">Le restaurant Smith &amp; Sons est ouvert tous les jours.</p>
-  <p class="free" data-test="c">Le raccourci par défaut est &#8997;&amp;.</p>
-  <p class="free" data-test="d">Do I really look like a guy with a plan ? I'm a dog chasing cars. I wouldn't know what to do with one if I caught it. You know, I just... do things.</p>
-  <p class="free" data-test="e">Eh ma gueule, tu te crois chez mémé ?</p>
+  <main class="tuto-sections">
 
-  <h2>Contenteditable (cible injectResult + garde beforeinput)</h2>
-  <p class="edit" contenteditable="true" id="edit">Tape ici (bloqué sauf paste). injectResult écrira dans cette zone.</p>
+    <!-- ─────────────── Section 1 — Traduire (interactive) ─────────────── -->
+    <section class="tuto-section interactive active" data-index="1">
+      <aside class="tuto-instructions">
+        <h2 class="tuto-step-title">Traduire</h2>
+        <ol class="tuto-steps">
+          <li data-tick="selection" data-state="active">
+            <span class="tuto-step-label">Sélectionne le texte d'exemple</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="shortcut" data-state="upcoming">
+            <span class="tuto-step-label">Presse <span class="lc3-key">⌥</span><span class="lc3-key">&amp;</span></span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="action" data-state="upcoming">
+            <span class="tuto-step-label">Choisis l'action</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+        </ol>
+        <div class="tuto-nav">
+          <button type="button" class="tuto-next">Suivant →</button>
+        </div>
+      </aside>
 
-  <h2>Coches (pilotées par Swift via window.tuto.tick)</h2>
-  <p class="ticks">
-    <span id="tick-ready">● prêt</span>
-    <span id="tick-shortcut">● raccourci</span>
-    <span id="tick-action">● action</span>
-  </p>
+      <div class="tuto-stage">
+        <div class="lc3-appwin" aria-label="Fenêtre d'exemple">
+          <div class="lc3-traffic">
+            <span class="lc3-tl lc3-tl-r"></span>
+            <span class="lc3-tl lc3-tl-y"></span>
+            <span class="lc3-tl lc3-tl-g"></span>
+          </div>
+          <div class="lc3-appwin-body">
+            <p class="lc3-nx-quote" data-edit contenteditable="true">Le chat dort sur le canapé devant la cheminée.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  <div id="log"></div>
+    <!-- ─────────────── Section 2 — Rends plus formel (interactive) ─────────────── -->
+    <section class="tuto-section interactive" data-index="2">
+      <aside class="tuto-instructions">
+        <h2 class="tuto-step-title">Rends plus formel</h2>
+        <ol class="tuto-steps">
+          <li data-tick="selection" data-state="active">
+            <span class="tuto-step-label">Sélectionne le texte d'exemple</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="shortcut" data-state="upcoming">
+            <span class="tuto-step-label">Presse <span class="lc3-key">⌥</span><span class="lc3-key">&amp;</span></span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="action" data-state="upcoming">
+            <span class="tuto-step-label">Choisis l'action</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+        </ol>
+        <div class="tuto-nav">
+          <button type="button" class="tuto-next">Suivant →</button>
+        </div>
+      </aside>
 
-  <script>
-    const logEl = document.getElementById("log");
-    function log(dir, msg) {
-      const t = new Date().toISOString().substr(11, 12);
-      logEl.textContent += "[" + t + "] " + dir + " " + msg + "\n";
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-    function send(payload) {
-      try { window.webkit.messageHandlers.tutoBridge.postMessage(payload); log("JS->Swift", JSON.stringify(payload)); }
-      catch (e) { log("ERR", "bridge indisponible " + e); }
-    }
+      <div class="tuto-stage">
+        <div class="lc3-appwin" aria-label="Fenêtre d'exemple">
+          <div class="lc3-traffic">
+            <span class="lc3-tl lc3-tl-r"></span>
+            <span class="lc3-tl lc3-tl-y"></span>
+            <span class="lc3-tl lc3-tl-g"></span>
+          </div>
+          <div class="lc3-appwin-body">
+            <p class="lc3-nx-quote" data-edit contenteditable="true">Eh ma gueule, tu te crois chez mémé ?</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    // --- API Swift -> JS (window.tuto.*) ---
-    window.tuto = {
-      // M.2.3-fix BUG 2 — dernière sélection NON VIDE mémorisée (texte + Range).
-      // On ne lit plus la sélection « live » au moment du ⌥& (timing fragile :
-      // la sélection d'un contenteditable peut collapser avant l'éval async).
-      _lastSelection: "",
-      _lastRange: null,
+    <!-- ─────────────── Section 3 — Générer une action (interactive) ─────────────── -->
+    <section class="tuto-section interactive" data-index="3">
+      <aside class="tuto-instructions">
+        <h2 class="tuto-step-title">Générer une action</h2>
+        <ol class="tuto-steps">
+          <li data-tick="selection" data-state="active">
+            <span class="tuto-step-label">Sélectionne le texte d'exemple</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="shortcut" data-state="upcoming">
+            <span class="tuto-step-label">Presse <span class="lc3-key">⌥</span><span class="lc3-key">&amp;</span></span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+          <li data-tick="action" data-state="upcoming">
+            <span class="tuto-step-label">Choisis l'action</span>
+            <span class="tuto-check" aria-hidden="true"></span>
+          </li>
+        </ol>
+        <div class="tuto-nav">
+          <button type="button" class="tuto-next">Suivant →</button>
+        </div>
+      </aside>
 
-      /// Lue par Swift (handleTutorialShortcut) à la place de getSelection live.
-      /// Instrumenté (M.2.3-fix-2) : logue EXACTEMENT ce qui est renvoyé à Swift.
-      lastSelection() {
-        log("Swift->JS", "lastSelection() -> [" + this._lastSelection.length + "] " + JSON.stringify(this._lastSelection));
-        return this._lastSelection;
-      },
+      <div class="tuto-stage">
+        <div class="lc3-appwin" aria-label="Fenêtre d'exemple">
+          <div class="lc3-traffic">
+            <span class="lc3-tl lc3-tl-r"></span>
+            <span class="lc3-tl lc3-tl-y"></span>
+            <span class="lc3-tl lc3-tl-g"></span>
+          </div>
+          <div class="lc3-appwin-body">
+            <p class="lc3-nx-quote" data-edit contenteditable="true">Do I really look like a guy with a plan ? I'm a dog chasing cars.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      tick(step) {
-        const el = document.getElementById("tick-" + step);
-        if (el) el.classList.add("on");
-        log("Swift->JS", "tick(" + step + ")");
-        return true;
-      },
+    <!-- ─────────────── Section 4 — Félicitations (finale) ─────────────── -->
+    <section class="tuto-section final" data-index="4">
+      <div class="tuto-final-card">
+        <h2 class="tuto-final-title">Félicitations 🎉</h2>
+        <p class="tuto-final-text">Placeholder — le wording de clôture arrive en M.2.5.</p>
+        <!-- Emplacement réservé pour l'anim clavier ⌥& (M.2.5/M.2.8) -->
+        <div class="tuto-kbd-anim-slot" aria-hidden="true"></div>
+        <!-- Le bouton « Fermer » cérémonial sera ajouté en M.2.5 -->
+      </div>
+    </section>
 
-      injectResult(text) {
-        const edit = document.getElementById("edit");
-        edit.focus();
-        // M.2.3-fix BUG 1 (bonus) — restaure la Range d'origine si elle est
-        // dans le contenteditable, pour REMPLACER la sélection (sinon insert
-        // au caret). Sélection perdue quand le popover avait pris le focus.
-        const r = this._lastRange;
-        if (r && edit.contains(r.commonAncestorContainer)) {
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(r);
-        }
-        // M.2.3-fix BUG 1 — flag d'injection : la garde beforeinput laisse
-        // passer execCommand('insertText') (inputType non listé) le temps de
-        // l'écriture programmatique.
-        window._tutoInjecting = true;
-        document.execCommand("insertText", false, text);
-        window._tutoInjecting = false;
-        log("Swift->JS", "injectResult(" + JSON.stringify(text).slice(0, 60) + ")");
-        return true;
-      },
+  </main>
 
-      refocusEdit() {
-        const edit = document.getElementById("edit");
-        edit.focus();
-        log("Swift->JS", "refocusEdit()");
-        return document.activeElement === edit;
-      }
-    };
+  <!-- Instrumentation 🧪 (retirée en M.2.5) -->
+  <div id="log" class="tuto-debug" aria-hidden="true"></div>
 
-    // --- JS -> Swift ---
-    window.addEventListener("load", () => send({ type: "ready" }));
-
-    document.addEventListener("selectionchange", () => {
-      const sel = document.getSelection();
-      const s = String(sel);
-      if (s.length) {
-        // Mémorise la dernière sélection non vide (texte + Range cloné). Non
-        // effacée au collapse → fiable au moment du ⌥& même si elle disparaît.
-        window.tuto._lastSelection = s;
-        if (sel.rangeCount) window.tuto._lastRange = sel.getRangeAt(0).cloneRange();
-        // Instrumenté : longueur mémorisée (pour localiser une troncature).
-        send({ type: "selection", text: s, len: s.length });
-      }
-    });
-
-    // M.2.3 — listener JS ⌥& RETIRÉ : le hotkey Carbon de loucedé consomme la
-    // touche au niveau système, le JS ne la voit jamais. Le trigger passe par
-    // le handler Carbon branché sur tutorialMode (cf. TutorialWindowController).
-
-    // Garde : bloque la saisie clavier ordinaire dans le contenteditable,
-    // sauf paste / injection programmatique (flag _tutoInjecting).
-    const edit = document.getElementById("edit");
-    edit.addEventListener("beforeinput", (e) => {
-      const allowed = window._tutoInjecting
-        || e.inputType === "insertFromPaste"
-        || e.inputType === "insertReplacementText";
-      if (!allowed) { e.preventDefault(); send({ type: "blockedInput", inputType: e.inputType }); }
-    });
-  </script>
+  <script src="tutorial.js"></script>
 </body>
 </html>
