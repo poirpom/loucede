@@ -30,6 +30,13 @@
   <h2>Texte libre (sélection &rarr; &#8997;&amp;)</h2>
   <p class="free">Sélectionne une partie de cette phrase puis presse &#8997;&amp; : le bridge envoie la sélection à Swift, qui répond en cochant « raccourci ✓ ».</p>
 
+  <h2>Textes de test (sélectionner &rarr; &#8997;&amp; &rarr; action)</h2>
+  <p class="free" data-test="a">Le chat dort sur le canapé devant la cheminée.</p>
+  <p class="free" data-test="b">Le restaurant Smith &amp; Sons est ouvert tous les jours.</p>
+  <p class="free" data-test="c">Le raccourci par défaut est &#8997;&amp;.</p>
+  <p class="free" data-test="d">Do I really look like a guy with a plan ? I'm a dog chasing cars. I wouldn't know what to do with one if I caught it. You know, I just... do things.</p>
+  <p class="free" data-test="e">Eh ma gueule, tu te crois chez mémé ?</p>
+
   <h2>Contenteditable (cible injectResult + garde beforeinput)</h2>
   <p class="edit" contenteditable="true" id="edit">Tape ici (bloqué sauf paste). injectResult écrira dans cette zone.</p>
 
@@ -63,7 +70,11 @@
       _lastRange: null,
 
       /// Lue par Swift (handleTutorialShortcut) à la place de getSelection live.
-      lastSelection() { return this._lastSelection; },
+      /// Instrumenté (M.2.3-fix-2) : logue EXACTEMENT ce qui est renvoyé à Swift.
+      lastSelection() {
+        log("Swift->JS", "lastSelection() -> [" + this._lastSelection.length + "] " + JSON.stringify(this._lastSelection));
+        return this._lastSelection;
+      },
 
       tick(step) {
         const el = document.getElementById("tick-" + step);
@@ -113,7 +124,8 @@
         // effacée au collapse → fiable au moment du ⌥& même si elle disparaît.
         window.tuto._lastSelection = s;
         if (sel.rangeCount) window.tuto._lastRange = sel.getRangeAt(0).cloneRange();
-        send({ type: "selection", text: s });
+        // Instrumenté : longueur mémorisée (pour localiser une troncature).
+        send({ type: "selection", text: s, len: s.length });
       }
     });
 

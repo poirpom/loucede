@@ -136,6 +136,9 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         webView?.evaluateJavaScript("window.tuto ? window.tuto.lastSelection() : ''") { [weak self] result, _ in
             guard let self else { return }
             let selection = (result as? String) ?? ""
+            #if DEBUG
+            print("🧪 [tuto] sélection reçue [\(selection.count)] = \(selection.debugDescription)")
+            #endif
             guard !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 // Pas de sélection → no-op (équivalent du requireSelection normal).
                 return
