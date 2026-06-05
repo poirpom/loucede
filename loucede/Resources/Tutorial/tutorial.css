@@ -21,6 +21,7 @@
   --tuto-muted:         #6e6e73;            /* texte secondaire (site)             */
   --tuto-dim:           #8e8e93;            /* texte tertiaire (site)              */
   --tuto-done:          #2EA66B;            /* coche faite (repris de l'actuel)    */
+  --tuto-done-text:     #98989d;            /* texte d'une sous-étape faite (grisé) */
   --tuto-hairline:      rgba(0,0,0,0.08);
 
   /* fake-window macOS (site .lc3-appwin) */
@@ -47,6 +48,7 @@
     --tuto-muted:       #a1a1a8;
     --tuto-dim:         #8e8e93;
     --tuto-done:        #45c98a;
+    --tuto-done-text:   #6b6b70;
     --tuto-hairline:    rgba(255,255,255,0.10);
 
     --lc3-win-bg:       #1e1e20;
@@ -137,9 +139,10 @@ body {
 .tuto-steps li:last-child { border-bottom: none; }
 .tuto-step-label { flex: 1 1 auto; }
 
-/* Coche à droite — 3 états visuels via data-state */
+/* Coche à GAUCHE du texte (style todo list) — 3 états visuels via data-state */
 .tuto-check {
   flex: 0 0 auto;
+  order: -1;               /* ferre la coche avant le label (gauche) */
   width: 20px; height: 20px;
   border-radius: 50%;
   display: inline-grid;
@@ -163,8 +166,11 @@ body {
   background: color-mix(in srgb, var(--tuto-accent) 16%, transparent);
 }
 
-/* done : vert + check ✓ */
-.tuto-steps li[data-state="done"] { color: var(--tuto-text); }
+/* done : vert + check ✓ + label barré/grisé */
+.tuto-steps li[data-state="done"] .tuto-step-label {
+  text-decoration: line-through;
+  color: var(--tuto-done-text);
+}
 .tuto-steps li[data-state="done"] .tuto-check {
   border: 1.5px solid var(--tuto-done);
   background: var(--tuto-done);
@@ -259,11 +265,16 @@ body {
 }
 
 /* ─────────────────────────── Section finale ─────────────────────────── */
+/* Écran final : plein cadre — couvre toute la fenêtre (déborde le padding du
+   body), pas de coins arrondis. Le fond final remplace entièrement --tuto-bg. */
 .tuto-section.final {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
   align-items: center;
   justify-content: center;
   background: var(--tuto-final-bg);
-  border-radius: 18px;
+  border-radius: 0;
 }
 .tuto-final-card {
   text-align: center;
