@@ -254,6 +254,13 @@ body {
 .tuto-next:hover  { filter: brightness(1.06); }
 .tuto-next:active { filter: brightness(0.94); }
 
+/* M.2.5-fix-4 — écran 3 (le plus dense : 6 milestones + info + notice) : la
+   croissance flex des steps ne suffit plus à caler le bouton en bas. On passe
+   les steps en hauteur naturelle et on pinne le bouton en bas via margin auto.
+   Scopé à l'écran 3 → écrans 1/2 inchangés. */
+.tuto-section[data-index="3"] .tuto-steps { flex: 0 0 auto; }
+.tuto-section[data-index="3"] .tuto-nav   { margin-top: auto; }
+
 /* ───────────────────── Fake-window macOS (60%) — site .lc3-appwin ───────────────────── */
 .tuto-stage {
   display: flex;
