@@ -28,7 +28,7 @@ struct FeaturesStep: View {
                            title: "Configurer le raccourci clavier",
                            detail: "Ou conserver celui par défaut (qui est très bien)")
                 featureRow(icon: "key.fill",
-                           title: "Configurer ta clé API",
+                           title: "Fournir une clé API",
                            detail: "Pour que loucedé puisse utiliser l'IA",
                            required: true)
                 featureRow(icon: "power",
