@@ -63,6 +63,11 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.level = .normal
+        // M.2.4 #5 (best-effort) — autorise le drag par le fond. La WKWebView
+        // recouvre la titlebar (fullSizeContentView) et consomme la souris sur
+        // son contenu : ce flag peut ne PAS s'activer sous la webview. Fix
+        // robuste (bande de drag dédiée) reporté backlog si insuffisant.
+        window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 760, height: 520)
         window.isReleasedWhenClosed = false
         window.center()
