@@ -22,20 +22,32 @@ struct FeaturesStep: View {
             VStack(alignment: .leading, spacing: 20) {
                 featureRow(icon: "checkmark.shield.fill",
                            title: "Autoriser l'accessibilité à loucedé",
-                           detail: "Pour fonctionner correctement")
+                           detail: "Pour lui permettre de fonctionner",
+                           required: true)
                 featureRow(icon: "keyboard",
                            title: "Configurer le raccourci clavier",
                            detail: "Ou conserver celui par défaut (qui est très bien)")
                 featureRow(icon: "key.fill",
                            title: "Configurer ta clé API",
-                           detail: "Pour que loucedé puisse utiliser l'IA")
+                           detail: "Pour que loucedé puisse utiliser l'IA",
+                           required: true)
                 featureRow(icon: "power",
-                           title: "Autoriser loucedé à se lancer au démarrage de ton ordi",
+                           title: "Autoriser loucedé à se lancer au démarrage",
                            detail: "Pour l'avoir toujours à dispo")
             }
             .frame(maxWidth: 420)
             .frame(maxWidth: .infinity)
             .padding(.top, 4)
+
+            Spacer()
+
+            // Légende des items requis (accessibilité + clé API), centrée
+            // à mi-chemin entre les items et le bouton.
+            (Text("*").foregroundColor(.red)
+             + Text(" Nécessaire à loucedé pour faire ses tours de magie").foregroundStyle(.secondary))
+                .font(.system(size: 12))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
             Spacer()
 
@@ -53,12 +65,20 @@ struct FeaturesStep: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func featureRow(icon: String, title: String, detail: String) -> some View {
+    private func featureRow(icon: String, title: String, detail: String, required: Bool = false) -> some View {
         HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 40)
+            // Astérisque rouge des items requis. Slot à largeur fixe (présent
+            // même si vide) pour garder les icônes alignées entre les rows.
+            HStack(spacing: 4) {
+                Text(required ? "*" : "")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.red)
+                    .frame(width: 8, alignment: .trailing)
+                Image(systemName: icon)
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 40)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 16, weight: .semibold))
                 Text(detail).font(.system(size: 13)).foregroundStyle(.secondary)
