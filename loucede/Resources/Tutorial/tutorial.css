@@ -11,7 +11,8 @@
   color-scheme: light dark;
 
   --tuto-bg:            #CAE9FF;            /* fond global fenêtre (brief)        */
-  --tuto-card-bg:       #FFFFFF;            /* encadré instructions (brief)        */
+  --tuto-card-bg:       #F2F5F9;            /* encadré instructions — gris très léger
+                                              (distinct du blanc pur de la fake-window) */
   --tuto-card-shadow:   0 4px 12px rgba(0,0,0,0.08);
   --tuto-final-bg:      #C8EDD8;            /* écran final (brief)                 */
 
@@ -75,7 +76,7 @@ body {
 /* ───────────────────── Indicateur de progression ───────────────────── */
 .tuto-progress {
   flex: 0 0 auto;
-  align-self: center;
+  align-self: flex-start;   /* ferré à gauche, aligné sur le bord gauche de l'encadré */
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;

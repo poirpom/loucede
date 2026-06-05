@@ -45,16 +45,22 @@
   // ─────────────────────────── Navigation ───────────────────────────
   const sections = Array.from(document.querySelectorAll(".tuto-section"));
   const progressEl = document.getElementById("progress");
-  const TOTAL = sections.length;
+  const TOTAL = sections.length;                                              // 4 — navigation
+  const STEPS = document.querySelectorAll(".tuto-section.interactive").length; // 3 — écrans d'apprentissage
 
   function goToSection(index) {
     const target = sections.find((s) => Number(s.dataset.index) === index);
     if (!target) return;
     sections.forEach((s) => s.classList.toggle("active", s === target));
     document.body.dataset.section = String(index);
-    if (progressEl) progressEl.textContent = "Étape " + index + " / " + TOTAL;
+    // Indicateur : « Étape X / 3 » sur les écrans interactifs, masqué sur l'écran final.
+    if (progressEl) {
+      const isFinal = target.classList.contains("final");
+      progressEl.style.display = isFinal ? "none" : "";
+      if (!isFinal) progressEl.textContent = "Étape " + index + " / " + STEPS;
+    }
     log("nav", "section " + index);
-    // Focus l'éditable de la nouvelle section (si présent).
+    // Focus l'éditable de la nouvelle section (si présent — seule la section 2 en a).
     const edit = activeEdit();
     if (edit) edit.focus();
   }
@@ -86,7 +92,9 @@
     tick(step) {
       const sec = activeSection();
       const li = sec ? sec.querySelector('[data-tick="' + step + '"]') : null;
-      if (li) {
+      // Garde anti-réavance : ne rejoue pas si déjà cochée (sinon un re-tick
+      // ferait avancer indûment la sous-étape suivante).
+      if (li && li.dataset.state !== "done") {
         li.dataset.state = "done";
         // Active la prochaine sous-étape encore "upcoming".
         let next = li.nextElementSibling;
@@ -141,6 +149,15 @@
       window.tuto._lastSelection = s;
       if (sel.rangeCount) window.tuto._lastRange = sel.getRangeAt(0).cloneRange();
       send({ type: "selection", text: s, len: s.length });
+      // Fix M.2.4 #3 — coche « selection » EN INTERNE : Swift n'est pas notifié
+      // des sélections utilisateur. Si la sélection tombe dans la fake-window
+      // de la section active, on coche nous-mêmes la sous-étape correspondante.
+      // (Logique JS pure — le contrat Swift reste intact.)
+      const sec = activeSection();
+      const stage = sec ? sec.querySelector(".tuto-stage") : null;
+      if (stage && sel.anchorNode && stage.contains(sel.anchorNode)) {
+        window.tuto.tick("selection");
+      }
     }
   });
 
