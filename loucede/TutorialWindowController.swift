@@ -2,16 +2,20 @@
 //  TutorialWindowController.swift
 //  loucede
 //
-//  Phase M.2 — Tuto interactif post-onboarding.
+//  Phase M.2 — Tuto interactif post-onboarding (M.2.0 → M.2.8, livré).
 //
-//  M.2.1 (coquille) : fenêtre native in-process hébergeant la page tuto
-//  (`Resources/Tutorial/index.html`) dans une WKWebView. Pattern auto-contenu
-//  aligné sur `PurchaseWindowController` (D.3) : rétention statique, dédupe,
-//  point de sortie unique `windowWillClose`. La fenêtre est recréée à chaque
-//  `present()` (état coches in-memory → reset gratuit, cf. décision M.2.0).
+//  Fenêtre native in-process hébergeant la page tuto
+//  (`Resources/Tutorial/{index.html,tutorial.css,tutorial.js}`) dans une
+//  WKWebView. Pattern auto-contenu aligné sur `PurchaseWindowController` (D.3) :
+//  rétention statique, dédupe, point de sortie unique `windowWillClose`.
+//  Fermée puis rouverte → recréée (état coches in-memory → reset gratuit, cf.
+//  décision M.2.0) ; déjà ouverte → ramenée au premier plan (pas de reset).
 //
-//  À venir : bridge JS (M.2.2), orchestration mode tuto (M.2.3), layout +
-//  contenu (M.2.4/M.2.5), coches auto (M.2.6), entry points réels (M.2.7).
+//  Composants : bridge JS↔Swift (handler `tutoBridge`), trigger ⌥& via hotkey
+//  Carbon branché sur `tutorialMode`, coches auto via hooks symétriques
+//  (selection/shortcut/search/generator/action/magic/copy/paste/close).
+//  Entry points : onboarding écran 7 + Réglages → Général → Tutoriel.
+//  Décisions : #9 (archi), #10 (folder reference), #11-#14 (UX checklist).
 //
 
 import Cocoa

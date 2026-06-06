@@ -1,9 +1,11 @@
 /*
-  tutorial.css — Tuto loucedé (Phases M.2.4 + M.2.5)
+  tutorial.css — Tuto loucedé (Phases M.2.4 → M.2.6)
   Layout 40/60, 4 sections navigables, esthétique site (.lc3-appwin, .lc3-key,
   traffic lights, .lc3-kbd). Accent #4b7bff (cohérence site).
   M.2.5 : badges d'action (.tuto-action #FFE4CC), distinction visuelle
   milestone/info dans la checklist, anim clavier + bouton Fermer (écran final).
+  M.2.6 : notices en carte verte semi-transparente + picto vert, densité
+  checklist resserrée (padding 9px, coches 18px).
 */
 
 /* ─────────────────────────── Tokens ─────────────────────────── */
