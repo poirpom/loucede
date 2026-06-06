@@ -344,6 +344,48 @@ struct GeneralSettingsView: View {
                     }
                 }
 
+                Divider()
+
+                // M.2.7 — Section Tutoriel (entry point release : rejouer le tuto)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Tutoriel")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    HStack {
+                        HStack(spacing: 10) {
+                            Image(systemName: "graduationcap.fill")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Réviser les bases")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                Text("Refais le tuto interactif à tout moment")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.secondary.opacity(0.7))
+                            }
+                        }
+
+                        Spacer()
+
+                        Button(action: {
+                            TutorialWindowController.present()
+                        }) {
+                            Text("Refaire le tuto")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.purple.opacity(0.15))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 #if DEBUG
                 Divider()
 

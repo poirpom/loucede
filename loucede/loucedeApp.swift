@@ -180,10 +180,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let onboardingView = OnboardingView(
             onComplete: finalize,
-            // M.1 : « Faire le tuto » finalise comme « Pas de tuto ». En M.2,
-            // remplacer ce corps par l'ouverture de la fenêtre tuto WKWebView
-            // (puis finalize au besoin) — aucun changement d'UI requis.
-            onStartTutorial: finalize
+            // M.2.7 : « Faire le tuto » finalise l'onboarding (ferme la fenêtre +
+            // setupApp → app lancée) PUIS ouvre la fenêtre tuto WKWebView.
+            onStartTutorial: { finalize(); TutorialWindowController.present() }
         )
 
         let window = NSWindow(
