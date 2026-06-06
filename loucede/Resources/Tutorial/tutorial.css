@@ -222,7 +222,7 @@ body {
    lignes info ↳ (M.2.6 — renforce la hiérarchie visuelle de decisions #11). */
 .tuto-notice {
   margin-top: 16px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: var(--tuto-notice-bg);
   border: 0.5px solid var(--tuto-notice-border);
   border-radius: 12px;
