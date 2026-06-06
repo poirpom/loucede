@@ -24,6 +24,10 @@
   --tuto-done-text:     #98989d;            /* texte d'une sous-étape faite (grisé) */
   --tuto-hairline:      rgba(0,0,0,0.08);
 
+  /* notice (carte de récompense) — vert semi-transparent dérivé du vert "done" */
+  --tuto-notice-bg:     rgba(46,166,107,0.12);
+  --tuto-notice-border: rgba(46,166,107,0.24);
+
   /* badge d'action (imite un chip loucedé) */
   --tuto-action-bg:     #FFE4CC;            /* orange pâle (palette site)          */
   --tuto-action-border: rgba(180,110,50,0.30);
@@ -55,6 +59,9 @@
     --tuto-done:        #45c98a;
     --tuto-done-text:   #6b6b70;
     --tuto-hairline:    rgba(255,255,255,0.10);
+
+    --tuto-notice-bg:     rgba(69,201,138,0.14);
+    --tuto-notice-border: rgba(69,201,138,0.30);
 
     --lc3-win-bg:       #1e1e20;
     --lc3-win-shadow:   0 12px 32px rgba(0,0,0,0.45),
@@ -208,12 +215,15 @@ body {
   opacity: 0.7;
 }
 
-/* Notification contextuelle (écran 3) : hors flux des étapes — divider au-dessus
-   + icône ℹ️. Distincte des milestones ET des lignes info ↳. */
+/* Notification contextuelle (récompense de fin d'écran) : carte verte
+   semi-transparente, hors flux des étapes. Distincte des milestones ET des
+   lignes info ↳ (M.2.6 — renforce la hiérarchie visuelle de decisions #11). */
 .tuto-notice {
   margin-top: 16px;
-  padding-top: 14px;
-  border-top: 0.5px solid var(--tuto-hairline);
+  padding: 12px 14px;
+  background: var(--tuto-notice-bg);
+  border: 0.5px solid var(--tuto-notice-border);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -232,7 +242,7 @@ body {
   transform: translateY(0);
   pointer-events: auto;
 }
-.tuto-notice-icon { flex: 0 0 auto; color: var(--tuto-accent); }
+.tuto-notice-icon { flex: 0 0 auto; color: var(--tuto-done); }
 
 /* Navigation */
 .tuto-nav {
