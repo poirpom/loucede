@@ -151,7 +151,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 0;
+  padding: 9px 0;
   border-bottom: 0.5px solid var(--tuto-hairline);
   font-size: 14px;
   line-height: 1.4;
@@ -163,11 +163,11 @@ body {
 .tuto-check {
   flex: 0 0 auto;
   order: -1;               /* ferre la coche avant le label (gauche) */
-  width: 20px; height: 20px;
+  width: 18px; height: 18px;
   border-radius: 50%;
   display: inline-grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   transition: background .18s ease, border-color .18s ease, color .18s ease;
 }
