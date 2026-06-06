@@ -27,6 +27,7 @@
   /* notice (carte de récompense) — vert semi-transparent dérivé du vert "done" */
   --tuto-notice-bg:     rgba(46,166,107,0.12);
   --tuto-notice-border: rgba(46,166,107,0.24);
+  --tuto-notice-text:   #1b5e40;            /* vert foncé — contraste sur carte verte */
 
   /* badge d'action (imite un chip loucedé) */
   --tuto-action-bg:     #FFE4CC;            /* orange pâle (palette site)          */
@@ -62,6 +63,7 @@
 
     --tuto-notice-bg:     rgba(69,201,138,0.14);
     --tuto-notice-border: rgba(69,201,138,0.30);
+    --tuto-notice-text:   #b9e8cf;          /* vert clair — contraste sur carte sombre */
 
     --lc3-win-bg:       #1e1e20;
     --lc3-win-shadow:   0 12px 32px rgba(0,0,0,0.45),
@@ -229,7 +231,7 @@ body {
   gap: 10px;
   font-size: 13px;
   line-height: 1.4;
-  color: var(--tuto-muted);
+  color: var(--tuto-notice-text);
   /* Apparition conditionnelle : masquée tant que l'écran n'est pas terminé,
      révélée (transition douce) au tick du dernier milestone — cf. tutorial.js. */
   opacity: 0;
