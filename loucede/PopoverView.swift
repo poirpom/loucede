@@ -1586,16 +1586,3 @@ private struct TrialExpiredOverlay: View {
         }
     }
 }
-
-// MARK: - Visual Effect Blur (translucent background)
-
-struct VisualEffectBlur: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.blendingMode = .behindWindow
-        view.material = .popover
-        view.state = .active
-        return view
-    }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
