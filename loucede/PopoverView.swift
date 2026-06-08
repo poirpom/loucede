@@ -959,8 +959,8 @@ struct PopoverView: View {
                 case .resultEditable:
                     // K.2-B lot 2b — popover éditable + bottom bar
                     // Annuler/Valider en bas (en dehors du ScrollView).
+                    // Q.1.c : Divider retiré — footer accent différencie par ton.
                     generatorEditableContent
-                    Divider()
                     generatorEditableBottomBar
                 case .error(let message):
                     generatorCompactContent(error: message)
@@ -1111,12 +1111,10 @@ struct PopoverView: View {
                             .textFieldStyle(.plain)
                             .font(.system(size: 13))
                             .foregroundStyle(.primary)
+                            // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                            .tint(PolishTokens.cursorColor)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.primary.opacity(0.06))
-                            )
                             .focused($isGeneratorFocused)
 
                         // K.2-B lot 2b — Regénérer est SECONDAIRE dans ce
@@ -1180,12 +1178,10 @@ struct PopoverView: View {
                             .textFieldStyle(.plain)
                             .font(.system(size: 13))
                             .foregroundStyle(.primary)
+                            // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                            .tint(PolishTokens.cursorColor)
                             .padding(.horizontal, 10)
                             .frame(height: 36)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.primary.opacity(0.06))
-                            )
                             .focused($isEditableTitleFocused)
                     }
                 }
@@ -1233,12 +1229,10 @@ struct PopoverView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
+                // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                .tint(PolishTokens.cursorColor)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.06))
-                )
         }
     }
 
@@ -1256,14 +1250,12 @@ struct PopoverView: View {
             TextEditor(text: $state.editablePrompt)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
+                // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                .tint(PolishTokens.cursorColor)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .frame(maxHeight: 250)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.06))
-                )
         }
     }
 
@@ -1277,6 +1269,8 @@ struct PopoverView: View {
                 .foregroundStyle(.secondary)
             Picker("", selection: $state.editableCategory) {
                 Text("Sans catégorie").tag(PromptCategory?.none)
+                // Q.1.c : divider natif macOS (groupe nil vs catégories réelles).
+                Divider()
                 ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
                     Text(cat.rawValue).tag(PromptCategory?.some(cat))
                 }
@@ -1325,6 +1319,8 @@ struct PopoverView: View {
             .disabled(!state.canValidate)
         }
         .padding(12)
+        // Q.1.c : footer raccourcis = zone d'accent (cohérent footer mainView).
+        .polishAccentBackground()
     }
 
     // MARK: - Result
