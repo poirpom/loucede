@@ -104,9 +104,18 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Phase 1.4h : fond popup solide (remplace le VisualEffectBlur
-        // translucide). Adaptatif light/dark depuis Phase 6.7b revertée.
-        .background(Color(NSColor.windowBackgroundColor))
+        // Q.1.b : vibrancy hudWindow (PolishVibrancyView) sur le popup principal.
+        // TODO Q.1.d: supprimer ce conditionnel une fois resultView migré (Q.1.c
+        // migrera generator). Cette condition est temporaire pour ne pas affecter
+        // les surfaces hors-périmètre Q.1.b — generator/result gardent le fond
+        // solide `windowBackgroundColor` inchangé jusqu'à Q.1.c/d.
+        .background {
+            if state.generatorPhase == nil && state.activeAction == nil {
+                PolishVibrancyView()
+            } else {
+                Color(NSColor.windowBackgroundColor)
+            }
+        }
         // K.4-lot1 (P3) : radius 12 → 16 (look macOS récent sans copier les
         // radius exagérés de Tahoe). DOIT rester synchro avec le layer de la
         // NSWindow (`hostingView.layer.cornerRadius` dans loucedeApp.swift).
@@ -487,8 +496,10 @@ struct PopoverView: View {
             .padding(.horizontal, 12)
             .padding(.top, 12)
             .padding(.bottom, 12)
-
-            Divider()
+            // Q.1.b : bande header = zone d'accent (overlay translucide sur la
+            // vibrancy). Permanente — appliquée même sans texte sélectionné
+            // (logo seul). La différenciation de zone remplace le Divider retiré.
+            .polishAccentBackground()
 
             // 2026-05-07 : empty state quand le provider courant n'a pas de
             // clé API configurée (cf. `ActionsStore.hasUsableProvider`).
@@ -558,6 +569,8 @@ struct PopoverView: View {
                     TextField("Rechercher", text: $state.searchQuery)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        // Q.1.b : curseur d'accent loucedé sur champ sans contour.
+                        .tint(PolishTokens.cursorColor)
                         .focused($isSearchFocused)
                         // K.0-fix-1 : navigation liste + Esc 2-temps gérés
                         // ici (vue focalisée → couche SwiftUI fiable, vs
@@ -603,15 +616,14 @@ struct PopoverView: View {
                             return .handled
                         }
                 }
+                // Q.1.b : champ recherche flottant — pilule de fond retirée (le
+                // champ flotte sur la vibrancy, pattern Things). Paddings verticaux
+                // conservés pour la respiration. Divider au-dessus (sous la top bar)
+                // et en dessous retirés : différenciation par ton, pas par bordure.
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.06))
-                )
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                Divider()
 
                 // Point 2 pre-V1 (2026-05-07) : popup à hauteur dynamique
                 // (cf. AppDelegate.calculatedPopoverHeight). Le ScrollView
@@ -703,8 +715,11 @@ struct PopoverView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                // Q.1.b : footer raccourcis = zone d'accent (overlay translucide).
+                .polishAccentBackground()
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            // Q.1.b : zone liste/recherche = neutre (vibrancy pure). L'ancien fond
+            // opaque `controlBackgroundColor` est retiré — il masquerait le blur.
     }
 
     // MARK: - Empty state (pas de clé API configurée — 2026-05-07)
@@ -748,8 +763,10 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            // Q.1.b : footer = zone d'accent, symétrique avec actionsListView.
+            .polishAccentBackground()
         }
-        .background(Color(NSColor.controlBackgroundColor))
+        // Q.1.b : corps empty state = neutre (vibrancy). Fond opaque retiré.
     }
 
     /// Item unique de l'empty state — clic ou ↵ ouvre Réglages → Général.
@@ -770,7 +787,7 @@ struct PopoverView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .foregroundStyle(Color.white)
-        .background(Color(hex: "3F84F7"))
+        .background(PolishTokens.selectionBackground)
         // K.4-lot1 (P3) : radius 8, concentrique (popup 16 − inset 8pt) —
         // aligné sur la barre de sélection (même inset latéral 8pt).
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -855,7 +872,7 @@ struct PopoverView: View {
         .padding(.vertical, 8)
         // Phase 1.4j : sélection #3F84F7, texte blanc pour contraste.
         .foregroundStyle(isSelected ? Color.white : Color.primary)
-        .background(isSelected ? Color(hex: "3F84F7") : Color.clear)
+        .background(isSelected ? PolishTokens.selectionBackground : Color.clear)
         // K.4-lot1 (P3) : radius 6 → 8, concentrique avec la popup :
         // radius_barre = radius_popup (16) − inset latéral (8pt, le
         // `.padding(.horizontal, 8)` du VStack de la liste) = 8.
