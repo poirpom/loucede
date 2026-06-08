@@ -67,6 +67,14 @@ struct PopoverView: View {
     // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
     // du popup), pour que chaque nouvelle action reparte en format compact.
     @State private var resultExpanded: Bool = false
+    // Q.2.a : grâce de rétrécissement. Maintient la hauteur de contenu pleine
+    // pendant que la NSWindow descend (cf. `toggleResultExpanded`), pour que le
+    // contenu masque progressivement la fenêtre au lieu de claquer à compact.
+    @State private var resultShrinkGrace: Bool = false
+    // Q.2.a : invalide les clamps différés orphelins (toggle plus récent, reset,
+    // mashing F). Incrémenté à chaque toggle ; la closure différée n'agit que si
+    // son token capturé est toujours le courant. `&+=` = wrap-around safe.
+    @State private var resultClampToken: Int = 0
 
     init(
         onClose: @escaping () -> Void = {},
@@ -152,6 +160,10 @@ struct PopoverView: View {
             // Reset : showPopover remet déjà la fenêtre à 400×500, on n'a
             // qu'à synchroniser l'état local.
             resultExpanded = false
+            // Q.2.a : neutralise une grâce de shrink en cours (réouverture
+            // pendant les 0.28 s) — sinon le contenu resterait plein dans une
+            // fenêtre compacte. Reset instantané, pas de conceal sur réouverture.
+            resultShrinkGrace = false
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -192,6 +204,9 @@ struct PopoverView: View {
                 if resultExpanded {
                     resultExpanded = false
                 }
+                // Q.2.a : reset instantané de la grâce — un retour liste pendant
+                // un conceal en cours ne doit pas laisser le contenu plein.
+                resultShrinkGrace = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
@@ -372,34 +387,58 @@ struct PopoverView: View {
     }
 
     /// Phase 1.4b : bascule le format de la fenêtre résultat (compact ↔ agrandi).
-    /// Deux animations jouent en parallèle et de même durée (0.25 s easeInOut) :
-    /// 1) la NSWindow via NSAnimationContext (AppDelegate.resizePopover)
-    /// 2) les frames SwiftUI via withAnimation
-    /// La 2e évite le saut abrupt à la réduction : sans elle, SwiftUI recalcule
-    /// instantanément maxHeight=300, ce qui crée un espace vide avant que la
-    /// fenêtre elle-même n'ait fini de rétrécir.
+    ///
+    /// La NSWindow s'anime symétriquement dans les deux sens (0.25 s easeInEaseOut,
+    /// via `AppDelegate.resizePopover`). La hauteur du contenu SwiftUI, elle, est
+    /// pilotée par le **timing** du clamp `maxHeight` (cf. `resultView`) :
+    /// - **agrandissement** : contenu à pleine hauteur immédiatement → la fenêtre
+    ///   grandit pour le révéler (reveal fluide) ;
+    /// - **rétrécissement** : le contenu reste plein pendant la descente de la
+    ///   fenêtre (grâce `resultShrinkGrace`), qui le masque progressivement
+    ///   (conceal fluide, miroir du reveal), puis clampe à compact une fois la
+    ///   fenêtre arrivée (clamp invisible, fenêtre déjà à sa taille finale).
+    ///
+    /// Q.2.a (2026-06-08) : ce **clamp différé** restaure la symétrie visuelle
+    /// que la Phase 6.14-fix-2 avait perdue. On n'utilise PAS `withAnimation` sur
+    /// la frame — pourtant le réflexe SwiftUI naturel — car ce pattern a été retiré
+    /// en 6.14-fix-2 suite à un crash `NSInternalInconsistencyException` :
+    /// l'interpolation SwiftUI de la frame (300↔2000pt) en parallèle de l'anim
+    /// NSWindow forçait le solver de constraints à ~15 re-renders concurrents
+    /// pendant les 250 ms (race condition fatale). Le clamp différé **décorrèle**
+    /// les deux animations dans le temps (frame mutée seulement après la fin de
+    /// l'anim window) → aucun chevauchement, donc aucune réintroduction du risque.
+    /// Effet de bord : la « fine bande noire » à la réduction (trade-off assumé
+    /// en 6.14-fix-2) disparaît, le contenu remplissant la fenêtre tout du long.
     private func toggleResultExpanded() {
         let newExpanded = !resultExpanded
-        // Phase 6.14-fix (2026-04-26) : suspend le flush du buffer LLM
-        // pendant l'animation NSWindow. Sans ça, la mutation de
-        // `state.resultText` à 60Hz pendant que AppKit anime la fenêtre
-        // déclenche un crash NSInternalInconsistencyException
-        // « The window has been marked as needing another Update Constraints ».
-        //
-        // Phase 6.14-fix-2 (2026-04-26) : RETRAIT du `withAnimation` sur
-        // `resultExpanded`. La cause résiduelle du crash était l'animation
-        // SwiftUI qui interpolait la frame du ScrollView (300 ↔ 2000pt) en
-        // parallèle de l'animation NSWindow — ~15 re-renders SwiftUI pendant
-        // les 250ms, chacun forçant le solver de constraints à reculer en
-        // même temps qu'AppKit animait la window. Race condition fatale.
-        // Avec le set instantané, `resultExpanded` passe à la nouvelle
-        // valeur en 1 frame, et seule la NSWindow s'anime côté AppKit —
-        // pas de chevauchement. Trade-off : à la réduction, pendant 250ms,
-        // une fine bande noire peut apparaître en bas (window rétrécit
-        // progressivement, ScrollView déjà à 300pt). Largement acceptable.
+        // Token capturé pour la closure différée : tout toggle ultérieur
+        // l'invalide (double-F, mashing F, reset → cf. chemins onChange).
+        resultClampToken &+= 1
+        let token = resultClampToken
+        // Phase 6.14-fix (2026-04-26) : suspend le flush du buffer LLM pendant
+        // l'animation NSWindow. Sans ça, la mutation de `state.resultText` à
+        // 60Hz pendant que AppKit anime la fenêtre déclenche un crash
+        // NSInternalInconsistencyException « The window has been marked as
+        // needing another Update Constraints ».
         state.suspendFlush()
         globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact)
         resultExpanded = newExpanded
+        if newExpanded {
+            // Reveal : contenu plein immédiat, la fenêtre grandit par-dessus.
+            resultShrinkGrace = false
+        } else {
+            // Conceal : on maintient la hauteur pleine pendant la descente de la
+            // fenêtre (0.25 s), puis on clampe à compact. Délai 0.28 s = après
+            // l'arrivée de la NSWindow (clamp invisible) mais avant le
+            // `resumeFlush` (0.3 s) → la passe de layout tombe sur une fenêtre
+            // statique ET un flush encore suspendu (conditions optimales,
+            // aucune anim window concurrente : le risque 6.14 reste écarté).
+            resultShrinkGrace = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+                guard token == resultClampToken else { return } // toggle plus récent → abandon
+                resultShrinkGrace = false
+            }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
             state.resumeFlush()
         }
@@ -1369,10 +1408,12 @@ struct PopoverView: View {
                 }
                 // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
                 // la hauteur disponible. En format compact, plafonné à 300.
-                // Valeur finie (2000) plutôt que .infinity pour permettre à SwiftUI
-                // d'interpoler la hauteur sous withAnimation (depuis/vers .infinity
-                // produit un saut abrupt, surtout à la réduction).
-                .frame(maxHeight: resultExpanded ? 2000 : 300)
+                // Valeur finie (2000) plutôt que .infinity (depuis/vers .infinity
+                // produit un saut abrupt).
+                // Q.2.a : la hauteur suit `resultExpanded` OU la grâce de shrink
+                // (`resultShrinkGrace`), qui maintient le contenu plein pendant la
+                // descente de la fenêtre au rétrécissement (cf. `toggleResultExpanded`).
+                .frame(maxHeight: (resultExpanded || resultShrinkGrace) ? 2000 : 300)
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
 
