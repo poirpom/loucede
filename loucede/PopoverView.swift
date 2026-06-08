@@ -104,13 +104,13 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Q.1.b : vibrancy hudWindow (PolishVibrancyView) sur le popup principal.
-        // TODO Q.1.d: supprimer ce conditionnel une fois resultView migré (Q.1.c
-        // migrera generator). Cette condition est temporaire pour ne pas affecter
-        // les surfaces hors-périmètre Q.1.b — generator/result gardent le fond
-        // solide `windowBackgroundColor` inchangé jusqu'à Q.1.c/d.
+        // Q.1.b/c : vibrancy hudWindow (PolishVibrancyView) sur le popup principal
+        // ET le générateur (Q.1.c). Seule la fenêtre de réponse (`activeAction != nil`)
+        // garde encore le fond solide.
+        // TODO Q.1.d: retirer ce conditionnel une fois resultView migré vers la
+        // vibrancy — le body posera alors `.polishVibrancy()` inconditionnellement.
         .background {
-            if state.generatorPhase == nil && state.activeAction == nil {
+            if state.activeAction == nil {
                 PolishVibrancyView()
             } else {
                 Color(NSColor.windowBackgroundColor)
@@ -948,7 +948,8 @@ struct PopoverView: View {
     private var generatorView: some View {
         VStack(spacing: 0) {
             generatorTopBar
-            Divider()
+            // Q.1.c : Divider retiré — différenciation par ton (bandeau accent
+            // vs zone neutre), comme mainView.
             if let phase = state.generatorPhase {
                 switch phase {
                 case .compact:
@@ -966,7 +967,8 @@ struct PopoverView: View {
                 }
             }
         }
-        .background(Color(NSColor.controlBackgroundColor))
+        // Q.1.c : fond opaque retiré — la vibrancy vient du body (conditionnel
+        // `activeAction == nil`), comme mainView. Zone champs = neutre.
         .focusable()
         .focusEffectDisabled()
         .focused($focus, equals: .generator)
@@ -988,6 +990,8 @@ struct PopoverView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .padding(12)
+        // Q.1.c : bandeau titre = zone d'accent (cohérent top bar mainView).
+        .polishAccentBackground()
     }
 
     /// Contenu compact : label + helper d'exemple + TextField + bouton.
@@ -1016,12 +1020,10 @@ struct PopoverView: View {
                 TextField("", text: $state.generatorInputText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                    .tint(PolishTokens.cursorColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.primary.opacity(0.06))
-                    )
                     .focused($isGeneratorFocused)
                     .onSubmit { state.runGeneration() }
 
@@ -1059,12 +1061,9 @@ struct PopoverView: View {
             TextField("", text: .constant(state.generatorInputText))
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
+                // Q.1.c : champ flottant (pilule retirée). Disabled → pas de tint.
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.primary.opacity(0.04))
-                )
                 .disabled(true)
 
             HStack(spacing: 8) {
