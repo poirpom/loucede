@@ -877,10 +877,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.level = .floating
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.wantsLayer = true
-        // K.4-lot1 (P3) : radius 12 → 16. DOIT rester synchro avec le
-        // `.clipShape(RoundedRectangle(cornerRadius:))` du body SwiftUI
-        // (PopoverView.swift) pour aligner coins fenêtre et contenu.
-        hostingView.layer?.cornerRadius = 16
+        // K.4-lot1 (P3) : radius 12 → 16. Q.1.d : source unique via
+        // `PolishTokens.cornerRadius` — synchro garantie avec le clip du body
+        // SwiftUI (PopoverView, `.polishVibrancy()`) pour aligner coins fenêtre
+        // et contenu.
+        hostingView.layer?.cornerRadius = PolishTokens.cornerRadius
         hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
         panel.hasShadow = true  // Native shadow since we mask corners at AppKit level

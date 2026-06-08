@@ -104,27 +104,14 @@ struct PopoverView: View {
         // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
         // on verrait une bande transparente de chaque côté.
         .frame(width: resultExpanded ? 500 : 400)
-        // Q.1.b/c : vibrancy hudWindow (PolishVibrancyView) sur le popup principal
-        // ET le générateur (Q.1.c). Seule la fenêtre de réponse (`activeAction != nil`)
-        // garde encore le fond solide.
-        // TODO Q.1.d: retirer ce conditionnel une fois resultView migré vers la
-        // vibrancy — le body posera alors `.polishVibrancy()` inconditionnellement.
-        .background {
-            if state.activeAction == nil {
-                PolishVibrancyView()
-            } else {
-                Color(NSColor.windowBackgroundColor)
-            }
-        }
-        // K.4-lot1 (P3) : radius 12 → 16 (look macOS récent sans copier les
-        // radius exagérés de Tahoe). DOIT rester synchro avec le layer de la
-        // NSWindow (`hostingView.layer.cornerRadius` dans loucedeApp.swift).
-        // Couvre liste ET résultat (même body/fenêtre).
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        // Q.1.b-bis : bordure intérieure subtile du panneau (4 côtés). Appliquée
-        // ici directement car le body pose son fond via le conditionnel Q.1.b
-        // (pas `polishVibrancy()`). Couvre toutes branches via le clip partagé.
-        .polishInnerBorder(cornerRadius: 16)
+        // Q.1.d : panneau loucedé canonique = vibrancy hudWindow + clip coins
+        // arrondis + bordure intérieure, le tout via `.polishVibrancy()`
+        // (inconditionnel — les 3 surfaces mainView/generator/result partagent
+        // désormais le même fond). Le conditionnel Q.1.b et le `.polishInnerBorder`
+        // explicite Q.1.b-bis sont absorbés par le sucre.
+        // Le rayon (PolishTokens.cornerRadius) DOIT rester synchro avec le layer
+        // de la NSWindow (`hostingView.layer.cornerRadius` dans loucedeApp.swift).
+        .polishVibrancy()
         // Phase 6.2 Étape 9 (2026-04-27) : modal « trial épuisé »
         // présenté en overlay (reste dans la fenêtre popup, pas une
         // sheet macOS séparée). Apparaît quand `state.showTrialExpiredModal`
