@@ -85,6 +85,17 @@ enum PolishTokens {
     static let selectionBackground = Color(hex: "3F84F7")
     static let cursorColor = Color(hex: "3F84F7")
 
+    // MARK: Champs (fill subtil — fiches structurées)
+
+    /// Fill subtil des champs d'une fiche multi-champs (générateur, édition
+    /// action) — structure visuellement la colonne de champs. `Color.primary`
+    /// est déjà colorScheme-aware (noir opaque en light, blanc opaque en dark).
+    /// NE PAS appliquer sur un champ isolé (popup Rechercher) — cf. fiche
+    /// `details/polish-popups-things.md` (cas limite isolé vs multiples).
+    static let fieldFillColor: Color = .primary.opacity(0.06)
+    static let fieldFillColorDisabled: Color = .primary.opacity(0.04)
+    static let fieldFillCornerRadius: CGFloat = 8
+
     // MARK: Ombre
 
     /// Tokens d'ombre exposés mais NON bundlés dans `polishVibrancy` : la
@@ -145,6 +156,13 @@ extension View {
     func polishInnerBorder(cornerRadius: CGFloat = PolishTokens.cornerRadius) -> some View {
         modifier(PolishInnerBorder(cornerRadius: cornerRadius))
     }
+
+    /// Fill subtil pour structurer un champ dans une fiche multi-champs
+    /// (générateur, édition action). Ne PAS appliquer sur les champs isolés
+    /// (popup Rechercher) — voir la fiche `details/polish-popups-things.md`.
+    func polishFieldFill(disabled: Bool = false) -> some View {
+        modifier(PolishFieldFill(disabled: disabled))
+    }
 }
 
 /// Implémentation de `.polishAccentBackground()` — lit `colorScheme` en interne
@@ -154,6 +172,19 @@ private struct PolishAccentBackground: ViewModifier {
 
     func body(content: Content) -> some View {
         content.background(PolishTokens.accentBackground(colorScheme))
+    }
+}
+
+/// Implémentation de `.polishFieldFill(disabled:)` — fill subtil arrondi.
+/// `Color.primary` étant déjà colorScheme-aware, pas de lecture d'environnement.
+private struct PolishFieldFill: ViewModifier {
+    var disabled: Bool
+
+    func body(content: Content) -> some View {
+        content.background(
+            RoundedRectangle(cornerRadius: PolishTokens.fieldFillCornerRadius)
+                .fill(disabled ? PolishTokens.fieldFillColorDisabled : PolishTokens.fieldFillColor)
+        )
     }
 }
 

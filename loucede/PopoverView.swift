@@ -1020,10 +1020,11 @@ struct PopoverView: View {
                 TextField("", text: $state.generatorInputText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                    // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                     .tint(PolishTokens.cursorColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+                    .polishFieldFill()
                     .focused($isGeneratorFocused)
                     .onSubmit { state.runGeneration() }
 
@@ -1061,9 +1062,10 @@ struct PopoverView: View {
             TextField("", text: .constant(state.generatorInputText))
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
-                // Q.1.c : champ flottant (pilule retirée). Disabled → pas de tint.
+                // Q.1.c-bis : fill subtil disabled (fiche structurée). Pas de tint.
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
+                .polishFieldFill(disabled: true)
                 .disabled(true)
 
             HStack(spacing: 8) {
@@ -1111,10 +1113,11 @@ struct PopoverView: View {
                             .textFieldStyle(.plain)
                             .font(.system(size: 13))
                             .foregroundStyle(.primary)
-                            // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                            // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                             .tint(PolishTokens.cursorColor)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
+                            .polishFieldFill()
                             .focused($isGeneratorFocused)
 
                         // K.2-B lot 2b — Regénérer est SECONDAIRE dans ce
@@ -1178,10 +1181,11 @@ struct PopoverView: View {
                             .textFieldStyle(.plain)
                             .font(.system(size: 13))
                             .foregroundStyle(.primary)
-                            // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                            // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                             .tint(PolishTokens.cursorColor)
                             .padding(.horizontal, 10)
                             .frame(height: 36)
+                            .polishFieldFill()
                             .focused($isEditableTitleFocused)
                     }
                 }
@@ -1229,10 +1233,11 @@ struct PopoverView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
-                // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                 .tint(PolishTokens.cursorColor)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
+                .polishFieldFill()
         }
     }
 
@@ -1250,12 +1255,15 @@ struct PopoverView: View {
             TextEditor(text: $state.editablePrompt)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
-                // Q.1.c : champ flottant (pilule retirée) + curseur d'accent.
+                // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
+                // `.scrollContentBackground(.hidden)` neutralise le fond natif de
+                // l'éditeur → le fill transparaît sans double background.
                 .tint(PolishTokens.cursorColor)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .frame(maxHeight: 250)
+                .polishFieldFill()
         }
     }
 
