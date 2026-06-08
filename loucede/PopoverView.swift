@@ -663,7 +663,14 @@ struct PopoverView: View {
                                 .frame(maxWidth: .infinity)
                         } else {
                             VStack(alignment: .leading, spacing: 2) {
-                                ForEach(rows) { row in
+                                // Q.1.b-bis : PolishDivider entre catégories — inséré
+                                // avant chaque en-tête de section sauf le 1er. Compté
+                                // dans `listContentHeight` (loucedeApp) pour le fit
+                                // exact en mode recherche.
+                                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                                    if index > 0, case .sectionHeader = row.item {
+                                        PolishDivider()
+                                    }
                                     popupRow(row)
                                 }
                             }

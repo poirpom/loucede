@@ -590,16 +590,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// K.unify.3.5 — hauteur réelle du contenu de la liste popup :
     /// en-têtes de section (`popoverSectionHeaderHeight`) + lignes d'action
     /// (`popoverActionRowHeight`) + spacings du `VStack(spacing: 2)`.
+    /// Q.1.b-bis : + PolishDivider entre catégories (avant chaque en-tête sauf
+    /// le 1er) — comptés ici pour le fit exact en mode recherche.
     private static func listContentHeight(for items: [PopupItem]) -> CGFloat {
         guard !items.isEmpty else { return 0 }
         var h: CGFloat = 0
-        for item in items {
+        var dividerCount = 0
+        for (i, item) in items.enumerated() {
             switch item {
-            case .sectionHeader:      h += popoverSectionHeaderHeight
-            case .action, .generator: h += popoverActionRowHeight
+            case .sectionHeader:
+                h += popoverSectionHeaderHeight
+                if i > 0 { dividerCount += 1 }   // mirror du rendu PopoverView
+            case .action, .generator:
+                h += popoverActionRowHeight
             }
         }
-        h += CGFloat(items.count - 1) * popoverActionRowSpacing
+        // Empreinte des dividers (0.5pt) + 1 enfant VStack chacun (→ +1 spacing).
+        h += CGFloat(dividerCount) * PolishTokens.dividerHeight
+        h += CGFloat(max(0, items.count + dividerCount - 1)) * popoverActionRowSpacing
         return h
     }
 
