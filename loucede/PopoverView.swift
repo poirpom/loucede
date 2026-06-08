@@ -562,9 +562,16 @@ struct PopoverView: View {
             // ⌘C/V/A, ←/→, ⌫ et l'IME sont gérés nativement. Le focus est
             // re-armé à chaque ouverture en mode liste (NSWindow préchargée)
             // via `isSearchFocused` (cf. onAppear / onChange openCounter).
-            HStack(spacing: 6) {
+            // Q.1.b-bis : champ Rechercher aligné sur une ligne d'action virtuelle.
+            // spacing 10 + loupe en boîte 20 (largeur) à 14pt = mirror de
+            // selectableItemRow (ActionIconView boxSize 20 + spacing 10) → le
+            // placeholder démarre au même x que les titres d'action. `.frame(width:)`
+            // seul : pas de croissance verticale de la barre (popoverChromeHeight
+            // inchangé).
+            HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
+                        .frame(width: 20)
                         .foregroundStyle(.secondary)
                     TextField("Rechercher", text: $state.searchQuery)
                         .textFieldStyle(.plain)
