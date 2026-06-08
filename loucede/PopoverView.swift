@@ -685,12 +685,13 @@ struct PopoverView: View {
                 // plus récente. Point 2 pre-V1 (2026-05-07) : settingsRow
                 // retiré, Réglages accessible via ⌘, (raccourci ; K.4-lot1 a
                 // retiré son affichage du footer).
-                Divider()
+                // Q.1.b-bis : Dividers retirés (au-dessus de l'updateRow et du
+                // footer) — la séparation se fait par le ton (footer accent vs
+                // zone neutre), pas par bordure.
                 if updateChecker.updateAvailable {
                     updateRow()
                         .padding(.horizontal, 8)
                         .padding(.top, 2)
-                    Divider()
                 }
 
                 // Footer 1 ligne (K.4-lot1, 2026-05-22) : navigation popup
@@ -747,7 +748,7 @@ struct PopoverView: View {
 
             Spacer(minLength: 0)
 
-            Divider()
+            // Q.1.b-bis : Divider retiré — séparation par le ton (footer accent).
 
             // Footer nav simplifié : pas de ↑↓ (un seul item, rien à
             // naviguer). Layout symétrique avec Spacer central —
