@@ -67,6 +67,17 @@ enum PolishTokens {
     static let dividerHeight: CGFloat = 0.5
     static let dividerPaddingHorizontal: CGFloat = 12
 
+    // MARK: Bordure intérieure
+
+    /// Fine bordure intérieure semi-transparente sur les 4 côtés du panneau —
+    /// adoucit l'edge net (visible surtout en dark). Inversion des tons.
+    static func innerBorderColor(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(white: 1.0, opacity: 0.12)
+            : Color(white: 0.0, opacity: 0.08)
+    }
+    static let innerBorderWidth: CGFloat = 0.5
+
     // MARK: Accent / sélection / curseur
 
     /// Bleu d'accent loucedé (#3F84F7), identique light/dark. Réservé à la row
@@ -108,21 +119,31 @@ struct PolishVibrancyView: NSViewRepresentable {
 
 extension View {
 
-    /// Base d'un panneau polish : pose la vibrancy en fond et clippe aux coins
-    /// arrondis. Remplace le couple `.background(windowBg).clipShape(...)`.
-    /// À appliquer sur la racine de chacune des 4 surfaces.
+    /// Base d'un panneau polish : pose la vibrancy en fond, clippe aux coins
+    /// arrondis et ajoute la bordure intérieure subtile. Remplace le couple
+    /// `.background(windowBg).clipShape(...)`. À appliquer sur la racine de
+    /// chacune des 4 surfaces.
     func polishVibrancy(
         material: NSVisualEffectView.Material = PolishTokens.material,
         cornerRadius: CGFloat = PolishTokens.cornerRadius
     ) -> some View {
         background(PolishVibrancyView(material: material))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .polishInnerBorder(cornerRadius: cornerRadius)
     }
 
     /// Marque une zone d'accent (bandeau header/footer) par un overlay
     /// semi-translucide adaptatif light/dark, par-dessus la vibrancy du panneau.
     func polishAccentBackground() -> some View {
         modifier(PolishAccentBackground())
+    }
+
+    /// Fine bordure intérieure semi-transparente sur les 4 côtés (adoucit
+    /// l'edge net du panneau). Primitive réutilisable : composée par
+    /// `polishVibrancy()` ET applicable directement (cas du body popup, qui
+    /// pose son fond via un conditionnel et n'appelle pas le sucre).
+    func polishInnerBorder(cornerRadius: CGFloat = PolishTokens.cornerRadius) -> some View {
+        modifier(PolishInnerBorder(cornerRadius: cornerRadius))
     }
 }
 
@@ -133,6 +154,22 @@ private struct PolishAccentBackground: ViewModifier {
 
     func body(content: Content) -> some View {
         content.background(PolishTokens.accentBackground(colorScheme))
+    }
+}
+
+/// Implémentation de `.polishInnerBorder(cornerRadius:)` — lit `colorScheme`
+/// en interne. `strokeBorder` reste à l'intérieur du rect (inset propre,
+/// aligné sur le clip parent).
+private struct PolishInnerBorder: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    var cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content.overlay(
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(PolishTokens.innerBorderColor(colorScheme),
+                              lineWidth: PolishTokens.innerBorderWidth)
+        )
     }
 }
 

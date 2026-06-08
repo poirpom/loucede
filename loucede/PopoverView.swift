@@ -121,6 +121,10 @@ struct PopoverView: View {
         // NSWindow (`hostingView.layer.cornerRadius` dans loucedeApp.swift).
         // Couvre liste ET résultat (même body/fenêtre).
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        // Q.1.b-bis : bordure intérieure subtile du panneau (4 côtés). Appliquée
+        // ici directement car le body pose son fond via le conditionnel Q.1.b
+        // (pas `polishVibrancy()`). Couvre toutes branches via le clip partagé.
+        .polishInnerBorder(cornerRadius: 16)
         // Phase 6.2 Étape 9 (2026-04-27) : modal « trial épuisé »
         // présenté en overlay (reste dans la fenêtre popup, pas une
         // sheet macOS séparée). Apparaît quand `state.showTrialExpiredModal`
