@@ -1345,8 +1345,9 @@ struct PopoverView: View {
                 }
             }
             .padding(12)
-
-            Divider()
+            // Q.1.d : header = zone d'accent (cohérent header mainView/generator).
+            // Divider retiré — différenciation par ton.
+            .polishAccentBackground()
 
             // Phase 1.4i : zone basse du résultat (texte + footer boutons).
             VStack(spacing: 0) {
@@ -1374,7 +1375,10 @@ struct PopoverView: View {
                         }
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
+                        // Q.1.d : padding corps via tokens (h16/v12) — le markdown
+                        // ne touche plus les bords (defect « texte aux bords »).
+                        .padding(.horizontal, PolishTokens.paddingHorizontal)
+                        .padding(.vertical, PolishTokens.paddingVertical)
                 }
                 // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
                 // la hauteur disponible. En format compact, plafonné à 300.
@@ -1383,7 +1387,7 @@ struct PopoverView: View {
                 // produit un saut abrupt, surtout à la réduction).
                 .frame(maxHeight: resultExpanded ? 2000 : 300)
 
-                Divider()
+                // Q.1.d : Divider retiré — footer accent différencie par ton.
 
                 HStack(spacing: 8) {
                     // Phase 1.4 : boutons en .plain pour retirer le chrome bordered
@@ -1474,8 +1478,10 @@ struct PopoverView: View {
                     .keyboardShortcut(.return, modifiers: [])
                 }
                 .padding(12)
+                // Q.1.d : footer raccourcis = zone d'accent (cohérent mainView).
+                .polishAccentBackground()
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            // Q.1.d : fond opaque retiré — corps = zone neutre (vibrancy body).
         }
         .focusable()
         .focusEffectDisabled()
