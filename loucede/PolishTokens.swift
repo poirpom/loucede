@@ -34,6 +34,16 @@ enum PolishTokens {
     static let paddingHorizontal: CGFloat = 16
     static let paddingVertical: CGFloat = 12
 
+    // MARK: Typo — corps markdown de la réponse IA
+
+    /// Taille du corps markdown de la réponse IA (MarkdownUI `\.text`).
+    /// `...Expanded` s'applique en mode agrandi (touche F) pour une lecture
+    /// plus confortable. La cascade sur titres/code/listes est ASSUMÉE
+    /// (Chemin A1) : le thème MarkdownUI par défaut les dimensionne en `.em`
+    /// relatifs au corps, donc ils grossissent proportionnellement.
+    static let resultBodyFontSize: CGFloat = 13
+    static let resultBodyFontSizeExpanded: CGFloat = 15
+
     /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
     /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement
     /// modéré (~picto du `ConfirmationToast` non scalé ×3) : présence visuelle

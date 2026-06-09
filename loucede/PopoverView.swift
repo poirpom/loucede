@@ -1393,8 +1393,12 @@ struct PopoverView: View {
                     // les animations de resize (cf. `toggleResultExpanded`
                     // et `onChange(of: state.activeAction)` plus haut).
                     Markdown(state.resultText)
+                        // Chemin A1 : corps agrandi en mode F (lecture confort).
+                        // La cascade sur titres/code (thème MarkdownUI par défaut
+                        // en `.em`) est assumée — ils grossissent proportionnellement.
                         .markdownTextStyle(\.text) {
-                            FontSize(13)
+                            FontSize(resultExpanded ? PolishTokens.resultBodyFontSizeExpanded
+                                                    : PolishTokens.resultBodyFontSize)
                         }
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
