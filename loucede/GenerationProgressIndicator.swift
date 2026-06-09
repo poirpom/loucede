@@ -50,11 +50,13 @@ struct GenerationProgressIndicator: View {
         return max(0, now.timeIntervalSince(startDate))
     }
 
-    /// Palier couleur (snap, pas de fondu) : vert ≤ 8.0s, jaune ≤ 18.0s,
+    /// Palier couleur (snap, pas de fondu) : vert ≤ 8.0s, orange ≤ 18.0s,
     /// rouge au-delà. Couleurs sémantiques système (cohérence macOS natif).
+    /// Orange (et non jaune) sur le palier intermédiaire : `systemYellow`
+    /// manque de lisibilité sur la vibrancy claire (validé runtime Q.3).
     private func color(forElapsed elapsed: Double) -> Color {
         if elapsed <= 8.0 { return Color(nsColor: .systemGreen) }
-        if elapsed <= 18.0 { return Color(nsColor: .systemYellow) }
+        if elapsed <= 18.0 { return Color(nsColor: .systemOrange) }
         return Color(nsColor: .systemRed)
     }
 }
