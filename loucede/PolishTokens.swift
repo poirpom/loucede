@@ -26,11 +26,6 @@ import AppKit
 /// (cf. SettingsView/ActionsView) via des fonctions prenant un `ColorScheme`.
 enum PolishTokens {
 
-    // MARK: Matériau
-
-    /// Matériau vibrancy des 4 surfaces.
-    static let material: NSVisualEffectView.Material = .hudWindow
-
     // MARK: Géométrie
 
     /// Rayon des coins du panneau. 16 = valeur app actuelle (choix délibéré
@@ -113,39 +108,21 @@ enum PolishTokens {
     static let shadowOffsetY: CGFloat = 4
 }
 
-// MARK: - Wrapper vibrancy
-
-/// Pont SwiftUI vers `NSVisualEffectView` (blending `.behindWindow` → floute le
-/// contenu derrière la fenêtre). Matériau paramétrable, défaut `.hudWindow`.
-struct PolishVibrancyView: NSViewRepresentable {
-    var material: NSVisualEffectView.Material = PolishTokens.material
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = .behindWindow
-        view.state = .active
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-    }
-}
-
 // MARK: - View modifiers
 
 extension View {
 
-    /// Base d'un panneau polish : pose la vibrancy en fond, clippe aux coins
-    /// arrondis et ajoute la bordure intérieure subtile. Remplace le couple
-    /// `.background(windowBg).clipShape(...)`. À appliquer sur la racine de
-    /// chacune des 4 surfaces.
+    // Nom historique. La vibrancy a été retirée pour lisibilité (dogfooding
+    // 09/06). Le modifier conserve le clip et la bordure intérieure. Renommage
+    // en backlog tech.
+    //
+    /// Pose un fond opaque adaptatif (`windowBackgroundColor`, suit light/dark),
+    /// clippe aux coins arrondis et ajoute la bordure intérieure subtile.
+    /// À appliquer sur la racine de chacune des 4 surfaces.
     func polishVibrancy(
-        material: NSVisualEffectView.Material = PolishTokens.material,
         cornerRadius: CGFloat = PolishTokens.cornerRadius
     ) -> some View {
-        background(PolishVibrancyView(material: material))
+        background(Color(NSColor.windowBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .polishInnerBorder(cornerRadius: cornerRadius)
     }
