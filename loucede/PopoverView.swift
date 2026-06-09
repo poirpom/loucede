@@ -1479,15 +1479,9 @@ struct PopoverView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Phase 1.4b : indicateur F Agrandir / F Réduire. Clic souris
-                    // bascule aussi pour cohérence (sinon seule la touche F marcherait).
-                    Button { toggleResultExpanded() } label: {
-                        HStack(spacing: 6) {
-                            KeyboardKey("F")
-                            Text(resultExpanded ? "Réduire" : "Agrandir")
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    // L'affordance F Agrandir/Réduire est désormais portée par
+                    // la pastille flottante (ResultExpandPill), retirée du footer.
+                    // Le raccourci clavier F reste géré par `.onKeyPress` plus bas.
 
                     Spacer()
 
