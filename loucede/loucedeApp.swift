@@ -406,7 +406,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Recentré à chaque resize pour rester équilibré.
     ///
     /// Plafond de largeur de la fenêtre résultat agrandie.
-    static let popoverExpandedWidthCap: CGFloat = 500
+    static let popoverExpandedWidthCap: CGFloat = 620
     /// Largeur effective de la fenêtre résultat agrandie. Plafonnée par
     /// `popoverExpandedWidthCap`, mais jamais plus de la moitié de la largeur
     /// visible de l'écran (garde-fou petits écrans). Source unique partagée
