@@ -979,9 +979,13 @@ struct PopoverView: View {
             if let phase = state.generatorPhase {
                 switch phase {
                 case .compact:
+                    // Q.3 : cross-fade compact ↔ loading (mutation animée côté
+                    // PopoverState.runGeneration / .error).
                     generatorCompactContent(error: nil)
+                        .transition(.opacity)
                 case .loading:
                     generatorLoadingContent
+                        .transition(.opacity)
                 case .resultEditable:
                     // K.2-B lot 2b — popover éditable + bottom bar
                     // Annuler/Valider en bas (en dehors du ScrollView).
@@ -990,6 +994,7 @@ struct PopoverView: View {
                     generatorEditableBottomBar
                 case .error(let message):
                     generatorCompactContent(error: message)
+                        .transition(.opacity)
                 }
             }
         }
@@ -1078,34 +1083,24 @@ struct PopoverView: View {
         .padding(.bottom, 12)
     }
 
-    /// Phase loading : TextField désactivé + spinner.
+    /// Phase loading (Q.3) : spinner + compteur centrés dans la main zone,
+    /// ligne « Génération en cours… » centrée en bas (sans spinner). Le champ
+    /// de saisie a disparu (cross-fade depuis `.compact`). Le contenu remplit
+    /// la hauteur du popup (`maxHeight: .infinity`) pour un centrage réel.
     private var generatorLoadingContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Action à générer")
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            GenerationProgressIndicator()
+            Spacer(minLength: 0)
+            Text("Génération en cours…")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-
-            TextField("", text: .constant(state.generatorInputText))
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                // Q.1.c-bis : fill subtil disabled (fiche structurée). Pas de tint.
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .polishFieldFill(disabled: true)
-                .disabled(true)
-
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Génération en cours… 30 sec. de patience max 🙏")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 12)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 12)
         .padding(.top, 10)
-        .padding(.bottom, 12)
     }
 
     /// Phase resultEditable (K.2-B lot 2b) : popover ÉDITABLE complet.

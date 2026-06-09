@@ -224,7 +224,11 @@ final class PopoverState: ObservableObject {
 
         let myToken = UUID()
         currentGenerationToken = myToken
-        generatorPhase = .loading
+        // Q.3 : cross-fade compact → loading (le contenu par-phase porte
+        // `.transition(.opacity)` côté PopoverView).
+        withAnimation(.easeInOut(duration: 0.25)) {
+            generatorPhase = .loading
+        }
 
         // M.2.5-fix-2 — coche « generator » au lancement de la génération.
         if tutorialMode { tutorialGeneratorOpenedHandler?() }
@@ -266,7 +270,10 @@ final class PopoverState: ObservableObject {
                 }
             case .failure(let error):
                 let msg = Self.userFacingErrorMessage(for: error)
-                self.generatorPhase = .error(message: msg)
+                // Q.3 : cross-fade loading → error (symétrie avec succès).
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.generatorPhase = .error(message: msg)
+                }
             }
         }
     }
