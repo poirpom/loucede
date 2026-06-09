@@ -39,6 +39,13 @@ enum PolishTokens {
     static let paddingHorizontal: CGFloat = 16
     static let paddingVertical: CGFloat = 12
 
+    /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
+    /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement
+    /// modéré (~picto du `ConfirmationToast` non scalé ×3) : présence visuelle
+    /// sans dominer le compteur posé juste en dessous. Cf.
+    /// `details/Q.3-polish-compteur-generation.md`.
+    static let generationSpinnerHeight: CGFloat = 44
+
     // MARK: Fonds de zone
 
     /// Overlay semi-translucide marquant une zone d'accent (bandeau header /
