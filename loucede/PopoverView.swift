@@ -1415,6 +1415,16 @@ struct PopoverView: View {
                 // (`resultShrinkGrace`), qui maintient le contenu plein pendant la
                 // descente de la fenêtre au rétrécissement (cf. `toggleResultExpanded`).
                 .frame(maxHeight: (resultExpanded || resultShrinkGrace) ? 2000 : 300)
+                // Pastille F universelle : bouton flottant bi-mode (toujours
+                // visible) au bas du scroll. Overlay pur → ne touche aucune
+                // frame, le clamp Q.2.a (maxHeight ci-dessus) reste intact.
+                // Picto + action contextualisés par `resultExpanded`.
+                .overlay(alignment: .bottom) {
+                    ResultExpandPill(expanded: resultExpanded) {
+                        toggleResultExpanded()
+                    }
+                    .padding(.bottom, PolishTokens.resultExpandPillBottomMargin)
+                }
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
 
@@ -1565,6 +1575,48 @@ struct KeyboardKey: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(onAccent ? Color.white.opacity(0.4) : Color.gray.opacity(0.3), lineWidth: 1)
             )
+    }
+}
+
+// MARK: - Result Expand Pill (bouton F universel flottant)
+
+/// Bouton flottant posé en overlay au bas du scroll de la fenêtre de réponse,
+/// visible dans les DEUX modes (normal + agrandi). Picto contextualisé :
+/// « agrandir » en normal, « réduire » en agrandi. Clic = même action que le
+/// raccourci F (`toggleResultExpanded`). `KeyboardKey("F")` rappelle le
+/// raccourci, cohérent avec le footer. Fond `.ultraThinMaterial` (pattern
+/// `ConfirmationToast`) — seul effet translucide restant après le retrait de
+/// la vibrancy du panneau en Q.4.
+struct ResultExpandPill: View {
+    let expanded: Bool
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: expanded
+                      ? "arrow.down.right.and.arrow.up.left"
+                      : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: PolishTokens.resultExpandPillIconSize,
+                                  weight: PolishTokens.resultExpandPillIconWeight))
+                    .foregroundColor(.secondary)
+                    // Crossfade du symbole au basculement (le KeyboardKey reste stable).
+                    .contentTransition(.opacity)
+                KeyboardKey("F")
+            }
+            .padding(.horizontal, 10)
+            .frame(height: PolishTokens.resultExpandPillHeight)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule().strokeBorder(PolishTokens.innerBorderColor(colorScheme),
+                                       lineWidth: PolishTokens.resultExpandPillBorderWidth)
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: PolishTokens.resultExpandPillFadeDuration),
+                   value: expanded)
     }
 }
 

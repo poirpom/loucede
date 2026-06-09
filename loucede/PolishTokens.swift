@@ -44,6 +44,20 @@ enum PolishTokens {
     static let resultBodyFontSize: CGFloat = 13
     static let resultBodyFontSizeExpanded: CGFloat = 15
 
+    // MARK: Pastille F flottante (fenêtre de réponse, bi-mode)
+
+    /// Bouton F universel flottant en overlay bas du scroll de la fenêtre de
+    /// réponse — toujours visible (les 2 modes). Capsule `.ultraThinMaterial`
+    /// (pattern `ConfirmationToast`), picto contextualisé par le mode
+    /// (agrandir / réduire) + `KeyboardKey("F")` pour cohérence footer.
+    static let resultExpandPillHeight: CGFloat = 28
+    static let resultExpandPillIconSize: CGFloat = 13
+    static let resultExpandPillIconWeight: Font.Weight = .medium
+    /// = épaisseur de trait du picto (poids medium) pour un accord visuel.
+    static let resultExpandPillBorderWidth: CGFloat = 1.5
+    static let resultExpandPillBottomMargin: CGFloat = 10
+    static let resultExpandPillFadeDuration: Double = 0.18
+
     /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
     /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement
     /// modéré (~picto du `ConfirmationToast` non scalé ×3) : présence visuelle
