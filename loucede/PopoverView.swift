@@ -1595,7 +1595,7 @@ struct ResultExpandPill: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: PolishTokens.resultExpandPillSpacing) {
                 Image(systemName: expanded
                       ? "arrow.down.right.and.arrow.up.left"
                       : "arrow.up.left.and.arrow.down.right")
@@ -1606,7 +1606,7 @@ struct ResultExpandPill: View {
                     .contentTransition(.opacity)
                 KeyboardKey("F")
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, PolishTokens.resultExpandPillHorizontalPadding)
             .frame(height: PolishTokens.resultExpandPillHeight)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(

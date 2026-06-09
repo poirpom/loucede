@@ -57,6 +57,12 @@ enum PolishTokens {
     static let resultExpandPillBorderWidth: CGFloat = 1.5
     static let resultExpandPillBottomMargin: CGFloat = 10
     static let resultExpandPillFadeDuration: Double = 0.18
+    /// Padding horizontal interne de la capsule. Donne de l'air entre la
+    /// bordure de la capsule et son contenu (le `KeyboardKey("F")` ayant déjà
+    /// sa propre boîte, un padding trop serré créait un effet « double bordure »).
+    static let resultExpandPillHorizontalPadding: CGFloat = 12
+    /// Espace picto ↔ F dans la capsule.
+    static let resultExpandPillSpacing: CGFloat = 8
 
     /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
     /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement
