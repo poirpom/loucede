@@ -57,6 +57,11 @@ enum PolishTokens {
     static let resultExpandPillBorderWidth: CGFloat = 1.5
     static let resultExpandPillBottomMargin: CGFloat = 10
     static let resultExpandPillFadeDuration: Double = 0.18
+    /// Délai avant de basculer le picto de la pastille (agrandir ↔ réduire),
+    /// posé APRÈS le settle de l'animation NSWindow pour éviter que le crossfade
+    /// ne tombe pendant le glissement de la pastille (effet « promenade »).
+    /// DOIT rester aligné sur le délai `resultShrinkGrace` de `toggleResultExpanded`.
+    static let resultExpandPillSwapDelay: Double = 0.28
     /// Padding horizontal interne de la capsule. Donne de l'air entre la
     /// bordure de la capsule et son contenu (le `KeyboardKey("F")` ayant déjà
     /// sa propre boîte, un padding trop serré créait un effet « double bordure »).

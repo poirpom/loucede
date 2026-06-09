@@ -75,6 +75,12 @@ struct PopoverView: View {
     // mashing F). Incrémenté à chaque toggle ; la closure différée n'agit que si
     // son token capturé est toujours le courant. `&+=` = wrap-around safe.
     @State private var resultClampToken: Int = 0
+    // Mode AFFICHÉ par la pastille F flottante. Suit `resultExpanded`
+    // instantanément partout (reset ouverture, sortie résultat) SAUF dans
+    // `toggleResultExpanded`, où il est posé en différé après le settle de
+    // l'anim NSWindow → le picto reste plein et stable pendant le glissement,
+    // puis crossfade in-place une fois la fenêtre statique (anti-« promenade »).
+    @State private var pillExpanded: Bool = false
 
     init(
         onClose: @escaping () -> Void = {},
@@ -166,6 +172,8 @@ struct PopoverView: View {
             // pendant les 0.28 s) — sinon le contenu resterait plein dans une
             // fenêtre compacte. Reset instantané, pas de conceal sur réouverture.
             resultShrinkGrace = false
+            // Pastille : set instantané miroir (pas de swap différé hors toggle F).
+            pillExpanded = false
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -209,6 +217,8 @@ struct PopoverView: View {
                 // Q.2.a : reset instantané de la grâce — un retour liste pendant
                 // un conceal en cours ne doit pas laisser le contenu plein.
                 resultShrinkGrace = false
+                // Pastille : set instantané miroir (sortie du mode résultat).
+                pillExpanded = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
@@ -443,6 +453,14 @@ struct PopoverView: View {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
             state.resumeFlush()
+        }
+        // Pastille : swap du picto DIFFÉRÉ après le settle de la fenêtre (les
+        // deux sens), gardé par le token (mashing F → seul le dernier toggle
+        // pose la valeur finale). Pendant le glide, la pastille montre l'ancien
+        // picto plein et stable ; à l'arrivée, crossfade in-place (anti-« promenade »).
+        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultExpandPillSwapDelay) {
+            guard token == resultClampToken else { return }
+            pillExpanded = newExpanded
         }
     }
 
@@ -1420,7 +1438,9 @@ struct PopoverView: View {
                 // frame, le clamp Q.2.a (maxHeight ci-dessus) reste intact.
                 // Picto + action contextualisés par `resultExpanded`.
                 .overlay(alignment: .bottom) {
-                    ResultExpandPill(expanded: resultExpanded) {
+                    // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
+                    // pendant le glide → picto stable, crossfade après settle.
+                    ResultExpandPill(expanded: pillExpanded) {
                         toggleResultExpanded()
                     }
                     .padding(.bottom, PolishTokens.resultExpandPillBottomMargin)
