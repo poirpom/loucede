@@ -108,10 +108,12 @@ struct PopoverView: View {
                 mainView
             }
         }
-        // Phase 1.4b : largeur responsive (400 compact → 500 agrandi). Nécessaire
-        // pour que le contenu SwiftUI suive l'animation de la NSWindow ; sinon
-        // on verrait une bande transparente de chaque côté.
-        .frame(width: resultExpanded ? 500 : 400)
+        // Phase 1.4b : largeur responsive (compact → agrandi). Nécessaire pour
+        // que le contenu SwiftUI suive l'animation de la NSWindow ; sinon on
+        // verrait une bande transparente de chaque côté. Source unique partagée
+        // avec le frame de la NSWindow (`AppDelegate.resizePopover`) via le même
+        // helper → valeurs garanties identiques.
+        .frame(width: resultExpanded ? AppDelegate.expandedResultWidth() : AppDelegate.popoverDefaultWidth)
         // Q.1.d : panneau loucedé canonique = vibrancy hudWindow + clip coins
         // arrondis + bordure intérieure, le tout via `.polishVibrancy()`
         // (inconditionnel — les 3 surfaces mainView/generator/result partagent
