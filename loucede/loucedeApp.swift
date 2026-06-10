@@ -665,6 +665,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let x = (screenRect.width - width) / 2 + screenRect.minX
         let y = (screenRect.height - height) / 2 + screenRect.minY
         let newFrame = NSRect(x: x, y: y, width: width, height: height)
+        // Q.2.g (A.1) : ne pas (ré)animer un resize qui ne change pas la fenêtre.
+        // compact / loading / error mappent tous vers la MÊME taille (.compact) :
+        // animer la KeyablePanel vers son frame courant relançait une
+        // NSAnimationContext pendant que le TimelineView du spinner (Q.3)
+        // redessinait le hosting view → boucle « Update Constraints in Window
+        // pass » → NSGenericException (crash 6.14 réactivé en contexte veille +
+        // réseau mort). Skip du no-op = suppression du chevauchement d'animations.
+        let cur = window.frame
+        let e: CGFloat = 0.5   // tolérance sub-pixel
+        if abs(cur.minX - newFrame.minX) < e, abs(cur.minY - newFrame.minY) < e,
+           abs(cur.width - newFrame.width) < e, abs(cur.height - newFrame.height) < e {
+            return
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
