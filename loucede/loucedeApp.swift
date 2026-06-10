@@ -633,7 +633,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// tantôt « retour résultat compact »). Le mode explicite est désormais
     /// une `PopoverMode`, ce qui empêche le call site de prendre la mauvaise
     /// décision pour la hauteur cible.
-    func resizePopover(to mode: PopoverMode, searchQuery: String = "") {
+    func resizePopover(to mode: PopoverMode, searchQuery: String = "",
+                       duration: Double = PolishTokens.popoverResizeDuration) {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
         let screenRect = screen.visibleFrame
         let width: CGFloat
@@ -665,7 +666,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let y = (screenRect.height - height) / 2 + screenRect.minY
         let newFrame = NSRect(x: x, y: y, width: width, height: height)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(newFrame, display: true)
         }

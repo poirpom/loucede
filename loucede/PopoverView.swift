@@ -433,32 +433,35 @@ struct PopoverView: View {
         // NSInternalInconsistencyException « The window has been marked as
         // needing another Update Constraints ».
         state.suspendFlush()
-        globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact)
+        // Q.2.e : le toggle résultat utilise une durée d'anim ralentie (0.5s,
+        // perçue moins brutale) — spécifique à cette transition, le reste de
+        // l'app garde le défaut snappy 0.25s.
+        globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact,
+                                         duration: PolishTokens.popoverResultResizeDuration)
         resultExpanded = newExpanded
         if newExpanded {
             // Reveal : contenu plein immédiat, la fenêtre grandit par-dessus.
             resultShrinkGrace = false
         } else {
             // Conceal : on maintient la hauteur pleine pendant la descente de la
-            // fenêtre (0.25 s), puis on clampe à compact. Délai 0.28 s = après
-            // l'arrivée de la NSWindow (clamp invisible) mais avant le
-            // `resumeFlush` (0.3 s) → la passe de layout tombe sur une fenêtre
-            // statique ET un flush encore suspendu (conditions optimales,
-            // aucune anim window concurrente : le risque 6.14 reste écarté).
+            // fenêtre (0.5 s), puis on clampe à compact. `resultSettleDelay`
+            // (0.55 s) = après l'arrivée de la NSWindow (clamp invisible) et le
+            // flush encore suspendu → la passe de layout tombe sur une fenêtre
+            // statique (aucune anim window concurrente : le risque 6.14 reste écarté).
             resultShrinkGrace = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) {
                 guard token == resultClampToken else { return } // toggle plus récent → abandon
                 resultShrinkGrace = false
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) { [state] in
             state.resumeFlush()
         }
         // Pastille : swap du picto DIFFÉRÉ après le settle de la fenêtre (les
         // deux sens), gardé par le token (mashing F → seul le dernier toggle
         // pose la valeur finale). Pendant le glide, la pastille montre l'ancien
         // picto plein et stable ; à l'arrivée, crossfade in-place (anti-« promenade »).
-        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultExpandPillSwapDelay) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) {
             guard token == resultClampToken else { return }
             pillExpanded = newExpanded
         }

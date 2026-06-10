@@ -57,17 +57,29 @@ enum PolishTokens {
     static let resultExpandPillBorderWidth: CGFloat = 1.5
     static let resultExpandPillBottomMargin: CGFloat = 10
     static let resultExpandPillFadeDuration: Double = 0.18
-    /// Délai avant de basculer le picto de la pastille (agrandir ↔ réduire),
-    /// posé APRÈS le settle de l'animation NSWindow pour éviter que le crossfade
-    /// ne tombe pendant le glissement de la pastille (effet « promenade »).
-    /// DOIT rester aligné sur le délai `resultShrinkGrace` de `toggleResultExpanded`.
-    static let resultExpandPillSwapDelay: Double = 0.28
     /// Padding horizontal interne de la capsule. Donne de l'air entre la
     /// bordure de la capsule et son contenu (le `KeyboardKey("F")` ayant déjà
     /// sa propre boîte, un padding trop serré créait un effet « double bordure »).
     static let resultExpandPillHorizontalPadding: CGFloat = 12
     /// Espace picto ↔ F dans la capsule.
     static let resultExpandPillSpacing: CGFloat = 8
+
+    // MARK: Timing animation resize (popover)
+
+    /// Durée de l'animation NSWindow `resizePopover` par défaut (transitions
+    /// liste↔résultat, phases du générateur). Restée snappy.
+    static let popoverResizeDuration: Double = 0.25
+    /// Q.2.e — durée de l'animation pour l'agrandissement/réduction de la
+    /// fenêtre de réponse (touche F). Ralentie vs le défaut (0.25 perçue trop
+    /// brutale au runtime). Ne s'applique QU'au toggle résultat (passée
+    /// explicitement par `toggleResultExpanded`).
+    static let popoverResultResizeDuration: Double = 0.5
+    /// Q.2.e — délai de « settle » post-resize du résultat (légèrement > la
+    /// durée d'anim 0.5s). Consolide trois délais autrefois distincts, tous
+    /// calés sur la fin de l'anim NSWindow du toggle F : reset de la grâce de
+    /// shrink (clamp Q.2.a), reprise du flush LLM, et swap différé du picto de
+    /// la pastille (anti-« promenade », Q.2.c).
+    static let resultSettleDelay: Double = 0.55
 
     /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
     /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement
