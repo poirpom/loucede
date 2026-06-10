@@ -1514,13 +1514,21 @@ struct PopoverView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: .command)
 
-                    // Copier : ↵ — copie le résultat dans le presse-papier
-                    // (popup reste ouvert pour relire ou recopier).
+                    // Copier : ↵ — copie le résultat dans le presse-papier.
+                    // Q.2.d : ferme la fenêtre après la copie (toast bref puis
+                    // hidePopover), symétrique du « Coller » ⌘↵. En tutorialMode,
+                    // comportement inchangé (toast 1.2s + coche, sans fermeture).
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(state.resultText, forType: .string)
-                        showConfirmation("Copié")
-                        if state.tutorialMode { state.tutorialCopyHandler?() }  // M.2.5-fix — coche « copy »
+                        if state.tutorialMode {
+                            showConfirmation("Copié")
+                            state.tutorialCopyHandler?()  // M.2.5-fix — coche « copy »
+                        } else {
+                            showConfirmation("Copié", duration: 0.3) {
+                                globalAppDelegate?.hidePopover()
+                            }
+                        }
                     } label: {
                         HStack(spacing: 6) {
                             KeyboardKey("↵")
