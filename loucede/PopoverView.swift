@@ -1069,11 +1069,11 @@ struct PopoverView: View {
     private func generatorCompactContent(error: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Action à générer")
+                Text("Décris l'action simplement")
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                Text("Ex. : traduis en russe")
-                    .font(.system(size: 11))
+                    .foregroundStyle(.primary)
+                Text("Ex. traduis en danois ou transforme en haiku")
+                    .font(.system(size: 12))
                     .italic()
                     .foregroundStyle(.secondary)
             }
@@ -1151,11 +1151,11 @@ struct PopoverView: View {
                 // --- Section A : Action à générer + Regénérer ---
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Action à générer")
+                        Text("Décris l'action simplement")
                             .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                        Text("Ex. : traduis en russe")
-                            .font(.system(size: 11))
+                            .foregroundStyle(.primary)
+                        Text("Ex. traduis en danois ou transforme en haiku")
+                            .font(.system(size: 12))
                             .italic()
                             .foregroundStyle(.secondary)
                     }
