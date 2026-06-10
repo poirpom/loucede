@@ -222,7 +222,15 @@ struct PopoverView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
-            } else if !resultExpanded {
+            } else if !resultExpanded && state.pendingGeneratedAction == nil {
+                // Q.2.h.1 : le flow « run first » (action générée exécutée
+                // directement) gère son propre resize, différé après le
+                // démontage du spinner TimelineView du générateur (cf.
+                // `PopoverState.runGeneratedActionUnsaved`). Le discriminant
+                // `pendingGeneratedAction` est posé AVANT `runAction` →
+                // lecture déterministe ici, quel que soit le timing des
+                // handlers. Les actions du catalogue (pending == nil)
+                // gardent le resize historique ci-dessous.
                 state.suspendFlush()
                 globalAppDelegate?.resizePopover(to: .resultCompact)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -1396,6 +1404,23 @@ struct PopoverView: View {
             // Phase 1.4i : zone basse du résultat (texte + footer boutons).
             VStack(spacing: 0) {
                 ScrollView {
+                    // Q.2.h.1 : attente du 1er token d'une action générée
+                    // (« run first ») — la génération est finie, l'exécution
+                    // streamée démarre. Plain ProgressView (PAS de
+                    // TimelineView) → inerte pendant le resize 200→394
+                    // (leçon Q.2.g). Disparaît au 1er flush (condition de
+                    // vue dérivée de resultText, aucun signal dédié).
+                    // Les actions du catalogue (pending == nil) ne passent
+                    // jamais ici.
+                    if state.resultText.isEmpty && state.isProcessing
+                        && state.pendingGeneratedAction != nil {
+                        ProgressView()
+                            .controlSize(.large)
+                            .frame(height: PolishTokens.generationSpinnerHeight)
+                            // ≈ viewport compact (300) − paddings verticaux :
+                            // centre le spinner dans la zone de scroll.
+                            .frame(maxWidth: .infinity, minHeight: 260)
+                    } else {
                     // Phase 6.5 (2026-04-23) : rendu Markdown via MarkdownUI
                     // (gonzalezreal/swift-markdown-ui, MIT). L'action
                     // "Extrais la recette" produit du Markdown structuré
@@ -1427,6 +1452,7 @@ struct PopoverView: View {
                         // ne touche plus les bords (defect « texte aux bords »).
                         .padding(.horizontal, PolishTokens.paddingHorizontal)
                         .padding(.vertical, PolishTokens.paddingVertical)
+                    }   // fin if/else spinner d'attente (Q.2.h.1)
                 }
                 // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
                 // la hauteur disponible. En format compact, plafonné à 300.

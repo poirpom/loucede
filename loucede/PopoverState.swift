@@ -94,6 +94,14 @@ final class PopoverState: ObservableObject {
     /// tard via Réglages → Actions s'il laisse `nil`).
     @Published var editableCategory: PromptCategory? = nil
 
+    /// Q.2.h.1 — action générée par l'IA, exécutée directement (« run
+    /// first ») mais PAS (encore) ajoutée au catalogue. Non-nil ⟺ la
+    /// fenêtre de réponse affiche le résultat d'une action générée non
+    /// sauvegardée (pills ⌘S/⌘E en h.2/h.3). Remise à nil à la sauvegarde,
+    /// à la fermeture du popup et au reset — « tu veux la garder, tu
+    /// sauvegardes » : aucune persistance implicite.
+    @Published var pendingGeneratedAction: Action? = nil
+
     /// Token UUID renouvelé à chaque déclenchement de génération. Sert à
     /// l'annulation LOGIQUE d'une génération en cours (Esc pendant
     /// loading) : à la fin du Task, on vérifie que le token n'a pas
@@ -146,6 +154,7 @@ final class PopoverState: ObservableObject {
         generatorPhase = nil
         generatorInputText = ""
         clearEditableFields()
+        pendingGeneratedAction = nil
         showTrialExpiredModal = false
         openCounter &+= 1
     }
@@ -198,6 +207,7 @@ final class PopoverState: ObservableObject {
         generatorPhase = nil
         generatorInputText = ""
         clearEditableFields()
+        pendingGeneratedAction = nil
         searchQuery = ""
         selectedIndex = 0
     }
@@ -246,34 +256,74 @@ final class PopoverState: ObservableObject {
 
             switch result {
             case .success(let action):
-                // K.2-B lot 2b — peuple les 4 champs éditables depuis la
-                // proposition IA. En regénération (lot 2b : bouton
-                // « Regénérer » côté UI), ce code écrase les éditions
-                // manuelles de l'utilisateur — comportement « Regénérer
-                // = recommence », décision actée.
-                self.editableTitle = action.title
-                self.editableEmoji = action.emoji
-                self.editableDescription = action.description
-                self.editablePrompt = action.prompt
-                // Catégorie remise à « Sans catégorie » à chaque
-                // (re)génération — l'IA ne catégorise pas, l'utilisateur
-                // choisit (ou laisse nil pour catégoriser plus tard).
-                self.editableCategory = nil
-                // K.2-B lot 2b — synchronisation animation : le NSWindow
-                // resize est piloté par NSAnimationContext 0.25s côté
-                // AppDelegate (`.onChange(generatorPhase)` → `resizePopover`).
-                // Le withAnimation SwiftUI synchrone côté state permet
-                // au contenu interne de cross-fade pendant que la fenêtre
-                // s'agrandit — passage compact → éditable plus doux.
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    self.generatorPhase = .resultEditable(action)
-                }
+                // Q.2.h.1 — flow « run first, configure if needed » :
+                // l'action générée est exécutée DIRECTEMENT sur le texte
+                // capturé (stream dans la fenêtre de réponse), sans passer
+                // par la fiche d'édition. L'édition reste accessible a
+                // posteriori via ⌘E (h.3) ; la sauvegarde via ⌘S (h.2).
+                // L'ancien peuplement des champs `editable*` est déplacé
+                // au moment de ⌘E (h.3).
+                self.runGeneratedActionUnsaved(action)
             case .failure(let error):
                 let msg = Self.userFacingErrorMessage(for: error)
                 // Q.3 : cross-fade loading → error (symétrie avec succès).
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.generatorPhase = .error(message: msg)
                 }
+            }
+        }
+    }
+
+    /// Q.2.h.1 — exécute directement l'action générée (« run first »),
+    /// SANS l'ajouter au catalogue. L'action vit dans
+    /// `pendingGeneratedAction` jusqu'à une éventuelle sauvegarde (⌘S,
+    /// h.2) ou édition (⌘E, h.3) ; sinon elle est perdue à la fermeture
+    /// (principe acté : pas de cache implicite).
+    ///
+    /// Transition β (Q.2.g-safe) : l'ordre des mutations garantit que le
+    /// `TimelineView` du spinner est démonté AVANT le resize de la
+    /// NSWindow. (1) `runAction` pose `activeAction` — le
+    /// `.onChange(activeAction)` côté PopoverView SKIP le resize pour ce
+    /// chemin (discriminant `pendingGeneratedAction != nil`, posé avant).
+    /// (2) `generatorPhase = nil` démonte `generatorView` à la prochaine
+    /// passe de rendu — le `.onChange(generatorPhase)` skip aussi
+    /// (`activeAction != nil`, garde K.2-B lot 2b existante). (3) Le
+    /// resize vers `.resultCompact` est fait EXPLICITEMENT ici, différé
+    /// au tick suivant (`DispatchQueue.main.async`) → il démarre après
+    /// la passe de rendu qui a démonté le spinner, quelle que soit la
+    /// sémantique de timing des handlers `.onChange`. `suspendFlush`
+    /// autour du resize : pattern 6.14 (le stream démarre immédiatement).
+    private func runGeneratedActionUnsaved(_ generated: GeneratedAction) {
+        let action = Action(
+            id: UUID(),
+            name: generated.title,
+            icon: generated.emoji,
+            prompt: generated.prompt,
+            actionType: .ai,
+            shortDescription: generated.description,
+            originTemplateName: nil,
+            isFavorite: false,
+            isHidden: false,
+            displayOrder: 0,        // recalculé à la sauvegarde (⌘S, h.2)
+            category: nil
+        )
+        pendingGeneratedAction = action
+        runAction(action, recordPerAction: false)
+        guard activeAction != nil else {
+            // Gate licence/trial : `runAction` n'a pas lancé (modal trial
+            // présenté par-dessus). Retour à la saisie, input préservé.
+            pendingGeneratedAction = nil
+            generatorPhase = .compact
+            return
+        }
+        generatorPhase = nil
+        generatorInputText = ""
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.suspendFlush()
+            globalAppDelegate?.resizePopover(to: .resultCompact)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.resumeFlush()
             }
         }
     }
@@ -478,7 +528,12 @@ final class PopoverState: ObservableObject {
     ///   tester sans burner d'essais.
     /// - Incrément APRÈS le stream réussi (pas avant), pour ne pas
     ///   brûler des essais sur des erreurs réseau ou clé API absente.
-    func runAction(_ action: Action) {
+    /// Q.2.h.1 — `recordPerAction: false` pour une action générée non
+    /// sauvegardée : son `action.id` n'existe pas au catalogue, incrémenter
+    /// le compteur par-action créerait une entrée orpheline dans
+    /// `loucede.usage.perAction` (purge des orphelins = backlog Tech V2).
+    /// Le compteur TOTAL (`recordSuccessfulUse`) reste inconditionnel.
+    func runAction(_ action: Action, recordPerAction: Bool = true) {
         // Phase 6.2 Étape 9 : gate licence/trial.
         let license = LicenseManager.shared
         guard license.canRunAction else {
@@ -575,7 +630,11 @@ final class PopoverState: ObservableObject {
             // « stream réussi » → total et par-action restent cohérents.
             if streamSucceeded {
                 UsageTracker.shared.recordSuccessfulUse()
-                UsageTracker.shared.recordActionUse(actionID: action.id)
+                // Q.2.h.1 : pas de compteur par-action pour une action
+                // générée non sauvegardée (id absent du catalogue → orphelin).
+                if recordPerAction {
+                    UsageTracker.shared.recordActionUse(actionID: action.id)
+                }
             }
 
             // M.2.5 — coche « magic » côté tuto quand le stream a réussi.
