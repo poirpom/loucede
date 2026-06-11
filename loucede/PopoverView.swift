@@ -1398,12 +1398,18 @@ struct PopoverView: View {
             Text("Catégorie")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+            // Q.2.h.3 C2 : groupes via Section (séparateur natif macOS
+            // identique) au lieu d'un Divider nu — un item de menu sans tag
+            // que SwiftUI tentait d'associer à une sélection, d'où le
+            // warning console « Picker: the selection "" is invalid ».
             Picker("", selection: $state.editableCategory) {
-                Text("Sans catégorie").tag(PromptCategory?.none)
-                // Q.1.c : divider natif macOS (groupe nil vs catégories réelles).
-                Divider()
-                ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
-                    Text(cat.rawValue).tag(PromptCategory?.some(cat))
+                Section {
+                    Text("Sans catégorie").tag(PromptCategory?.none)
+                }
+                Section {
+                    ForEach(PromptCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
+                        Text(cat.rawValue).tag(PromptCategory?.some(cat))
+                    }
                 }
             }
             .labelsHidden()
