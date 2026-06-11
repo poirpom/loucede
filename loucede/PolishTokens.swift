@@ -44,20 +44,21 @@ enum PolishTokens {
     static let resultBodyFontSize: CGFloat = 13
     static let resultBodyFontSizeExpanded: CGFloat = 15
 
-    // MARK: Pills flottantes (fenêtre de réponse — composant ResultActionPill)
+    // MARK: Pastille F flottante (fenêtre de réponse — composant ResultActionPill)
 
-    /// Pills flottantes en overlay bas-droite du scroll de la fenêtre de
-    /// réponse (Q.2.c → généralisées Q.2.h.2) : F agrandir/réduire (toujours
-    /// visible) + ⌘S/⌘E (actions générées non sauvegardées). Capsule
-    /// `.ultraThinMaterial` (pattern `ConfirmationToast`), SF Symbol +
-    /// `KeyboardKey` pour cohérence footer.
+    /// Pastille F flottante centrée au bas du scroll de la fenêtre de réponse
+    /// (Q.2.c, position restaurée par le pivot Option C de Q.2.h.2 v2).
+    /// Capsule `.ultraThinMaterial` (pattern `ConfirmationToast`), SF Symbol
+    /// contextualisé (agrandir/réduire) + `KeyboardKey` pour cohérence footer.
+    /// Le composant `ResultActionPill` reste généralisé (symbol/key/shortcut)
+    /// pour d'éventuels usages futurs.
     static let resultActionPillHeight: CGFloat = 28
     static let resultActionPillIconSize: CGFloat = 13
     static let resultActionPillIconWeight: Font.Weight = .medium
     /// = épaisseur de trait du picto (poids medium) pour un accord visuel.
     static let resultActionPillBorderWidth: CGFloat = 1.5
-    /// Marge entre le cluster de pills et les bords bas + droit du scroll.
-    static let resultActionPillEdgeMargin: CGFloat = 10
+    /// Marge entre la pastille et le bord bas du scroll.
+    static let resultActionPillBottomMargin: CGFloat = 10
     static let resultActionPillFadeDuration: Double = 0.18
     /// Padding horizontal interne de la capsule. Donne de l'air entre la
     /// bordure de la capsule et son contenu (le `KeyboardKey` ayant déjà sa
@@ -65,8 +66,6 @@ enum PolishTokens {
     static let resultActionPillHorizontalPadding: CGFloat = 12
     /// Espace picto ↔ touche dans la capsule.
     static let resultActionPillSpacing: CGFloat = 8
-    /// Espace entre les pills du cluster [⌘S][⌘E][F] (Q.2.h.2).
-    static let resultActionPillClusterSpacing: CGFloat = 8
 
     // MARK: Timing animation resize (popover)
 

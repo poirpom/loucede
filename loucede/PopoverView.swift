@@ -1462,45 +1462,22 @@ struct PopoverView: View {
                 // (`resultShrinkGrace`), qui maintient le contenu plein pendant la
                 // descente de la fenêtre au rétrécissement (cf. `toggleResultExpanded`).
                 .frame(maxHeight: (resultExpanded || resultShrinkGrace) ? 2000 : 300)
-                // Pills flottantes au bas du scroll. Overlay pur → ne touche
+                // Pastille F flottante centrée au bas du scroll (position
+                // Q.2.c d'origine, restaurée par le pivot Option C — les
+                // actions ⌘S/⌘E vivent désormais dans la ResultActionsBar
+                // sous le header, pas en pills). Overlay pur → ne touche
                 // aucune frame, le clamp Q.2.a (maxHeight ci-dessus) reste
-                // intact. Q.2.h.2 : ancrage à DROITE (permanent, toutes les
-                // fenêtres de réponse) — F ferme la rangée, le cluster ⌘S/⌘E
-                // (h.2) pousse vers la gauche sans déplacer F.
-                .overlay(alignment: .bottomTrailing) {
-                    HStack(spacing: PolishTokens.resultActionPillClusterSpacing) {
-                        // Q.2.h.2 : ⌘S/⌘E visibles UNIQUEMENT en contexte
-                        // « action générée non sauvegardée ». Pills absentes
-                        // = raccourcis inexistants (pas de garde à part) —
-                        // les actions du catalogue n'affichent que F.
-                        // Disparition sèche au save (fades → Q.2.i).
-                        if state.pendingGeneratedAction != nil {
-                            ResultActionPill(symbol: "square.and.arrow.down",
-                                             key: "⌘S",
-                                             shortcut: KeyboardShortcut("s", modifiers: .command)) {
-                                state.saveGeneratedAction()
-                                showConfirmation("Action sauvegardée")
-                            }
-                            ResultActionPill(symbol: "pencil",
-                                             key: "⌘E",
-                                             shortcut: KeyboardShortcut("e", modifiers: .command)) {
-                                // TODO Q.2.h.3 : ré-entrée .resultEditable
-                                // pré-remplie depuis pendingGeneratedAction
-                                // (stub h.2 — aucun effet).
-                            }
-                        }
-                        // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
-                        // pendant le glide → picto stable, crossfade après settle.
-                        // F ferme la rangée : position stable avec ou sans ⌘S/⌘E.
-                        ResultActionPill(symbol: pillExpanded
-                                         ? "arrow.down.right.and.arrow.up.left"
-                                         : "arrow.up.left.and.arrow.down.right",
-                                         key: "F") {
-                            toggleResultExpanded()
-                        }
+                // intact.
+                .overlay(alignment: .bottom) {
+                    // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
+                    // pendant le glide → picto stable, crossfade après settle.
+                    ResultActionPill(symbol: pillExpanded
+                                     ? "arrow.down.right.and.arrow.up.left"
+                                     : "arrow.up.left.and.arrow.down.right",
+                                     key: "F") {
+                        toggleResultExpanded()
                     }
-                    .padding(.bottom, PolishTokens.resultActionPillEdgeMargin)
-                    .padding(.trailing, PolishTokens.resultActionPillEdgeMargin)
+                    .padding(.bottom, PolishTokens.resultActionPillBottomMargin)
                 }
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
