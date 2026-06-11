@@ -1426,7 +1426,13 @@ struct PopoverView: View {
     private var generatorEditableBottomBar: some View {
         HStack(spacing: 8) {
             Button {
-                state.exitGeneratorMode()
+                // C1.5 : routé vers le handler Esc contextuel (et non plus
+                // exitGeneratorMode en direct) — le bouton affiche « esc »,
+                // il doit faire exactement ce que fait la touche. En
+                // .resultEditable post-⌘E : retour à la fenêtre de réponse
+                // (pending préservé, resize) ; chemins standard : identique
+                // à l'ancien exitGeneratorMode.
+                state.handleEscapeInGeneratorMode()
             } label: {
                 HStack(spacing: 6) {
                     KeyboardKey("esc")

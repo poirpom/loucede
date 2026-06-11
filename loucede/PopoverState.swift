@@ -144,7 +144,16 @@ final class PopoverState: ObservableObject {
     /// `NSInternalInconsistencyException`: « The window has been marked as
     /// needing another Update Constraints in […] ». Voir le commit pour
     /// l'analyse détaillée.
-    private var flushPaused: Bool = false
+    ///
+    /// Q.2.h.3 C1.5 : COMPTEUR (et non plus Bool). Deux transitions
+    /// rapprochées (ex. ⌘E puis Esc < 0.3s pendant un stream) imbriquent
+    /// leurs paires suspend/resume : avec un Bool, le `resumeFlush` différé
+    /// de la PREMIÈRE réactivait les flushs pendant l'animation de la
+    /// SECONDE (mutation resultText pendant anim NSWindow → gel/crash
+    /// 6.14). Avec le compteur, les flushs ne reprennent qu'au dernier
+    /// resume (count == 0) — corrige toute la classe de courses (y compris
+    /// le mashing F pendant un stream).
+    private var flushSuspendCount: Int = 0
 
     private init() {}
 
@@ -385,9 +394,12 @@ final class PopoverState: ObservableObject {
         switch phase {
         case .loading:
             generatorPhase = .compact
-        case .resultEditable where activeAction != nil:
-            // Q.2.h.3 — Esc post-⌘E. Resize explicite : aucun .onChange ne
-            // couvre ce chemin (activeAction inchangé ; la garde K.2-B du
+        case .resultEditable where pendingGeneratedAction != nil:
+            // Q.2.h.3 — Esc post-⌘E. Marker `pendingGeneratedAction` : c'est
+            // LE marqueur du contexte « édition post-run-first » par
+            // construction (C1.5 — `activeAction != nil` n'était qu'un
+            // proxy). Resize explicite : aucun .onChange ne couvre ce chemin
+            // (activeAction inchangé ; la garde K.2-B du
             // .onChange(generatorPhase → nil) skip quand activeAction != nil).
             // `.resultCompact` redonne 426 (pending non-nil → barre comptée).
             generatorPhase = nil
@@ -588,11 +600,12 @@ final class PopoverState: ObservableObject {
     /// Ajoute le tampon de chunks accumulés à `resultText` en une seule
     /// passe. Appelé périodiquement par `flushTask` à ~60 Hz, ainsi qu'à
     /// la fin du stream (succès ou erreur) pour ne perdre aucun token.
-    /// Phase 6.14-fix : si `flushPaused == true`, on laisse les chunks
-    /// dans le buffer (le LLM continue de streamer côté `streamTask`,
-    /// rien n'est perdu — juste retardé jusqu'au `resumeFlush()`).
+    /// Phase 6.14-fix : si une suspension est active (`flushSuspendCount
+    /// > 0`), on laisse les chunks dans le buffer (le LLM continue de
+    /// streamer côté `streamTask`, rien n'est perdu — juste retardé
+    /// jusqu'au dernier `resumeFlush()`).
     private func flushPendingChunks() {
-        guard !flushPaused, !pendingChunkBuffer.isEmpty else { return }
+        guard flushSuspendCount == 0, !pendingChunkBuffer.isEmpty else { return }
         resultText += pendingChunkBuffer
         pendingChunkBuffer = ""
     }
@@ -601,16 +614,18 @@ final class PopoverState: ObservableObject {
     /// `resultText`. À appeler avant une transition de fenêtre AppKit
     /// (resize compact↔agrandi, retour liste). Le buffer continue à
     /// recevoir les tokens du LLM, ils seront appliqués au `resumeFlush()`.
+    /// C1.5 : compteur — chaque suspend doit être appairé à un resume ;
+    /// les flushs ne reprennent qu'à l'équilibre (cf. doc du compteur).
     func suspendFlush() {
-        flushPaused = true
+        flushSuspendCount += 1
     }
 
-    /// Phase 6.14-fix : reprend l'application des chunks et flush
-    /// immédiatement le buffer accumulé pendant la pause (rattrapage en
-    /// une seule passe — l'utilisateur voit les ~5-10 tokens manqués
-    /// apparaître d'un bloc, ce qui est imperceptible visuellement).
+    /// Phase 6.14-fix : décrémente la suspension ; au DERNIER resume
+    /// (count 0), flush immédiat du buffer accumulé pendant la pause
+    /// (rattrapage en une seule passe — l'utilisateur voit les ~5-10
+    /// tokens manqués apparaître d'un bloc, imperceptible visuellement).
     func resumeFlush() {
-        flushPaused = false
+        flushSuspendCount = max(0, flushSuspendCount - 1)
         flushPendingChunks()
     }
 
