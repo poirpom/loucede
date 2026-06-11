@@ -328,6 +328,21 @@ final class PopoverState: ObservableObject {
         }
     }
 
+    /// Q.2.h.2 — ⌘S : ajoute l'action générée au catalogue. Catégorie déjà
+    /// `nil` (« Sans catégorie », posée en h.1) ; `displayOrder` recalculé en
+    /// queue de catalogue (le 0 provisoire de h.1 est remplacé ici). Efface
+    /// ensuite le flag → les pills ⌘S/⌘E disparaissent (condition de rendu),
+    /// la fenêtre de réponse reste ouverte (F seule). Le toast « Action
+    /// sauvegardée » est affiché par le call site (PopoverView). Garde
+    /// anti-double-save : flag nil au 1er appel → no-op ensuite.
+    func saveGeneratedAction() {
+        guard var action = pendingGeneratedAction else { return }
+        let store = ActionsStore.shared
+        action.displayOrder = (store.actions.map(\.displayOrder).max() ?? 0) + 1
+        store.addAction(action)
+        pendingGeneratedAction = nil
+    }
+
     /// Esc en mode Générateur — comportement dépendant de la phase :
     /// - `.loading` → annule + retour à `.compact` (préserve l'input pour
     ///   retry rapide).

@@ -65,6 +65,8 @@ enum PolishTokens {
     static let resultActionPillHorizontalPadding: CGFloat = 12
     /// Espace picto ↔ touche dans la capsule.
     static let resultActionPillSpacing: CGFloat = 8
+    /// Espace entre les pills du cluster [⌘S][⌘E][F] (Q.2.h.2).
+    static let resultActionPillClusterSpacing: CGFloat = 8
 
     // MARK: Timing animation resize (popover)
 
