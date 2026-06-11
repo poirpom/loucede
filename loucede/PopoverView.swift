@@ -1462,17 +1462,22 @@ struct PopoverView: View {
                 // (`resultShrinkGrace`), qui maintient le contenu plein pendant la
                 // descente de la fenêtre au rétrécissement (cf. `toggleResultExpanded`).
                 .frame(maxHeight: (resultExpanded || resultShrinkGrace) ? 2000 : 300)
-                // Pastille F universelle : bouton flottant bi-mode (toujours
-                // visible) au bas du scroll. Overlay pur → ne touche aucune
-                // frame, le clamp Q.2.a (maxHeight ci-dessus) reste intact.
-                // Picto + action contextualisés par `resultExpanded`.
-                .overlay(alignment: .bottom) {
+                // Pills flottantes au bas du scroll. Overlay pur → ne touche
+                // aucune frame, le clamp Q.2.a (maxHeight ci-dessus) reste
+                // intact. Q.2.h.2 : ancrage à DROITE (permanent, toutes les
+                // fenêtres de réponse) — F ferme la rangée, le cluster ⌘S/⌘E
+                // (h.2) pousse vers la gauche sans déplacer F.
+                .overlay(alignment: .bottomTrailing) {
                     // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
                     // pendant le glide → picto stable, crossfade après settle.
-                    ResultExpandPill(expanded: pillExpanded) {
+                    ResultActionPill(symbol: pillExpanded
+                                     ? "arrow.down.right.and.arrow.up.left"
+                                     : "arrow.up.left.and.arrow.down.right",
+                                     key: "F") {
                         toggleResultExpanded()
                     }
-                    .padding(.bottom, PolishTokens.resultExpandPillBottomMargin)
+                    .padding(.bottom, PolishTokens.resultActionPillEdgeMargin)
+                    .padding(.trailing, PolishTokens.resultActionPillEdgeMargin)
                 }
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
@@ -1629,45 +1634,50 @@ struct KeyboardKey: View {
     }
 }
 
-// MARK: - Result Expand Pill (bouton F universel flottant)
+// MARK: - Result Action Pill (pills flottantes de la fenêtre de réponse)
 
-/// Bouton flottant posé en overlay au bas du scroll de la fenêtre de réponse,
-/// visible dans les DEUX modes (normal + agrandi). Picto contextualisé :
-/// « agrandir » en normal, « réduire » en agrandi. Clic = même action que le
-/// raccourci F (`toggleResultExpanded`). `KeyboardKey("F")` rappelle le
-/// raccourci, cohérent avec le footer. Fond `.ultraThinMaterial` (pattern
-/// `ConfirmationToast`) — seul effet translucide restant après le retrait de
-/// la vibrancy du panneau en Q.4.
-struct ResultExpandPill: View {
-    let expanded: Bool
+/// Q.2.h.2 — généralisation de l'ex-`ResultExpandPill` (Q.2.c). Pill
+/// flottante posée en overlay au bas du scroll de la fenêtre de réponse :
+/// SF Symbol + `KeyboardKey` (rappel raccourci, cohérent footer) dans une
+/// capsule `.ultraThinMaterial` (pattern `ConfirmationToast` — seul effet
+/// translucide restant après le retrait de la vibrancy du panneau en Q.4).
+///
+/// Cas d'usage : F (agrandir/réduire — `symbol` contextualisé par
+/// `pillExpanded`, crossfade au changement), ⌘S Sauvegarder et ⌘E Éditer
+/// (actions générées non sauvegardées, h.2/h.3 — `symbol` fixe, crossfade
+/// inerte). `shortcut` câble un raccourci SwiftUI sur le Button (S/E) ;
+/// F reste sur le `.onKeyPress` historique de la vue résultat → `nil`.
+struct ResultActionPill: View {
+    let symbol: String
+    let key: String
+    var shortcut: KeyboardShortcut? = nil
     let action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: PolishTokens.resultExpandPillSpacing) {
-                Image(systemName: expanded
-                      ? "arrow.down.right.and.arrow.up.left"
-                      : "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: PolishTokens.resultExpandPillIconSize,
-                                  weight: PolishTokens.resultExpandPillIconWeight))
+            HStack(spacing: PolishTokens.resultActionPillSpacing) {
+                Image(systemName: symbol)
+                    .font(.system(size: PolishTokens.resultActionPillIconSize,
+                                  weight: PolishTokens.resultActionPillIconWeight))
                     .foregroundColor(.secondary)
-                    // Crossfade du symbole au basculement (le KeyboardKey reste stable).
+                    // Crossfade du symbole au changement (le KeyboardKey reste stable).
                     .contentTransition(.opacity)
-                KeyboardKey("F")
+                KeyboardKey(key)
             }
-            .padding(.horizontal, PolishTokens.resultExpandPillHorizontalPadding)
-            .frame(height: PolishTokens.resultExpandPillHeight)
+            .padding(.horizontal, PolishTokens.resultActionPillHorizontalPadding)
+            .frame(height: PolishTokens.resultActionPillHeight)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(
                 Capsule().strokeBorder(PolishTokens.innerBorderColor(colorScheme),
-                                       lineWidth: PolishTokens.resultExpandPillBorderWidth)
+                                       lineWidth: PolishTokens.resultActionPillBorderWidth)
             )
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: PolishTokens.resultExpandPillFadeDuration),
-                   value: expanded)
+        .keyboardShortcut(shortcut)
+        .animation(.easeInOut(duration: PolishTokens.resultActionPillFadeDuration),
+                   value: symbol)
     }
 }
 

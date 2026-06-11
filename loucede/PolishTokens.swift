@@ -44,25 +44,27 @@ enum PolishTokens {
     static let resultBodyFontSize: CGFloat = 13
     static let resultBodyFontSizeExpanded: CGFloat = 15
 
-    // MARK: Pastille F flottante (fenêtre de réponse, bi-mode)
+    // MARK: Pills flottantes (fenêtre de réponse — composant ResultActionPill)
 
-    /// Bouton F universel flottant en overlay bas du scroll de la fenêtre de
-    /// réponse — toujours visible (les 2 modes). Capsule `.ultraThinMaterial`
-    /// (pattern `ConfirmationToast`), picto contextualisé par le mode
-    /// (agrandir / réduire) + `KeyboardKey("F")` pour cohérence footer.
-    static let resultExpandPillHeight: CGFloat = 28
-    static let resultExpandPillIconSize: CGFloat = 13
-    static let resultExpandPillIconWeight: Font.Weight = .medium
+    /// Pills flottantes en overlay bas-droite du scroll de la fenêtre de
+    /// réponse (Q.2.c → généralisées Q.2.h.2) : F agrandir/réduire (toujours
+    /// visible) + ⌘S/⌘E (actions générées non sauvegardées). Capsule
+    /// `.ultraThinMaterial` (pattern `ConfirmationToast`), SF Symbol +
+    /// `KeyboardKey` pour cohérence footer.
+    static let resultActionPillHeight: CGFloat = 28
+    static let resultActionPillIconSize: CGFloat = 13
+    static let resultActionPillIconWeight: Font.Weight = .medium
     /// = épaisseur de trait du picto (poids medium) pour un accord visuel.
-    static let resultExpandPillBorderWidth: CGFloat = 1.5
-    static let resultExpandPillBottomMargin: CGFloat = 10
-    static let resultExpandPillFadeDuration: Double = 0.18
+    static let resultActionPillBorderWidth: CGFloat = 1.5
+    /// Marge entre le cluster de pills et les bords bas + droit du scroll.
+    static let resultActionPillEdgeMargin: CGFloat = 10
+    static let resultActionPillFadeDuration: Double = 0.18
     /// Padding horizontal interne de la capsule. Donne de l'air entre la
-    /// bordure de la capsule et son contenu (le `KeyboardKey("F")` ayant déjà
-    /// sa propre boîte, un padding trop serré créait un effet « double bordure »).
-    static let resultExpandPillHorizontalPadding: CGFloat = 12
-    /// Espace picto ↔ F dans la capsule.
-    static let resultExpandPillSpacing: CGFloat = 8
+    /// bordure de la capsule et son contenu (le `KeyboardKey` ayant déjà sa
+    /// propre boîte, un padding trop serré créait un effet « double bordure »).
+    static let resultActionPillHorizontalPadding: CGFloat = 12
+    /// Espace picto ↔ touche dans la capsule.
+    static let resultActionPillSpacing: CGFloat = 8
 
     // MARK: Timing animation resize (popover)
 
