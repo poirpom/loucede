@@ -649,7 +649,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             height = Self.calculatedPopoverHeight(searchQuery: searchQuery)
         case .resultCompact:
             width = Self.popoverDefaultWidth
+            // Q.2.h.2 v2 : +32pt quand la barre d'actions sur l'action
+            // (ResultActionsBar) est visible — automatique sur tous les
+            // chemins (entrée run-first, retour F agrandi→compact). Le
+            // mode agrandi n'est pas concerné (hauteur écran×0.7, la
+            // barre prend sa place sur le scroll flexible).
             height = Self.popoverResultCompactHeight
+                + (PopoverState.shared.showsResultActionsBar
+                   ? PolishTokens.resultActionsBarHeight : 0)
         case .resultExpanded:
             width = Self.expandedResultWidth(for: screen)
             height = screenRect.height * 0.7

@@ -67,6 +67,23 @@ enum PolishTokens {
     /// Espace picto ↔ touche dans la capsule.
     static let resultActionPillSpacing: CGFloat = 8
 
+    // MARK: Barre d'actions sur l'action (fenêtre de réponse — ResultActionsBar)
+
+    /// Q.2.h.2 v2 (Option C) — zone « actions sur l'action affichée » posée
+    /// sous le header de la fenêtre de réponse, en continuité visuelle (même
+    /// fond accent, pas de séparateur). Contenu : ⌘S Sauvegarder · ⌘E Éditer
+    /// (pattern footer : KeyboardKey + label, boutons .plain). Visible via
+    /// `PopoverState.showsResultActionsBar` (V1.x-ready).
+    /// Hauteur TOTALE de la barre (contenu ~22 + padding bas 10). Sert aussi
+    /// au calcul de la hauteur fenêtre (`resizePopover` .resultCompact).
+    static let resultActionsBarHeight: CGFloat = 32
+    static let resultActionsBarBottomPadding: CGFloat = 10
+    /// Espace entre les items ⌘S / ⌘E.
+    static let resultActionsBarItemSpacing: CGFloat = 16
+    /// Durée des animations d'apparition (fade + slide-down post-settle) et
+    /// de disparition (fade + collapse sync resize, pattern K.2-B lot 2b).
+    static let resultActionsBarFadeDuration: Double = 0.25
+
     // MARK: Timing animation resize (popover)
 
     /// Durée de l'animation NSWindow `resizePopover` par défaut (transitions

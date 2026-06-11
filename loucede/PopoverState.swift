@@ -97,10 +97,17 @@ final class PopoverState: ObservableObject {
     /// Q.2.h.1 — action générée par l'IA, exécutée directement (« run
     /// first ») mais PAS (encore) ajoutée au catalogue. Non-nil ⟺ la
     /// fenêtre de réponse affiche le résultat d'une action générée non
-    /// sauvegardée (pills ⌘S/⌘E en h.2/h.3). Remise à nil à la sauvegarde,
+    /// sauvegardée (barre ⌘S/⌘E en h.2/h.3). Remise à nil à la sauvegarde,
     /// à la fermeture du popup et au reset — « tu veux la garder, tu
     /// sauvegardes » : aucune persistance implicite.
     @Published var pendingGeneratedAction: Action? = nil
+
+    /// Q.2.h.2 v2 — visibilité de la barre d'actions sur l'action affichée
+    /// (`ResultActionsBar`, sous le header de la fenêtre de réponse).
+    /// Aujourd'hui : action générée non sauvegardée uniquement. V1.x-ready :
+    /// extensible à d'autres contextes (édition d'actions du catalogue)
+    /// sans toucher la vue ni le calcul de hauteur fenêtre.
+    var showsResultActionsBar: Bool { pendingGeneratedAction != nil }
 
     /// Token UUID renouvelé à chaque déclenchement de génération. Sert à
     /// l'annulation LOGIQUE d'une génération en cours (Esc pendant

@@ -81,6 +81,15 @@ struct PopoverView: View {
     // l'anim NSWindow → le picto reste plein et stable pendant le glissement,
     // puis crossfade in-place une fois la fenêtre statique (anti-« promenade »).
     @State private var pillExpanded: Bool = false
+    // Q.2.h.2 v2 — révélation différée du CONTENU de la ResultActionsBar
+    // (fade + slide-down). La barre occupe sa hauteur dès le montage (la
+    // fenêtre arrive à 426 d'un coup) ; ce flag passe à true ~0.3s après
+    // (post-settle du resize d'entrée) via `scheduleActionsBarReveal()`.
+    @State private var actionsBarVisible: Bool = false
+    // Q.2.h.2 v2 — style du toast de confirmation courant : .standard pour
+    // Copié/Collé (géant ×3), .compact pour « Action sauvegardée » (qui
+    // déborderait la fenêtre 400pt à 39pt de typo).
+    @State private var confirmationStyle: ConfirmationToast.Style = .standard
 
     init(
         onClose: @escaping () -> Void = {},
@@ -174,6 +183,8 @@ struct PopoverView: View {
             resultShrinkGrace = false
             // Pastille : set instantané miroir (pas de swap différé hors toggle F).
             pillExpanded = false
+            // Barre d'actions : contenu masqué, re-révélé au prochain montage.
+            actionsBarVisible = false
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -219,6 +230,8 @@ struct PopoverView: View {
                 resultShrinkGrace = false
                 // Pastille : set instantané miroir (sortie du mode résultat).
                 pillExpanded = false
+                // Barre d'actions : contenu masqué (sortie du mode résultat).
+                actionsBarVisible = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
@@ -475,7 +488,10 @@ struct PopoverView: View {
         }
     }
 
-    private func showConfirmation(_ message: String, duration: Double = 1.2, then completion: (() -> Void)? = nil) {
+    private func showConfirmation(_ message: String, duration: Double = 1.2,
+                                  style: ConfirmationToast.Style = .standard,
+                                  then completion: (() -> Void)? = nil) {
+        confirmationStyle = style
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             confirmation = message
         }
@@ -487,6 +503,45 @@ struct PopoverView: View {
             }
             completion?()
         }
+    }
+
+    // MARK: - Q.2.h.2 v2 — Barre d'actions sur l'action (ResultActionsBar)
+
+    /// Révèle le contenu de la barre (fade + slide-down 0.25s) APRÈS le
+    /// settle du resize d'entrée (+0.3s, aligné sur le `resumeFlush` du
+    /// chemin run-first) — aucune animation SwiftUI pendant l'animation
+    /// NSWindow (leçon 6.14/Q.2.g). La hauteur, elle, est réservée dès le
+    /// montage (fenêtre déjà à 426) : seule l'opacité/offset bouge ici.
+    private func scheduleActionsBarReveal() {
+        guard !actionsBarVisible else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard state.showsResultActionsBar else { return }   // ⌘S/fermeture entre-temps
+            withAnimation(.easeOut(duration: PolishTokens.resultActionsBarFadeDuration)) {
+                actionsBarVisible = true
+            }
+        }
+    }
+
+    /// ⌘S — sauvegarde l'action générée puis fait disparaître la barre :
+    /// fade + collapse SwiftUI (la barre quitte le flux via la condition
+    /// `showsResultActionsBar`) SYNCHRONISÉ avec le resize NSWindow 426→394
+    /// (pattern K.2-B lot 2b : withAnimation + NSAnimationContext même
+    /// durée, suspendFlush autour — ⌘S possible pendant le streaming).
+    /// En mode agrandi : collapse seul, pas de resize fenêtre (hauteur
+    /// écran×0.7 indépendante de la barre).
+    private func saveGeneratedActionFromBar() {
+        guard state.showsResultActionsBar else { return }   // anti double-⌘S
+        state.suspendFlush()
+        withAnimation(.easeInOut(duration: PolishTokens.resultActionsBarFadeDuration)) {
+            state.saveGeneratedAction()
+        }
+        if !resultExpanded {
+            globalAppDelegate?.resizePopover(to: .resultCompact)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
+            state.resumeFlush()
+        }
+        showConfirmation("Action sauvegardée", style: .compact)
     }
 
     // MARK: - Main
@@ -1401,6 +1456,27 @@ struct PopoverView: View {
             // Divider retiré — différenciation par ton.
             .polishAccentBackground()
 
+            // Q.2.h.2 v2 (Option C) — barre « actions sur l'action » sous le
+            // header, continuité visuelle (même fond accent, pas de
+            // séparateur). La barre occupe sa hauteur dès l'entrée (la
+            // fenêtre arrive directement à 426 via le resize run-first →
+            // AUCUN resize à l'apparition) ; seul le contenu est révélé en
+            // fade + slide-down après le settle du resize (anti-concurrence
+            // d'animations, leçon 6.14/Q.2.g). La disparition (⌘S) est
+            // animée par `saveGeneratedActionFromBar` (fade + collapse sync
+            // resize, pattern K.2-B lot 2b).
+            if state.showsResultActionsBar {
+                ResultActionsBar(onSave: { saveGeneratedActionFromBar() },
+                                 onEdit: {
+                    // TODO Q.2.h.3 : ré-entrée .resultEditable pré-remplie
+                    // depuis pendingGeneratedAction (stub h.2 — aucun effet).
+                })
+                .opacity(actionsBarVisible ? 1 : 0)
+                .offset(y: actionsBarVisible ? 0 : -4)
+                .transition(.opacity)
+                .onAppear { scheduleActionsBarReveal() }
+            }
+
             // Phase 1.4i : zone basse du résultat (texte + footer boutons).
             VStack(spacing: 0) {
                 ScrollView {
@@ -1597,7 +1673,7 @@ struct PopoverView: View {
         // au centre de la vue résultat et se dissipe automatiquement.
         .overlay(alignment: .center) {
             if let msg = confirmation {
-                ConfirmationToast(message: msg)
+                ConfirmationToast(message: msg, style: confirmationStyle)
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
                     .allowsHitTesting(false)
             }
@@ -1681,24 +1757,91 @@ struct ResultActionPill: View {
     }
 }
 
-// MARK: - Confirmation Toast (✓ Copié / ✓ Collé)
+// MARK: - Result Actions Bar (Q.2.h.2 v2 — actions sur l'action affichée)
+
+/// Barre « actions sur l'action » posée sous le header de la fenêtre de
+/// réponse, en continuité visuelle avec lui (même fond accent, pas de
+/// séparateur — juste le padding). Option C : 3 zones par niveau d'objet
+/// sémantique (l'action ici / la réponse au footer / la fenêtre en
+/// pastille F). Items au pattern footer : KeyboardKey + label, boutons
+/// `.plain`, alignés à gauche (continuité avec le titre, lui aussi à
+/// gauche). Raccourcis ⌘S/⌘E portés par les Buttons → ils n'existent que
+/// quand la barre est rendue (`PopoverState.showsResultActionsBar`).
+///
+/// V1.x-ready : labels paramétrés (un futur contexte « édition d'action
+/// du catalogue » passera p. ex. saveLabel: "Sauvegarder modifications").
+struct ResultActionsBar: View {
+    var saveLabel: String = "Sauvegarder"
+    var editLabel: String = "Éditer"
+    let onSave: () -> Void
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(spacing: PolishTokens.resultActionsBarItemSpacing) {
+            Button(action: onSave) {
+                HStack(spacing: 6) {
+                    KeyboardKey("⌘S")
+                    Text(saveLabel)
+                }
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("s", modifiers: .command)
+
+            Button(action: onEdit) {
+                HStack(spacing: 6) {
+                    KeyboardKey("⌘E")
+                    Text(editLabel)
+                }
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("e", modifiers: .command)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)                                   // = header
+        .padding(.bottom, PolishTokens.resultActionsBarBottomPadding)
+        // Hauteur TOTALE déterministe = token (sert au calcul de la hauteur
+        // fenêtre dans `resizePopover` .resultCompact). Contenu calé en haut,
+        // le padding bas fait l'espacement avec la zone de scroll.
+        .frame(height: PolishTokens.resultActionsBarHeight, alignment: .top)
+        // Continuité visuelle : même fond accent que le header au-dessus.
+        .polishAccentBackground()
+    }
+}
+
+// MARK: - Confirmation Toast (✓ Copié / ✓ Collé / ✓ Action sauvegardée)
 
 struct ConfirmationToast: View {
     let message: String
+    /// Q.2.h.2 v2 — variante dimensionnelle. `.standard` = dimensions ×3
+    /// historiques (Phase 1.4a), inchangées pour Copié/Collé. `.compact` =
+    /// échelle réduite pour les libellés longs (« Action sauvegardée »
+    /// déborderait la fenêtre 400pt à 39pt de typo) : tient sur UNE ligne.
+    enum Style {
+        case standard
+        case compact
+
+        var iconSize: CGFloat   { self == .standard ? 42 : 28 }
+        var textSize: CGFloat   { self == .standard ? 39 : 22 }
+        var spacing: CGFloat    { self == .standard ? 24 : 16 }
+        var paddingH: CGFloat   { self == .standard ? 42 : 28 }
+        var paddingV: CGFloat   { self == .standard ? 30 : 20 }
+    }
+    var style: Style = .standard
 
     // Phase 1.4a : toutes les dimensions ×3 (+200 %).
     // Picto 14→42, texte 13→39, padding 14/10→42/30, spacing 8→24, shadow 8→24.
     // Si trop grand visuellement sur écran, diviser par 1.5 pour retomber à ×2.
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: style.spacing) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .font(.system(size: 42))
+                .font(.system(size: style.iconSize))
             Text(message)
-                .font(.system(size: 39, weight: .medium))
+                .font(.system(size: style.textSize, weight: .medium))
         }
-        .padding(.horizontal, 42)
-        .padding(.vertical, 30)
+        .padding(.horizontal, style.paddingH)
+        .padding(.vertical, style.paddingV)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .overlay(
