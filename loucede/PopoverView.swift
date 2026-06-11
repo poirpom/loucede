@@ -27,7 +27,8 @@ extension View {
 // depuis que la fenêtre AppKit est préchargée (cf. PopoverState.openCounter).
 private enum PopoverFocus: Hashable {
     case main
-    case result
+    // Q.2.j : `.result` retiré — la vue résultat ne porte plus de focus
+    // SwiftUI (le raccourci F est passé en `keyboardShortcut` window-level).
     case generator   // K.2-B lot 2a
 }
 
@@ -166,10 +167,11 @@ struct PopoverView: View {
         // Re-force le focus à chaque ouverture du popup (openCounter s'incrémente
         // dans PopoverState.reset()). Sans ça, la fenêtre préchargée garde un
         // focus stale. K.0 : en mode liste, le focus va au TextField de
-        // recherche (`isSearchFocused`) ; en mode résultat, au conteneur
-        // `.result`. Async pour fiabiliser sur NSWindow préchargée.
+        // recherche (`isSearchFocused`). Async pour fiabiliser sur NSWindow
+        // préchargée. Q.2.j : en mode résultat, plus de cible focus (F est un
+        // keyboardShortcut window-level) → nil efface un focus stale.
         .onChange(of: state.openCounter) { _, _ in
-            focus = state.activeAction == nil ? .main : .result
+            focus = state.activeAction == nil ? .main : nil
             if state.activeAction == nil {
                 DispatchQueue.main.async { isSearchFocused = true }
             }
@@ -188,7 +190,7 @@ struct PopoverView: View {
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
-            focus = state.activeAction == nil ? .main : .result
+            focus = state.activeAction == nil ? .main : nil
             if state.activeAction == nil {
                 DispatchQueue.main.async { isSearchFocused = true }
             }
@@ -196,7 +198,7 @@ struct PopoverView: View {
         }
         // Bascule aussi le focus quand on passe de liste → résultat ou retour.
         .onChange(of: state.activeAction) { _, newValue in
-            focus = newValue == nil ? .main : .result
+            focus = newValue == nil ? .main : nil
             if newValue == nil {
                 DispatchQueue.main.async { isSearchFocused = true }
             } else {
@@ -1572,10 +1574,16 @@ struct PopoverView: View {
                 .overlay(alignment: .bottom) {
                     // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
                     // pendant le glide → picto stable, crossfade après settle.
+                    // Q.2.j : raccourci F porté par le Button (niveau fenêtre,
+                    // sans focus — fix « F mort sans clic »). N'existe que
+                    // quand la pastille est rendue (= resultView uniquement :
+                    // « f » en liste/éditable va aux TextFields). Perte
+                    // Shift+F/Caps-F assumée (KeyEquivalent sensible).
                     ResultActionPill(symbol: pillExpanded
                                      ? "arrow.down.right.and.arrow.up.left"
                                      : "arrow.up.left.and.arrow.down.right",
-                                     key: "F") {
+                                     key: "F",
+                                     shortcut: KeyboardShortcut("f", modifiers: [])) {
                         toggleResultExpanded()
                     }
                     .padding(.bottom, PolishTokens.resultActionPillBottomMargin)
@@ -1679,21 +1687,16 @@ struct PopoverView: View {
             }
             // Q.1.d : fond opaque retiré — corps = zone neutre (vibrancy body).
         }
-        .focusable()
-        .focusEffectDisabled()
-        .focused($focus, equals: .result)
-        // Handler clavier vue résultat : F (bascule taille).
-        // Phase 6.15 (2026-04-26) : Esc retiré d'ici, désormais géré
-        // globalement par le NSEvent monitor (cf. installSlotMonitorIfNeeded).
-        // Centralisation = comportement uniforme et fiable sur tout le popup.
-        .onKeyPress(phases: .down) { press in
-            // F / f → bascule format. lowercased() pour accepter caps lock.
-            if press.characters.lowercased() == "f" {
-                toggleResultExpanded()
-                return .handled
-            }
-            return .ignored
-        }
+        // Q.2.j : le raccourci F est désormais porté par le Button de la
+        // pastille (`keyboardShortcut("f")`, niveau fenêtre — même mécanique
+        // que ↵ Copier / ⌘↵ Coller). L'ancien `.onKeyPress` exigeait que la
+        // vue tienne le focus SwiftUI, or le set `focus = .result` synchrone
+        // échouait sur la NSWindow préchargée (cold start) et lors de la
+        // bascule generatorView → resultView (run-first) : la vue n'était pas
+        // encore montée quand le binding s'appliquait → F mort sans clic
+        // préalable. Avec le shortcut window-level, plus aucune dépendance au
+        // focus — la machinerie `.focusable()/.focused(.result)` orpheline a
+        // été retirée. Esc reste géré par le NSEvent monitor (Phase 6.15).
         // Overlay du toast de confirmation (copie / collage). S'affiche brièvement
         // au centre de la vue résultat et se dissipe automatiquement.
         .overlay(alignment: .center) {
