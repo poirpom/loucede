@@ -373,11 +373,7 @@ final class PopoverState: ObservableObject {
         editableDescription = pending.shortDescription ?? ""
         editablePrompt = pending.prompt
         editableCategory = nil
-        generatorPhase = .resultEditable(GeneratedAction(
-            title: pending.name,
-            emoji: pending.icon,
-            description: pending.shortDescription ?? "",
-            prompt: pending.prompt))
+        generatorPhase = .resultEditable
     }
 
     /// Esc en mode Générateur — comportement dépendant de la phase :
@@ -411,6 +407,11 @@ final class PopoverState: ObservableObject {
                 self?.resumeFlush()
             }
         case .compact, .resultEditable, .error:
+            // `.resultEditable` ici = FILET DÉFENSIF d'exhaustivité : par
+            // invariant (cf. `validateAndRun`), cette phase implique
+            // `pending != nil` → le `where` ci-dessus capte toujours. Si un
+            // futur chemin produisait `.resultEditable` sans pending, on
+            // retombe sur la sortie franche (comportement raisonnable).
             exitGeneratorMode()
         }
     }
@@ -469,101 +470,37 @@ final class PopoverState: ObservableObject {
         !editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Convertit les 4 champs édités + la catégorie choisie en une
-    /// `Action` complète, l'ajoute au catalogue via
-    /// `ActionsStore.addAction()`, puis :
-    /// - Si du texte a été capturé à l'ouverture du popup
-    ///   (`CapturedTextManager.shared.hasSelection`) → lance l'action
-    ///   immédiatement via `runAction(_:)`. Le popup bascule en mode
-    ///   résultat compact via `.onChange(activeAction)` côté
-    ///   PopoverView.
-    /// - Sinon (aucun texte capturé) → l'action est ajoutée au
-    ///   catalogue mais pas lancée (pas de texte cible). Le popup se
-    ///   ferme proprement via `hidePopover()`. Garde défensive : le
-    ///   popup s'ouvre désormais uniquement sur sélection
-    ///   (`showPopover(requireSelection: true)`), mais le cas reste
-    ///   couvert sans risque.
+    /// ⌘↵ Valider de la fiche d'édition (`.resultEditable`, atteinte
+    /// uniquement via ⌘E depuis la fenêtre de réponse — Q.2.h.3).
     ///
-    /// La sélection capturée est figée à l'ouverture du popup
-    /// (cf. `AppDelegate.captureSelectedText()` appelée uniquement
-    /// dans `showPopover` / `showPopoverWithAction`), donc la lecture
-    /// de `hasSelection` ici est stable — pas besoin de snapshot.
+    /// INVARIANT (Q.2.h.4) : en `.resultEditable`, `pendingGeneratedAction`
+    /// est toujours non-nil — l'unique producteur de cette phase est
+    /// `enterEditFromResult()`, gardé par `pending != nil`. L'ancienne
+    /// branche « standard » (création d'une Action neuve + run/hide selon
+    /// la sélection), héritée du flow generate → éditable d'avant le
+    /// run-first h.1, est devenue inatteignable et a été retirée.
     ///
-    /// Ordre des opérations critique : `runAction` D'ABORD (set
-    /// `activeAction`), `generatorPhase = nil` APRÈS — le
-    /// `.onChange(of: generatorPhase)` côté PopoverView lit
-    /// `state.activeAction != nil` au moment du retour à nil pour
-    /// décider de NE PAS resize vers `.list` (le `.onChange(activeAction)`
-    /// resize vers `.resultCompact` à la place).
-    func validateAndRun() {
-        guard canValidate else { return }
-
-        // Q.2.h.3 — contexte ⌘E (édition d'une action générée déjà
-        // exécutée) : validation contextuelle (addAction toujours,
-        // re-exécution seulement si le prompt a été modifié). Le chemin
-        // standard mini-popover → .resultEditable a toujours pending == nil.
-        if let pending = pendingGeneratedAction {
-            validateFromResultEdit(pending: pending)
-            return
-        }
-
-        let store = ActionsStore.shared
-        // K.2-B lot 2b — `displayOrder` en queue de catalogue : max
-        // existant + 1. Évite la collision avec les actions au
-        // `displayOrder = 0` par défaut et place l'action générée à
-        // la fin (cohérent avec « action ajoutée »).
-        let nextDisplayOrder = (store.actions.map(\.displayOrder).max() ?? 0) + 1
-        let newAction = Action(
-            id: UUID(),
-            name: editableTitle.trimmingCharacters(in: .whitespacesAndNewlines),
-            icon: editableEmoji.trimmingCharacters(in: .whitespacesAndNewlines),
-            prompt: editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines),
-            actionType: .ai,
-            shortDescription: editableDescription.trimmingCharacters(in: .whitespacesAndNewlines),
-            originTemplateName: nil,
-            isFavorite: false,
-            isHidden: false,
-            displayOrder: nextDisplayOrder,
-            category: editableCategory
-        )
-        store.addAction(newAction)
-
-        let hasText = CapturedTextManager.shared.hasSelection
-        if hasText {
-            // Lance l'action immédiatement — la popup bascule en mode
-            // résultat via `.onChange(activeAction)`. Ordre :
-            // runAction d'abord (set activeAction), nettoyage et
-            // generatorPhase = nil ensuite.
-            runAction(newAction)
-            generatorInputText = ""
-            clearEditableFields()
-            generatorPhase = nil
-        } else {
-            // Pas de texte cible : action ajoutée au catalogue, popup
-            // fermé sans lancement (pas d'erreur, pas de plantage).
-            exitGeneratorMode()
-            globalAppDelegate?.hidePopover()
-        }
-    }
-
-    /// Q.2.h.3 — validation depuis la fiche d'édition post-⌘E. L'action est
-    /// TOUJOURS ajoutée au catalogue (id de `pending` conservé, edits
-    /// titre/emoji/description/catégorie inclus, displayOrder en queue) ;
-    /// re-exécutée SEULEMENT si le prompt a été modifié (comparaison
-    /// trimmée stricte) — sinon le `resultText` affiché reste valide et
-    /// n'est PAS touché (l'utilisateur retrouve sa réponse telle quelle,
-    /// header mis à jour via `activeAction = saved`).
+    /// Comportement : l'action est TOUJOURS ajoutée au catalogue (id de
+    /// `pending` conservé, edits titre/emoji/description/catégorie inclus,
+    /// displayOrder en queue) ; re-exécutée SEULEMENT si le prompt a été
+    /// modifié (comparaison trimmée stricte) — sinon le `resultText`
+    /// affiché reste valide et n'est PAS touché (l'utilisateur retrouve sa
+    /// réponse telle quelle, header mis à jour via `activeAction = saved`).
     ///
     /// `pendingGeneratedAction = nil` EN TÊTE : les handlers `.onChange`
     /// lisent l'état final du bloc (mutations batchées) → la garde h.1 de
     /// `.onChange(activeAction)` laisse passer le resize `.resultCompact`
-    /// (394, barre disparue) — pattern du `validateAndRun` historique,
-    /// aucun resize explicite nécessaire. Le `resultExpanded` a été resetté
-    /// par le call site du ⌘E (retour toujours compact).
+    /// (394, barre disparue) — aucun resize explicite nécessaire. Le
+    /// `resultExpanded` a été resetté par le call site du ⌘E (retour
+    /// toujours compact).
     ///
     /// Edge assumé : prompt modifié + trial épuisé → l'action est sauvée
     /// mais `runAction` présente le modal sans lancer (acceptable, signalé).
-    private func validateFromResultEdit(pending: Action) {
+    func validateAndRun() {
+        guard canValidate else { return }
+        // Invariant ci-dessus : pas de branche sans `pending`.
+        guard let pending = pendingGeneratedAction else { return }
+
         pendingGeneratedAction = nil
         let store = ActionsStore.shared
         let promptEdited = editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -787,17 +724,19 @@ final class PopoverState: ObservableObject {
 ///   « Générer » actif.
 /// - `.loading` : appel `ActionGenerator.generate` en cours. UI affiche
 ///   un spinner. TextField désactivé.
-/// - `.resultEditable(GeneratedAction)` (K.2-B lot 2b) : génération
-///   réussie. Les 4 champs (titre/emoji/description/prompt) sont
-///   éditables nativement via les `editable*` de `PopoverState` +
-///   sélecteur de catégorie + barre Annuler/Valider. Le payload
-///   `GeneratedAction` est la proposition initiale (peuplée dans les
-///   `editable*` au moment de la transition vers cette phase).
+/// - `.resultEditable` (K.2-B lot 2b, refondue Q.2.h.3/h.4) : fiche
+///   d'édition de l'action générée, atteinte uniquement via ⌘E depuis la
+///   fenêtre de réponse. Les 4 champs (titre/emoji/description/prompt)
+///   sont éditables nativement via les `editable*` de `PopoverState`
+///   (peuplés par `enterEditFromResult` AVANT la transition) + sélecteur
+///   de catégorie + barre Annuler/Valider. Q.2.h.4 : l'ancien payload
+///   `GeneratedAction` (proposition initiale du flow generate → éditable
+///   pré-run-first) n'était plus jamais lu — retiré.
 /// - `.error(message: String)` : génération échouée. Message affiché,
 ///   bouton Générer prêt à relancer. Popover reste compact.
 enum GeneratorPhase: Equatable {
     case compact
     case loading
-    case resultEditable(GeneratedAction)
+    case resultEditable
     case error(message: String)
 }
