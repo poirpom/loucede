@@ -544,6 +544,22 @@ struct PopoverView: View {
         showConfirmation("Action sauvegardée", style: .compact)
     }
 
+    /// Q.2.h.3 — ⌘E : resets « retour toujours compact » puis ré-entrée
+    /// dans la fiche d'édition (PopoverState.enterEditFromResult, qui fait
+    /// basculer le body et résize via le .onChange(generatorPhase) existant).
+    /// Depuis l'agrandi : `resultExpanded = false` ramène le frame SwiftUI
+    /// à 400 pendant que la fenêtre anime vers 400×680 — set instantané,
+    /// même pattern (6.14-fix-2) que le retour liste depuis l'agrandi. Le
+    /// retour post-validation/Esc repart donc toujours compact (F dispo
+    /// pour ré-agrandir).
+    private func enterEditFromResultBar() {
+        resultClampToken &+= 1        // invalide grace/swap différés en vol
+        resultExpanded = false
+        resultShrinkGrace = false
+        pillExpanded = false
+        state.enterEditFromResult()
+    }
+
     // MARK: - Main
 
     /// K.unify.3 — liste unifiée de la popup (FAVORIS + catégories +
@@ -1467,10 +1483,7 @@ struct PopoverView: View {
             // resize, pattern K.2-B lot 2b).
             if state.showsResultActionsBar {
                 ResultActionsBar(onSave: { saveGeneratedActionFromBar() },
-                                 onEdit: {
-                    // TODO Q.2.h.3 : ré-entrée .resultEditable pré-remplie
-                    // depuis pendingGeneratedAction (stub h.2 — aucun effet).
-                })
+                                 onEdit: { enterEditFromResultBar() })
                 .opacity(actionsBarVisible ? 1 : 0)
                 .offset(y: actionsBarVisible ? 0 : -4)
                 .transition(.opacity)

@@ -350,17 +350,54 @@ final class PopoverState: ObservableObject {
         pendingGeneratedAction = nil
     }
 
+    /// Q.2.h.3 — ⌘E : ré-entrée dans la fiche d'édition (`.resultEditable`)
+    /// depuis la fenêtre de réponse. Peuple les `editable*` depuis l'action
+    /// générée non sauvegardée et bascule `generatorPhase` → le body remonte
+    /// `generatorView`, le `.onChange(generatorPhase)` existant fait le
+    /// resize 426→680 (avec `suspendFlush` — couvre ⌘E pendant le streaming).
+    /// Les resets « retour toujours compact » (resultExpanded etc.) sont
+    /// faits par le call site PopoverView (état de vue).
+    func enterEditFromResult() {
+        guard let pending = pendingGeneratedAction else { return }
+        editableTitle = pending.name
+        editableEmoji = pending.icon
+        editableDescription = pending.shortDescription ?? ""
+        editablePrompt = pending.prompt
+        editableCategory = nil
+        generatorPhase = .resultEditable(GeneratedAction(
+            title: pending.name,
+            emoji: pending.icon,
+            description: pending.shortDescription ?? "",
+            prompt: pending.prompt))
+    }
+
     /// Esc en mode Générateur — comportement dépendant de la phase :
     /// - `.loading` → annule + retour à `.compact` (préserve l'input pour
     ///   retry rapide).
-    /// - `.compact` / `.resultEditable` / `.error` → quitte le mode
-    ///   Générateur entièrement, retour à `mainView`.
+    /// - `.resultEditable` post-⌘E (`activeAction != nil`, Q.2.h.3) →
+    ///   annule l'édition : retour à la fenêtre de réponse, `pending`
+    ///   PRÉSERVÉ (la barre d'actions revient, rien n'est perdu).
+    /// - `.compact` / `.resultEditable` standard / `.error` → quitte le
+    ///   mode Générateur entièrement, retour à `mainView`.
     func handleEscapeInGeneratorMode() {
         guard let phase = generatorPhase else { return }
         cancelOngoingGeneration()
         switch phase {
         case .loading:
             generatorPhase = .compact
+        case .resultEditable where activeAction != nil:
+            // Q.2.h.3 — Esc post-⌘E. Resize explicite : aucun .onChange ne
+            // couvre ce chemin (activeAction inchangé ; la garde K.2-B du
+            // .onChange(generatorPhase → nil) skip quand activeAction != nil).
+            // `.resultCompact` redonne 426 (pending non-nil → barre comptée).
+            generatorPhase = nil
+            generatorInputText = ""
+            clearEditableFields()
+            suspendFlush()
+            globalAppDelegate?.resizePopover(to: .resultCompact)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.resumeFlush()
+            }
         case .compact, .resultEditable, .error:
             exitGeneratorMode()
         }
@@ -449,6 +486,15 @@ final class PopoverState: ObservableObject {
     func validateAndRun() {
         guard canValidate else { return }
 
+        // Q.2.h.3 — contexte ⌘E (édition d'une action générée déjà
+        // exécutée) : validation contextuelle (addAction toujours,
+        // re-exécution seulement si le prompt a été modifié). Le chemin
+        // standard mini-popover → .resultEditable a toujours pending == nil.
+        if let pending = pendingGeneratedAction {
+            validateFromResultEdit(pending: pending)
+            return
+        }
+
         let store = ActionsStore.shared
         // K.2-B lot 2b — `displayOrder` en queue de catalogue : max
         // existant + 1. Évite la collision avec les actions au
@@ -486,6 +532,57 @@ final class PopoverState: ObservableObject {
             exitGeneratorMode()
             globalAppDelegate?.hidePopover()
         }
+    }
+
+    /// Q.2.h.3 — validation depuis la fiche d'édition post-⌘E. L'action est
+    /// TOUJOURS ajoutée au catalogue (id de `pending` conservé, edits
+    /// titre/emoji/description/catégorie inclus, displayOrder en queue) ;
+    /// re-exécutée SEULEMENT si le prompt a été modifié (comparaison
+    /// trimmée stricte) — sinon le `resultText` affiché reste valide et
+    /// n'est PAS touché (l'utilisateur retrouve sa réponse telle quelle,
+    /// header mis à jour via `activeAction = saved`).
+    ///
+    /// `pendingGeneratedAction = nil` EN TÊTE : les handlers `.onChange`
+    /// lisent l'état final du bloc (mutations batchées) → la garde h.1 de
+    /// `.onChange(activeAction)` laisse passer le resize `.resultCompact`
+    /// (394, barre disparue) — pattern du `validateAndRun` historique,
+    /// aucun resize explicite nécessaire. Le `resultExpanded` a été resetté
+    /// par le call site du ⌘E (retour toujours compact).
+    ///
+    /// Edge assumé : prompt modifié + trial épuisé → l'action est sauvée
+    /// mais `runAction` présente le modal sans lancer (acceptable, signalé).
+    private func validateFromResultEdit(pending: Action) {
+        pendingGeneratedAction = nil
+        let store = ActionsStore.shared
+        let promptEdited = editablePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let saved = Action(
+            id: pending.id,
+            name: editableTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+            icon: editableEmoji.trimmingCharacters(in: .whitespacesAndNewlines),
+            prompt: promptEdited,
+            actionType: .ai,
+            shortDescription: editableDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+            originTemplateName: nil,
+            isFavorite: false,
+            isHidden: false,
+            displayOrder: (store.actions.map(\.displayOrder).max() ?? 0) + 1,
+            category: editableCategory
+        )
+        store.addAction(saved)
+
+        if promptEdited != pending.prompt.trimmingCharacters(in: .whitespacesAndNewlines) {
+            // Prompt modifié → re-exécution, le nouveau stream écrase le
+            // resultText. recordPerAction défaut (true) : l'action vient
+            // d'être sauvée, le compteur par-action est légitime.
+            runAction(saved)
+        } else {
+            // Prompt intact → le résultat affiché reste valide. Header
+            // rafraîchi (titre/emoji éventuellement édités).
+            activeAction = saved
+        }
+        generatorInputText = ""
+        clearEditableFields()
+        generatorPhase = nil
     }
 
     /// Ajoute le tampon de chunks accumulés à `resultText` en une seule
