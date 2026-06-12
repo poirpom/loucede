@@ -185,6 +185,11 @@ struct TabIconButton: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
             )
+            // F.4 C3 : en .plain, les pixels transparents ne sont pas
+            // hit-testés (background Color.clear quand non sélectionné)
+            // → seuls picto et texte cliquaient. Toute la pastille 80×56
+            // devient cliquable.
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }

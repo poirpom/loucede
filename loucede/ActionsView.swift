@@ -477,7 +477,9 @@ struct ActionsSettingsView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             }
-            .frame(width: 280)
+            // F.4 C3 : 280 → 380 (ratio ~38/62 à la fenêtre 1000pt de
+            // l'onglet Actions) — les noms d'actions respirent.
+            .frame(width: 380)
             .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
 
             Divider()
