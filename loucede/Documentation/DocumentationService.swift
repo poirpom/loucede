@@ -108,8 +108,26 @@ final class DocumentationService {
         return DocumentationPageContent(
             id: tuto.id,
             title: tuto.title,
-            markdown: markdown
+            markdown: Self.strippingLeadingTitle(markdown)
         )
+    }
+
+    /// Le script de migration écrit le titre du tuto en H1 en tête de
+    /// chaque `.md` — la vue l'affiche déjà via son `pageHeader` (bloc
+    /// bleu + titre 32pt), ce qui le doublonnait à l'écran (runtime F.3
+    /// C1). Le bundle étant généré (hors scope côté app), on retire ce
+    /// premier H1 au chargement. Strictement la première ligne + les
+    /// lignes vides qui suivent — les H1 éventuels en cours de document
+    /// sont préservés.
+    private static func strippingLeadingTitle(_ markdown: String) -> String {
+        var lines = markdown.components(separatedBy: "\n")
+        guard let first = lines.first, first.hasPrefix("# ") else { return markdown }
+        lines.removeFirst()
+        while let next = lines.first,
+              next.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.removeFirst()
+        }
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Manifest

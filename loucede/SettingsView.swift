@@ -77,7 +77,7 @@ struct SettingsView: View {
                 }
                 // Phase F.3 (2026-06-12) : onglet Documentation — la doc
                 // embarquée (ex-fenêtre dédiée ⌘D) vit désormais ici.
-                TabIconButton(title: "Documentation", systemImage: "book", isSelected: selectedTab == 5) {
+                TabIconButton(title: "Doc", systemImage: "book", isSelected: selectedTab == 5) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 5 }
                 }
             }
