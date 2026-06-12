@@ -114,32 +114,19 @@ struct DocumentationView: View {
     /// cette vue.
     @ObservedObject private var manager = DocumentationManager.shared
 
-    // Note pivot UX (2026-05-09) : on n'utilise PAS de custom toolbar
-    // (`ToolbarItem(.navigation)` + `@State columnVisibility` +
-    // `.toolbar(removing: .sidebarToggle)`) pour forcer la position du
-    // bouton de toggle sidebar. Tentative initiale (commit `35e4fbc`)
-    // a échoué runtime : l'API `.toolbar(removing: .sidebarToggle)` ne
-    // supprime pas le bouton natif quand le `NavigationSplitView` est
-    // hosté dans une `NSWindow` AppKit via `NSHostingView` (probable
-    // interaction avec le NSToolbar implicite du `[.titled]` styleMask).
-    //
-    // Pivot pragmatique : la fenêtre hôte a une titlebar transparente
-    // sans titre (`titleVisibility = .hidden` +
-    // `titlebarAppearsTransparent = true` — fenêtre Réglages depuis
-    // F.3, ex-fenêtre doc dédiée avant). Le bouton natif continue de
-    // « voyager » selon l'état de la sidebar, mais n'a plus rien à
-    // chevaucher.
-    //
-    // NE PAS retenter `.toolbar(removing: .sidebarToggle)` ici sans
-    // d'abord vérifier que SwiftUI a corrigé le bug ou qu'on a basculé
-    // hors NSHostingView. L'invariant à préserver : « bouton de toggle
-    // ne tronque rien » (assuré par titlebar transparente sans titre).
+    // F.4 C2 (2026-06-12) : NavigationSplitView ABANDONNÉ au profit d'un
+    // HStack custom (sidebar 280pt fixe + Divider + détail). Raisons :
+    // dans l'onglet Réglages, le bouton toggle natif du split view et le
+    // chrome « inset » de sa sidebar détonnaient (retours runtime F.3/F.4),
+    // et `.toolbar(removing: .sidebarToggle)` est non fiable sous
+    // NSHostingView (échec historique B.2, commit `35e4fbc`). La sidebar
+    // n'est plus collapsible — assumé pour un onglet Réglages.
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             sidebarContent
-                .navigationSplitViewColumnWidth(280)
-        } detail: {
+                .frame(width: 280)
+            Divider()
             detailContent
         }
         // F.3 (2026-06-12) : la vue charge sa propre liste. Le trigger
@@ -233,6 +220,11 @@ struct DocumentationView: View {
                 }
             }
             .listStyle(.sidebar)
+            // F.4 C2 : hors NavigationSplitView, la List .sidebar dessine
+            // son propre fond/encadré — masqué pour fondre la sidebar
+            // dans la fenêtre Réglages (le Divider du HStack marque la
+            // séparation, le highlight de sélection est préservé).
+            .scrollContentBackground(.hidden)
         }
     }
 
