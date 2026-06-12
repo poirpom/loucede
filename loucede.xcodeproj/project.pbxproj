@@ -49,6 +49,7 @@
 				"Resources/Documentation/images/03-obtenir-et-configurer-ta-cle-api-ia-cleanshot-2026-05-10-20-10-36.png",
 				"Resources/Documentation/images/05-comprendre-la-fenetre-de-resultat-visuels-tutos-fenetre.webp",
 				Resources/Documentation/manifest.json,
+				"Resources/Documentation/Tuto-cle-API-loucede.pdf",
 				"Resources/Documentation/tutos/01-bienvenue-dans-loucede.md",
 				"Resources/Documentation/tutos/02-installer-loucede.md",
 				"Resources/Documentation/tutos/03-obtenir-et-configurer-ta-cle-api-ia.md",
