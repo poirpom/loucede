@@ -90,6 +90,65 @@ struct DocumentationPageContent: Decodable, Equatable {
     let markdown: String
 }
 
+// MARK: - Manifest local (Phase F.1)
+
+/// Schéma de `Resources/Documentation/manifest.json`, produit par
+/// `scripts/migrate-notion-docs.py`. Décodé avec
+/// `keyDecodingStrategy = .convertFromSnakeCase` (les clés JSON sont
+/// en snake_case : generated_at, notion_number, category_id…).
+///
+/// Interne à la couche données : le service mappe vers les modèles UI
+/// historiques (`DocumentationPage` / `DocumentationPageContent`),
+/// la vue ne consomme jamais ces structs directement.
+struct DocumentationManifest: Decodable {
+    /// Version du schéma manifest (ex. "1.0").
+    let version: String
+
+    /// Horodatage ISO 8601 du run du script (clé `generated_at`).
+    let generatedAt: String
+
+    /// Nom du ZIP d'export Notion source (clé `source_zip`) — trace
+    /// de provenance, non consommé par l'app.
+    let sourceZip: String
+
+    /// Catégories éditoriales, avec leur ordre canonique.
+    let categories: [Category]
+
+    /// Tutos publiés, dans l'ordre du script (re-triés par `sequence`
+    /// côté service par robustesse).
+    let tutos: [Tuto]
+
+    struct Category: Decodable {
+        /// Slug stable (ex. "demarrer").
+        let id: String
+        /// Titre affiché, emoji inclus (ex. "🚀 Démarrer") — matche le
+        /// `categoryOrder` hardcodé de DocumentationView.
+        let title: String
+        /// Ordre canonique 1-based.
+        let order: Int
+    }
+
+    struct Tuto: Decodable {
+        /// Slug stable, dérivé du nom de fichier (ex.
+        /// "01-bienvenue-dans-loucede"). Sert d'ID de sélection sidebar.
+        let id: String
+        /// Ordre global d'affichage (1-based, trous possibles si un
+        /// tuto est dépublié — ex. le 02 « Installer loucedé »).
+        let sequence: Int
+        /// Numéro Notion zero-padded (clé `notion_number`, ex. "04").
+        let notionNumber: String
+        let title: String
+        let emoji: String
+        /// Référence `Category.id` (clé `category_id`).
+        let categoryId: String
+        /// Chemin relatif à `Documentation/` (ex. "tutos/01-….md").
+        let file: String
+        /// Chemins relatifs des images du tuto (non consommé : les
+        /// `.md` portent leurs propres références `bundle://`).
+        let images: [String]
+    }
+}
+
 // MARK: - Erreurs
 
 /// Erreurs typées de la couche documentation. Exposées par le service
@@ -98,7 +157,17 @@ struct DocumentationPageContent: Decodable, Equatable {
 /// — pas de jargon technique exposé en surface.
 ///
 /// Pattern symétrique avec `LicenseError`.
+///
+/// Note F.1 : depuis la bascule en lecture locale, seuls
+/// `.bundleResourceMissing`, `.notFound` et `.decodingFailed` sont
+/// encore levés. Les cas réseau restent déclarés mais inertes —
+/// suppression au cleanup F.3 (avec le code proxy doc).
 enum DocumentationError: LocalizedError, Equatable {
+    /// Une ressource attendue manque au bundle (manifest.json ou
+    /// fichier .md référencé par le manifest). Désync bundle/manifest
+    /// — ne devrait pas arriver : le script génère les deux ensemble.
+    case bundleResourceMissing(String)
+
     /// Le device n'a pas de connexion (Wi-Fi off, mode avion…).
     case networkUnavailable
 
@@ -143,6 +212,8 @@ enum DocumentationError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .bundleResourceMissing:
+            return "Documentation embarquée introuvable. Réinstalle loucedé si ça persiste."
         case .networkUnavailable:
             return "Pas de connexion réseau. Réessaie une fois connecté."
         case .proxyUnreachable:

@@ -2,25 +2,33 @@
 //  DocumentationService.swift
 //  loucede
 //
-//  Point 4 pre-V1 — Sous-étape B.1 (2026-05-09) : couche réseau de
-//  l'intégration native de la documentation Notion.
+//  Phase F.1 (2026-06-12) : bascule de la lecture réseau (proxy Scaleway
+//  → Notion) vers la lecture locale du bundle. La documentation vit dans
+//  `Resources/Documentation/` (folder reference, hiérarchie préservée
+//  dans le bundle) : `manifest.json` + `tutos/*.md` + `images/*`,
+//  générés par `scripts/migrate-notion-docs.py`.
 //
-//  Architecture (réutilise le proxy déjà en place pour Polar) :
-//  loucedé ──[X-Loucede-App-Key]──▶ proxy Scaleway ──[Bearer NOTION_TOKEN]──▶ api.notion.com
-//
-//  Pattern symétrique avec `LicenseService.swift` :
+//  Architecture conservée de l'ère réseau (B.1, 2026-05-09) :
 //    - Singleton @MainActor avec init private
-//    - URLSession custom (timeouts 15s/30s, no cache HTTP)
-//    - JSONDecoder avec convertFromSnakeCase (inerte ici puisque les
-//      clés sont déjà en camelCase côté proxy, mais conservé par
-//      cohérence + filet défensif si schéma proxy évoluait)
-//    - Helpers privés : buildRequest → sendOrThrow → validateStatusCode
-//    - LicenseConfig.assertConfigured() en début de chaque méthode pub
-//    - Erreurs typées en DocumentationError (cf. DocumentationModels.swift)
+//    - API publique inchangée : `fetchList()` / `fetchPage(id:)`,
+//      async throws — le manager et la vue ne voient aucune différence.
+//      (async sans await désormais : signature préservée pour ne pas
+//      toucher les call sites ; la lecture disque de fichiers de
+//      quelques Ko sur le main actor est négligeable.)
+//    - Erreurs typées DocumentationError (cf. DocumentationModels.swift)
 //
-//  La classe ne gère AUCUN état : c'est une API stateless. La gestion
-//  d'état (pages chargées, page courante, loading flags, errors UI)
-//  est dans `DocumentationManager`.
+//  Mapping manifest → modèles UI (la vue consomme les modèles
+//  historiques, inchangés en F.1) :
+//    - id ← tuto.id (slug, ex. "01-bienvenue-dans-loucede" — plus un
+//      UUID Notion : la validation UUID de l'ère réseau a été retirée)
+//    - icon ← emoji · category ← titre résolu via manifest.categories
+//    - number ← notionNumber (strings zero-padded, le tri string de
+//      DocumentationView reste valide)
+//    - summary / cover / level / priority ← nil (absents du manifest,
+//      la vue les traite déjà comme optionnels)
+//
+//  La classe reste stateless — la gestion d'état (pages chargées, page
+//  courante, loading flags, errors UI) est dans `DocumentationManager`.
 //
 
 import Foundation
@@ -29,181 +37,98 @@ import Foundation
 final class DocumentationService {
     static let shared = DocumentationService()
 
-    private let session: URLSession
     private let decoder: JSONDecoder
 
-    /// Regex de validation d'un UUID v4 textuel (8-4-4-4-12 hex). Utilisé
-    /// par `fetchPage(id:)` pour rejeter localement un ID malformé avant
-    /// l'appel réseau (évite un round-trip serveur garanti d'échouer +
-    /// retourne une erreur sémantique propre `invalidPageID`).
-    private static let uuidRegex = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
+    /// Racine de la doc dans le bundle : `Contents/Resources/Documentation/`.
+    /// `nil` théoriquement impossible (folder reference embarquée au build)
+    /// — traité en `bundleResourceMissing` par les méthodes publiques.
+    private var documentationRoot: URL? {
+        Bundle.main.resourceURL?.appendingPathComponent("Documentation", isDirectory: true)
+    }
 
     private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
-        // Pas de cache HTTP — quand l'utilisateur ouvre la doc, on veut
-        // toujours la version Notion la plus à jour. La perf n'est pas
-        // un enjeu (≤ 30 pages typiquement).
-        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        self.session = URLSession(configuration: config)
-
         let dec = JSONDecoder()
-        // `convertFromSnakeCase` est inerte sur les schemas actuels (le
-        // proxy renvoie déjà des clés camelCase) mais on conserve le
-        // réglage par cohérence avec `LicenseService` et comme filet
-        // défensif si le schéma proxy évoluait un jour vers snake_case.
+        // Le manifest est en snake_case (generated_at, notion_number,
+        // category_id…) — produit par le script Python. La conversion
+        // automatique évite les CodingKeys manuelles.
         dec.keyDecodingStrategy = .convertFromSnakeCase
         self.decoder = dec
     }
 
     // MARK: - Public API
 
-    /// Récupère la liste des pages de documentation publiées. Le proxy
-    /// filtre côté serveur sur `Type = Utilisateur AND État = Terminé`
-    /// et trie par `N° ASC` — l'app reçoit la liste prête à afficher.
-    ///
-    /// Renvoie un tableau vide si aucune page ne match les critères
-    /// (cas légitime, pas une erreur).
+    /// Liste des tutos du manifest, triés par `sequence` ASC, mappés
+    /// vers `DocumentationPage` (modèle UI historique).
     ///
     /// Erreurs possibles :
-    ///   - `.networkUnavailable` (pas de connexion)
-    ///   - `.proxyUnreachable` (DNS / 502)
-    ///   - `.invalidAppSecret` (401 du proxy)
-    ///   - `.notionAPIError(code:)` (4xx/5xx Notion forwardé)
-    ///   - `.decodingFailed` / `.serverError` / `.unknown`
+    ///   - `.bundleResourceMissing` (manifest.json absent du bundle)
+    ///   - `.decodingFailed` (manifest non conforme au schéma)
     func fetchList() async throws -> [DocumentationPage] {
-        LicenseConfig.assertConfigured()
-        let response: ListResponse = try await postExpectingJSON(
-            path: "notion-list",
-            body: nil
+        let manifest = try loadManifest()
+        let categoryTitles = Dictionary(
+            uniqueKeysWithValues: manifest.categories.map { ($0.id, $0.title) }
         )
-        return response.pages
+        return manifest.tutos
+            .sorted { $0.sequence < $1.sequence }
+            .map { tuto in
+                DocumentationPage(
+                    id: tuto.id,
+                    title: tuto.title,
+                    summary: nil,
+                    icon: tuto.emoji,
+                    cover: nil,
+                    category: categoryTitles[tuto.categoryId],
+                    level: nil,
+                    priority: nil,
+                    number: tuto.notionNumber
+                )
+            }
     }
 
-    /// Récupère le contenu Markdown d'une page. Le proxy convertit le
-    /// block Notion via `notion-to-md` côté serveur.
-    ///
-    /// `id` doit être un UUID valide (8-4-4-4-12 hex) — sinon levée
-    /// locale de `.invalidPageID` sans appel réseau.
+    /// Contenu Markdown d'un tuto, lu depuis `Documentation/<tuto.file>`.
     ///
     /// Erreurs possibles :
-    ///   - `.invalidPageID` (validation locale UUID)
-    ///   - `.networkUnavailable` / `.proxyUnreachable` / `.invalidAppSecret`
-    ///   - `.notFound` (404 Notion : page supprimée ou ID inconnu)
-    ///   - `.notionAPIError(code:)` (autres 4xx/5xx Notion)
-    ///   - `.decodingFailed` / `.serverError` / `.unknown`
+    ///   - `.notFound` (slug absent du manifest)
+    ///   - `.bundleResourceMissing` (fichier .md absent du bundle —
+    ///     désync manifest/fichiers, ne devrait pas arriver : le script
+    ///     génère les deux ensemble)
+    ///   - `.decodingFailed` (manifest non conforme)
     func fetchPage(id: String) async throws -> DocumentationPageContent {
-        LicenseConfig.assertConfigured()
-        guard id.range(of: Self.uuidRegex, options: .regularExpression) != nil else {
-            throw DocumentationError.invalidPageID
+        let manifest = try loadManifest()
+        guard let tuto = manifest.tutos.first(where: { $0.id == id }) else {
+            throw DocumentationError.notFound
         }
-        // Le proxy Scaleway `/notion-page` attend `page_id` (convention
-        // Notion API + contrat documenté dans `proxy/README.md` section
-        // « Notion Docs » + `proxy/handler.js → handleNotionPage` qui lit
-        // `body.page_id`). On garde `id` côté API Swift pour la
-        // lisibilité au call site — la traduction se fait ici, à la
-        // frontière réseau.
-        return try await postExpectingJSON(
-            path: "notion-page",
-            body: ["page_id": id]
+        guard let root = documentationRoot else {
+            throw DocumentationError.bundleResourceMissing("Documentation/")
+        }
+        let fileURL = root.appendingPathComponent(tuto.file)
+        guard let markdown = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            throw DocumentationError.bundleResourceMissing(tuto.file)
+        }
+        return DocumentationPageContent(
+            id: tuto.id,
+            title: tuto.title,
+            markdown: markdown
         )
     }
 
-    // MARK: - Helpers réseau
+    // MARK: - Manifest
 
-    /// Wrapper générique pour les POST attendant une réponse JSON
-    /// décodable. `body` peut être `nil` pour les endpoints sans
-    /// paramètre (ex. `notion-list`).
-    private func postExpectingJSON<R: Decodable>(path: String, body: [String: String]?) async throws -> R {
-        let request = try buildRequest(path: path, body: body)
-        let (data, response) = try await sendOrThrow(request: request)
-        try validateStatusCode(response, body: data)
+    /// Lit et décode `Documentation/manifest.json` depuis le bundle.
+    /// Pas de cache : relu à chaque appel — fichier de quelques Ko,
+    /// cohérent avec la décision « pas de cache » du manager (B.1).
+    private func loadManifest() throws -> DocumentationManifest {
+        guard let root = documentationRoot else {
+            throw DocumentationError.bundleResourceMissing("Documentation/")
+        }
+        let manifestURL = root.appendingPathComponent("manifest.json")
+        guard let data = try? Data(contentsOf: manifestURL) else {
+            throw DocumentationError.bundleResourceMissing("manifest.json")
+        }
         do {
-            return try decoder.decode(R.self, from: data)
+            return try decoder.decode(DocumentationManifest.self, from: data)
         } catch {
             throw DocumentationError.decodingFailed
         }
     }
-
-    /// Construit la requête POST avec headers d'auth + body JSON.
-    /// `body == nil` envoie un body JSON `{}` (le proxy accepte un body
-    /// vide pour les endpoints sans paramètre).
-    private func buildRequest(path: String, body: [String: String]?) throws -> URLRequest {
-        let url = LicenseConfig.proxyBaseURL.appendingPathComponent(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(LicenseConfig.appSecret, forHTTPHeaderField: "X-Loucede-App-Key")
-        let payload = body ?? [:]
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        return request
-    }
-
-    /// Mappe les `URLError` en `DocumentationError` typées. Identique
-    /// au pattern de `LicenseService.sendOrThrow`.
-    private func sendOrThrow(request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch let error as URLError {
-            switch error.code {
-            case .notConnectedToInternet,
-                 .networkConnectionLost,
-                 .timedOut,
-                 .dataNotAllowed,
-                 .internationalRoamingOff:
-                throw DocumentationError.networkUnavailable
-            case .cannotFindHost,
-                 .cannotConnectToHost,
-                 .dnsLookupFailed:
-                throw DocumentationError.proxyUnreachable
-            default:
-                throw DocumentationError.unknown(error.localizedDescription)
-            }
-        } catch {
-            throw DocumentationError.unknown(error.localizedDescription)
-        }
-    }
-
-    /// Mappe le status code HTTP vers une `DocumentationError` typée.
-    /// 200 est succès. 4xx/5xx sont mappés selon la sémantique :
-    ///   - 401 → invalidAppSecret (rejet du proxy)
-    ///   - 404 → notFound (page Notion introuvable)
-    ///   - 502 → proxyUnreachable (Notion injoignable depuis le proxy)
-    ///   - autres 4xx → notionAPIError (forwardé tel quel)
-    ///   - autres 5xx → serverError
-    private func validateStatusCode(_ response: URLResponse, body: Data) throws {
-        guard let http = response as? HTTPURLResponse else {
-            throw DocumentationError.unknown("Réponse non-HTTP")
-        }
-        switch http.statusCode {
-        case 200:
-            return
-        case 401:
-            throw DocumentationError.invalidAppSecret
-        case 404:
-            throw DocumentationError.notFound
-        case 502:
-            throw DocumentationError.proxyUnreachable
-        case 400...499:
-            // 4xx Notion non couverts ci-dessus (rate-limit 429,
-            // forbidden 403, etc.) — forwardés tels quels.
-            throw DocumentationError.notionAPIError(code: http.statusCode)
-        case 500...599:
-            throw DocumentationError.serverError(http.statusCode)
-        default:
-            throw DocumentationError.serverError(http.statusCode)
-        }
-    }
-}
-
-// MARK: - Wrapper de la réponse /notion-list
-
-/// Le proxy renvoie `{ pages: [...] }` plutôt qu'un array brut, pour
-/// permettre une éventuelle évolution future (pagination, métadonnées,
-/// total count). Wrapper interne au service — le manager n'expose que
-/// `[DocumentationPage]` à la UI.
-private struct ListResponse: Decodable {
-    let pages: [DocumentationPage]
 }
