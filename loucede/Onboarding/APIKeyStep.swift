@@ -87,6 +87,10 @@ struct APIKeyStep: View {
 
                 providerLinksSection
 
+                Spacer().frame(height: 18)
+
+                tutorialLinkButton
+
                 Spacer()
 
                 // Boutons système : Retour secondaire + Valider primaire
@@ -244,6 +248,26 @@ struct APIKeyStep: View {
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.secondary)
+    }
+
+    /// Lien texte vers le tuto PDF clé API (Q.2.f) — réplique exacte du
+    /// style skipButton (« Configurer plus tard → ») : .plain, 14 semibold,
+    /// secondary, sans curseur main. Ouvre le PDF bundlé dans le lecteur
+    /// PDF système (NSWorkspace), pas de fenêtre interne.
+    private var tutorialLinkButton: some View {
+        Button("Comment obtenir une clé API →", action: openAPIKeyTutorial)
+            .buttonStyle(.plain)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    /// Échec silencieux assumé si le PDF manque au bundle (improbable :
+    /// embarqué via la folder reference Resources/Documentation/).
+    private func openAPIKeyTutorial() {
+        guard let url = Bundle.main.url(forResource: "Tuto-cle-API-loucede",
+                                        withExtension: "pdf",
+                                        subdirectory: "Documentation") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Provider quick-links
