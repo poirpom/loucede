@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "generated_at": "2026-06-04T19:36:10Z",
-  "source_zip": "843cf671-c80f-4c97-a18a-3f61223487c1_ExportBlock-7142a007-731d-43c4-846b-211402ae8b72.zip",
+  "generated_at": "2026-06-12T12:08:10Z",
+  "source_zip": "8fe2e140-d5c3-4864-ab75-adc4813e54c4_ExportBlock-375b59c0-8ed3-4ac7-afac-449dc980dea5.zip",
   "categories": [
     {
       "id": "demarrer",
@@ -46,15 +46,15 @@
       "images": []
     },
     {
-      "id": "03-obtenir-et-configurer-ta-cle-api-ia",
+      "id": "03-obtenir-et-fournir-une-cle-api",
       "sequence": 3,
       "notion_number": "04",
-      "title": "Obtenir et configurer ta clé API IA",
+      "title": "Obtenir et fournir une clé API",
       "emoji": "🔑",
       "category_id": "demarrer",
-      "file": "tutos/03-obtenir-et-configurer-ta-cle-api-ia.md",
+      "file": "tutos/03-obtenir-et-fournir-une-cle-api.md",
       "images": [
-        "images/03-obtenir-et-configurer-ta-cle-api-ia-cleanshot-2026-05-10-20-10-36.png"
+        "images/03-obtenir-et-fournir-une-cle-api-cleanshot-2026-05-10-20-10-36.png"
       ]
     },
     {

@@ -1,4 +1,4 @@
-# Obtenir et configurer ta clé API IA
+# Obtenir et fournir une clé API
 
 Tu as installé loucedé, tu l’as lancé mais l'app refuse de fonctionner sans qu'une clé API soit renseignée. 
 
@@ -97,17 +97,14 @@ Dans la console, va dans la section *API Keys*. Clique sur *Create new key* (ou 
 
 ### 4. La coller dans loucedé
 
-1. **Dans loucedé, ouvre les *Réglages* (en appuyant sur `⌘,`).** 
-    
-    Tu peux aussi y accéder via la barre des menus.
-    
+1. **Dans loucedé, ouvre les *Réglages.*** 
 2. **Dans l’onglet *Général*, sélectionne ton fournisseur dans le menu déroulant, puis colle ta clé dans le champ *Clé API*.** 
 3. **Pas besoin de valider, pas de bouton "tester". Tu colles, c'est bon. La première utilisation confirmera que tout marche.**
     
     Sauf si tu copies n’importe quoi dans le champ *Clé API*, hein. RESTE FOCUS STEUPLÉ C CHO LÀ
     
 
-![CleanShot 2026-05-10_20-10-36.png](bundle://images/03-obtenir-et-configurer-ta-cle-api-ia-cleanshot-2026-05-10-20-10-36.png)
+![CleanShot 2026-05-10_20-10-36.png](bundle://images/03-obtenir-et-fournir-une-cle-api-cleanshot-2026-05-10-20-10-36.png)
 
 ---
 
