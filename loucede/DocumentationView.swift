@@ -465,6 +465,10 @@ struct DocumentationView: View {
                                 ForegroundColor(Color(hex: "3F84F7"))
                                 UnderlineStyle(.single)
                             }
+                            // Images bundle://images/… de la doc locale
+                            // (F.2) — résolues dans Documentation/images/
+                            // du bundle. Cf. BundleImageProvider.swift.
+                            .markdownImageProvider(BundleImageProvider())
                             .padding(.horizontal, 32)
                             .padding(.vertical, 32)
                     }
