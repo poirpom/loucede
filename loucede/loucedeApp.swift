@@ -46,15 +46,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popoverWindow: NSWindow?
     var settingsWindow: NSWindow?
     var onboardingWindow: NSWindow?
-    /// Fenêtre dédiée à la documentation (Point 4 pre-V1, 2026-05-08).
-    /// Phase de transition : héberge actuellement un placeholder
-    /// « En construction » (cf. `DocumentationView`), en attendant
-    /// l'intégration native Notion API + Scaleway proxy + swift-markdown-ui
-    /// développée en 4 incréments (A → D).
-    /// Créée à la première ouverture, mise au front à chaque ⌘D suivant.
-    /// Persistance position/taille via `setFrameAutosaveName` (mécanisme
-    /// natif AppKit, pas de UserDefaults manuel).
-    var docWindow: NSWindow?
     var eventMonitor: Any?
     var localEventMonitor: Any?
     /// K.2-B lot 2b fix (2026-05-27) — état de la suspension du monitor
@@ -966,85 +957,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Ouvre (ou ramène au front) la fenêtre de documentation.
-    /// Point 4 pre-V1 (2026-05-08) — appelée par le shortcut ⌘D du popup.
-    ///
-    /// Phase de transition (cf. `DocumentationView`) : la fenêtre héberge
-    /// actuellement un placeholder « En construction » statique, donc
-    /// pas de logique de reload — `existing.makeKeyAndOrderFront` suffit.
-    /// Quand l'intégration native Notion API + swift-markdown-ui sera
-    /// branchée (incréments A → D), c'est `DocumentationView` qui
-    /// récupérera son propre cycle de chargement / refresh.
-    ///
-    /// Comportement :
-    /// - Si la fenêtre n'existe pas encore → la crée (900×700, centrée,
-    ///   resizable, position/taille auto-persistées via
-    ///   `setFrameAutosaveName`).
-    /// - Si la fenêtre existe (visible ou cachée par ⌘W précédent) →
-    ///   la met / ramène au front.
-    /// - DANS TOUS LES CAS : déclenche un refresh de la liste de pages
-    ///   via `DocumentationManager.shared.loadList()` (cf. note ci-dessous).
-    @objc func openDocumentation() {
-        // B.3 fix (2026-05-09) : force le refresh de la liste à chaque
-        // ouverture de la fenêtre doc, pas seulement à la première
-        // création. Sans ça, si l'utilisateur ferme la fenêtre puis la
-        // rouvre alors que Notion / le proxy est down entre-temps, il
-        // continuerait de voir les données stale du fetch précédent
-        // (la vue `DocumentationView` persiste avec
-        // `isReleasedWhenClosed = false`, donc le `.task` SwiftUI ne
-        // re-fire pas au re-show — d'où ce trigger côté AppKit, source
-        // de vérité unique pour le cycle de fetch). En contrepartie le
-        // `.task` côté `DocumentationView` a été retiré pour ne pas
-        // doubler les appels au premier open.
-        //
-        // Race condition acceptée V1 : si l'utilisateur ⌘D rapidement
-        // plusieurs fois de suite, plusieurs `loadList()` peuvent fire
-        // en parallèle (le proxy est hit 2-3 fois). Pas de crash, juste
-        // un gaspillage mineur. À mitiger en V1.x via
-        // `guard !isLoadingList else { return }` dans
-        // `DocumentationManager.loadList()` si feedback utilisateur.
-        Task { await DocumentationManager.shared.loadList() }
-
-        if let existing = docWindow {
-            existing.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Documentation loucedé"
-        // Pivot UX (2026-05-09) : titlebar transparente sans titre
-        // visible. Cohérent avec les fenêtres Settings et Onboarding
-        // du projet (mêmes 2 lignes plus haut dans ce fichier). Évite
-        // que le bouton de toggle sidebar `NavigationSplitView` (qui
-        // « voyage » selon l'état de la sidebar) ne chevauche le titre
-        // AppKit centré — bug observé en B.2 et qu'on n'a pas réussi
-        // à fixer côté SwiftUI via `.toolbar(removing: .sidebarToggle)`
-        // (ne fonctionne pas fiablement avec NSHostingView wrap).
-        // `window.title = "..."` est conservé pour rester visible dans
-        // le Dock, Cmd+Tab et le menu Window — c'est uniquement
-        // l'affichage dans la titlebar qui est masqué.
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.minSize = NSSize(width: 600, height: 400)
-        window.contentView = NSHostingView(rootView: DocumentationView())
-        window.center()
-        // Persistance native AppKit : la frame est sauvegardée auto
-        // dans UserDefaults sous la clé « NSWindow Frame loucede.documentation »
-        // et restaurée au prochain lancement (override le `center()` ci-dessus
-        // dès le 2e open).
-        window.setFrameAutosaveName("loucede.documentation")
-        window.isReleasedWhenClosed = false
-
-        docWindow = window
-        docWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
+    // F.3 (2026-06-12) : `openDocumentation()` et la fenêtre doc dédiée
+    // (`docWindow`, ex-Point 4 pre-V1) ont été supprimées — la doc vit
+    // dans l'onglet « Doc » des Réglages (index 5), ⌘D passe par
+    // `openSettings(tab: 5)`. Le fetch liste est porté par le `.task`
+    // de `DocumentationView` (le fix B.3 « trigger AppKit » n'avait plus
+    // d'objet : la vue est recréée à chaque entrée dans l'onglet).
+    // La clé d'autosave « NSWindow Frame loucede.documentation » reste
+    // orpheline en UserDefaults (inoffensif — backlog clés orphelines).
 
     func suspendHotkeys() {
         if let ref = hotKeyRef {

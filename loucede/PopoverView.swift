@@ -405,13 +405,15 @@ struct PopoverView: View {
                     settingsHandler()
                     return nil
                 }
-                // ⌘D — ouvre la doc embarquée. Ferme le popup AVANT
-                // (sinon la fenêtre doc ouvre derrière, popoverWindow
-                // ayant un NSWindow level supérieur). `closeHandler()`
-                // joue le rôle du « hidePopover » côté Settings.
+                // ⌘D — ouvre les Réglages sur l'onglet Doc (F.3 : la
+                // fenêtre doc dédiée a été supprimée, la doc vit dans
+                // l'onglet index 5). Ferme le popup AVANT (sinon la
+                // fenêtre ouvre derrière, popoverWindow ayant un
+                // NSWindow level supérieur). `closeHandler()` joue le
+                // rôle du « hidePopover » côté Settings.
                 if event.charactersIgnoringModifiers == "d" {
                     closeHandler()
-                    globalAppDelegate?.openDocumentation()
+                    globalAppDelegate?.openSettings(tab: 5)
                     return nil
                 }
                 return event
