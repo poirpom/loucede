@@ -113,19 +113,19 @@ struct SettingsView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-        // F.4 : taille par onglet (style Things 3). Le frame SwiftUI
-        // s'anime via le withAnimation qui enveloppe déjà tout changement
-        // de selectedTab (clics + notification deeplink) ; la NSWindow est
-        // animée en parallèle par AppDelegate.resizeSettingsWindow
-        // (.onChange ci-dessous), seul propriétaire de la frame fenêtre
-        // (sizingOptions = [] sur la hosting view côté openSettings).
-        .frame(width: currentSize.width, height: currentSize.height)
+        // F.4 (C1.5) : PAS de taille fixe côté SwiftUI — le contenu
+        // remplit la hosting view, qui suit la NSWindow frame par frame
+        // pendant l'animation de resizeSettingsWindow. Une seule source
+        // d'animation (AppKit) : un .frame fixe animé en parallèle
+        // « flottait » au moindre décalage de timing (contenu centré
+        // dans la hosting view) — retour runtime C1. Les tailles par
+        // onglet ne vivent que dans tabSizes, consommées par
+        // l'AppDelegate (création + resize).
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: selectedTab) { _, newTab in
             globalAppDelegate?.resizeSettingsWindow(to: Self.size(forTab: newTab))
         }
     }
-
-    private var currentSize: CGSize { Self.size(forTab: selectedTab) }
 
     // MARK: - Tailles par onglet (F.4)
 
