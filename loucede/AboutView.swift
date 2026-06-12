@@ -89,7 +89,10 @@ struct AboutView: View {
             VStack(spacing: 8) {
                 Text("Logiciel libre sous licence GPL v3")
                     .font(.system(size: 12))
-                Text("Fork de TexTab par ELPROFUG0")
+                // Lien inline sur le mot « TexTab » (markdown natif de
+                // Text) vers le repo d'origine du fork — URL identique
+                // au README. Le reste de la phrase reste secondary.
+                Text("Fork de [TexTab](https://github.com/ELPROFUG0/TexTab) par ELPROFUG0")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
