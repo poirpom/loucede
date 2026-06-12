@@ -73,10 +73,13 @@
 //    6 (fallback) : ProgressView pour le cas race rare entre 2 fetches
 //      où selectedPageID a changé mais currentPage encore stale.
 //
-//  Trigger des fetches — sources distinctes pour liste vs page :
-//    - LISTE : côté AppKit dans `loucedeApp.swift:openDocumentation()`
-//      (Task lancé à chaque ouverture de la fenêtre, B.3 fix). Cette
-//      vue est passive sur la liste — elle observe via @ObservedObject.
+//  Trigger des fetches — tout vit dans cette vue depuis F.3 :
+//    - LISTE : `.task { manager.loadList() }` au mount. La vue est
+//      hostée dans l'onglet Documentation des Réglages et RECRÉÉE à
+//      chaque switch d'onglet (`.id(selectedTab)` côté SettingsView)
+//      → re-fetch par visite, gratuit en lecture locale (F.1).
+//      (L'ancien trigger AppKit de l'ère fenêtre dédiée — B.3 fix —
+//      a été retiré avec la fenêtre.)
 //    - PAGE : côté SwiftUI via `.onChange(of: selectedPageID, initial: true)`
 //      ci-dessous. Fire au mount (initial: true, si la sélection est
 //      déjà set par la chain `pages → first.id`) et à chaque clic
@@ -141,10 +144,16 @@ struct DocumentationView: View {
         } detail: {
             detailContent
         }
-        // Le trigger du fetch a été déplacé côté AppKit dans
-        // `loucedeApp.swift:openDocumentation()` (B.3 fix 2026-05-09).
-        // Pas de `.task` ici — la vue est passive, observe le manager
-        // via `@ObservedObject` et réagit à l'arrivée de `pages`.
+        // F.3 (2026-06-12) : la vue charge sa propre liste. Le trigger
+        // AppKit de l'ère fenêtre dédiée (B.3 fix — la fenêtre persistait,
+        // le .task ne re-firait pas au re-show) n'a plus d'objet : hostée
+        // dans l'onglet Réglages, la vue est RECRÉÉE à chaque switch
+        // d'onglet (`.id(selectedTab)` côté SettingsView) → .task fire à
+        // chaque entrée dans l'onglet. Lecture locale du bundle (F.1),
+        // instantanée — le re-fetch par visite est gratuit.
+        .task {
+            await manager.loadList()
+        }
         .onChange(of: manager.pages, initial: true) { _, _ in
             // `initial: true` (macOS 14+) fait fire la closure aussi
             // au premier render, avec la valeur courante de

@@ -75,6 +75,11 @@ struct SettingsView: View {
                 TabIconButton(title: "À propos", systemImage: "info.circle", isSelected: selectedTab == 4) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 4 }
                 }
+                // Phase F.3 (2026-06-12) : onglet Documentation — la doc
+                // embarquée (ex-fenêtre dédiée ⌘D) vit désormais ici.
+                TabIconButton(title: "Documentation", systemImage: "book", isSelected: selectedTab == 5) {
+                    withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 5 }
+                }
             }
             .padding(.vertical, 8)
             .onAppear { updateChecker.checkForUpdates() }
@@ -100,6 +105,7 @@ struct SettingsView: View {
                 case 2: LicenseSettingsView()
                 case 3: UpdatesView()
                 case 4: AboutView()
+                case 5: DocumentationView()
                 default: EmptyView()
                 }
             }
@@ -107,7 +113,11 @@ struct SettingsView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-        .frame(width: 800, height: 540)
+        // F.3 : 800×540 → 1000×700 pour accueillir l'onglet Documentation
+        // (sidebar 280 + zone de lecture). Taille UNIFORME pour tous les
+        // onglets — dette transitoire assumée jusqu'à F.4 (resize
+        // dynamique par onglet, style Things 3).
+        .frame(width: 1000, height: 700)
     }
 }
 

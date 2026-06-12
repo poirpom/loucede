@@ -947,7 +947,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 620),
+            // F.3 : aligné sur le .frame(1000×700) de SettingsView (la
+            // hosting view dicte la taille finale de toute façon).
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
