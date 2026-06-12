@@ -11,8 +11,8 @@
 //  bandeau 200pt, emoji 80pt centré, titre 32pt bold) au-dessus du
 //  rendu Markdown dans le case Loaded de `detailContent`. Esprit
 //  visuel Notion natif côté zone de lecture. Sources des icon/title :
-//  `manager.pages` (peuplé par /notion-list) — pas d'enrichissement
-//  du proxy /notion-page nécessaire (couplage minime).
+//  `manager.pages` (peuplé depuis le manifest local, F.1) — couplage
+//  minime sidebar/detail.
 //
 //  Mini-fix UX (2026-05-10, post-K+L+M) : pivot sur 2 points suite
 //  aux observations runtime :
@@ -57,7 +57,7 @@
 //    Polish typo — Customisation styles MarkdownUI (CE FICHIER)
 //
 //  4 états visuels gérés par `sidebarContent` (priorité décroissante) :
-//    1. Loading : ProgressView centré (~500ms typique)
+//    1. Loading : ProgressView centré (lecture locale — quasi invisible)
 //    2. Error : icône + message + détail localisé + bouton « Réessayer »
 //    3. Empty : sidebar naturellement vide + message zone droite
 //       (cas très rare — Faab a dépublié tous les tutos Notion)
@@ -67,7 +67,7 @@
 //    1. Empty list : message « Aucun tuto disponible pour le moment »
 //    2. Bootstrap (selectedPage == nil) : Color.clear (avant init de
 //       sélection par `.onChange(of: pages, initial: true)`)
-//    3. Loading page : ProgressView centré (~500ms typique)
+//    3. Loading page : ProgressView centré (lecture locale — quasi invisible)
 //    4. Error page : errorView avec bouton « Réessayer »
 //    5. Loaded : ScrollView + Markdown(content) + padding 32px
 //    6 (fallback) : ProgressView pour le cas race rare entre 2 fetches
@@ -123,14 +123,12 @@ struct DocumentationView: View {
     // hosté dans une `NSWindow` AppKit via `NSHostingView` (probable
     // interaction avec le NSToolbar implicite du `[.titled]` styleMask).
     //
-    // Pivot pragmatique : on cache le titre dans la titlebar AppKit
-    // côté `loucedeApp.swift:openDocumentation()` via
-    // `titleVisibility = .hidden` + `titlebarAppearsTransparent = true`,
-    // pattern cohérent avec les fenêtres Settings et Onboarding du
-    // projet. Le bouton natif continue de « voyager » selon l'état de
-    // la sidebar, mais n'a plus rien à chevaucher. Le titre AppKit
-    // reste dans `window.title` (visible dans le Dock, Cmd+Tab et
-    // menu Window — juste plus dans la titlebar).
+    // Pivot pragmatique : la fenêtre hôte a une titlebar transparente
+    // sans titre (`titleVisibility = .hidden` +
+    // `titlebarAppearsTransparent = true` — fenêtre Réglages depuis
+    // F.3, ex-fenêtre doc dédiée avant). Le bouton natif continue de
+    // « voyager » selon l'état de la sidebar, mais n'a plus rien à
+    // chevaucher.
     //
     // NE PAS retenter `.toolbar(removing: .sidebarToggle)` ici sans
     // d'abord vérifier que SwiftUI a corrigé le bug ou qu'on a basculé
@@ -157,21 +155,20 @@ struct DocumentationView: View {
         .onChange(of: manager.pages, initial: true) { _, _ in
             // `initial: true` (macOS 14+) fait fire la closure aussi
             // au premier render, avec la valeur courante de
-            // `manager.pages`. Couvre l'edge case où le Task lancé par
-            // `openDocumentation()` termine AVANT que la vue soit
-            // mountée — sans `initial: true`, `selectedPageID` resterait
-            // `nil` indéfiniment (pas de changement de `manager.pages`
-            // après mount donc pas de fire `.onChange`).
+            // `manager.pages`. Couvre le cas où le manager (singleton)
+            // a déjà des pages d'une visite précédente de l'onglet :
+            // sans `initial: true`, si le `.task` rend une liste
+            // identique, `manager.pages` ne CHANGE pas → pas de fire
+            // `.onChange` → `selectedPageID` resterait `nil`.
             //
             // Triple rôle :
             //   1. Init au mount (initial: true) si manager.pages déjà
             //      rempli → set sur la première page.
             //   2. Init au premier remplissage async (selectedPageID
             //      toujours nil) → idem.
-            //   3. Correction si refresh ramène un set différent où la
-            //      sélection actuelle a disparu (page supprimée côté
-            //      Notion entre 2 fetches) → fallback sur la première
-            //      page disponible.
+            //   3. Correction si un refresh ramène un set différent où
+            //      la sélection actuelle a disparu (tuto dépublié) →
+            //      fallback sur la première page disponible.
             // Si la sélection est toujours présente après refresh, on
             // ne touche à rien (pas de scroll/changement surprise).
             let newOrdered = orderedPages
@@ -211,7 +208,7 @@ struct DocumentationView: View {
     private var sidebarContent: some View {
         if manager.isLoadingList {
             // État 1 : Loading — ProgressView centré, pas de message
-            // texte (l'attente est ~500ms en pratique).
+            // texte (lecture locale, l'état est quasi invisible).
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = manager.listError {
@@ -281,10 +278,9 @@ struct DocumentationView: View {
     ///   `manager.pages` entre 2 refresh) → header entièrement skippé,
     ///   le Markdown s'affiche seul (graceful fallback).
     ///
-    /// Source des données : `manager.pages` (peuplé par /notion-list).
-    /// Pas dans `currentPage` (réponse /notion-page) qui ne contient
-    /// que id/title/markdown — décision V1 pour ne pas enrichir le
-    /// proxy (couplage minime sidebar/detail).
+    /// Source des données : `manager.pages` (peuplé depuis le manifest
+    /// local). Pas dans `currentPage` qui ne contient que
+    /// id/title/markdown (couplage minime sidebar/detail).
     ///
     /// Espacements verticaux finaux :
     ///   - Bloc bleu (si emoji présent) : 200pt height, plein-largeur
@@ -535,7 +531,7 @@ struct DocumentationView: View {
             guard let pages = pagesByCategory[categoryName], !pages.isEmpty else { return nil }
             // Tri par `number` ASC. Comparaison de strings — fonctionne
             // sur les numéros zero-padded ("01", "02", ..., "11")
-            // garantis par le proxy Scaleway côté serveur.
+            // garantis par le script de migration (notion_number).
             let sorted = pages.sorted { ($0.number ?? "") < ($1.number ?? "") }
             return (categoryName, sorted)
         }

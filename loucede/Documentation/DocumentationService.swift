@@ -24,8 +24,6 @@
 //    - icon ← emoji · category ← titre résolu via manifest.categories
 //    - number ← notionNumber (strings zero-padded, le tri string de
 //      DocumentationView reste valide)
-//    - summary / cover / level / priority ← nil (absents du manifest,
-//      la vue les traite déjà comme optionnels)
 //
 //  La classe reste stateless — la gestion d'état (pages chargées, page
 //  courante, loading flags, errors UI) est dans `DocumentationManager`.
@@ -74,12 +72,8 @@ final class DocumentationService {
                 DocumentationPage(
                     id: tuto.id,
                     title: tuto.title,
-                    summary: nil,
                     icon: tuto.emoji,
-                    cover: nil,
                     category: categoryTitles[tuto.categoryId],
-                    level: nil,
-                    priority: nil,
                     number: tuto.notionNumber
                 )
             }

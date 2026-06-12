@@ -2,20 +2,18 @@
 //  DocumentationManager.swift
 //  loucede
 //
-//  Point 4 pre-V1 — Sous-étape B.1 (2026-05-09) : gestion d'état de
-//  l'intégration native de la documentation Notion.
+//  Gestion d'état de la documentation embarquée (né B.1 2026-05-09 à
+//  l'ère proxy Notion, inchangé à la bascule locale F.1 2026-06-12 —
+//  seule la sémantique des erreurs a suivi).
 //
 //  Pattern symétrique avec `LicenseManager` :
 //    - Singleton @MainActor + ObservableObject
 //    - @Published properties pour binding SwiftUI
-//    - Délègue le réseau à `DocumentationService` (stateless)
+//    - Délègue la lecture du bundle à `DocumentationService` (stateless)
 //    - Gère les loading flags + les erreurs UI
 //
-//  Décision MVP V1 : pas de cache. Chaque `loadList()` / `loadPage(id:)`
-//  re-fetche depuis le proxy. Les pages restent peu nombreuses (≤ ~30
-//  prévues) et le proxy a déjà du cache HTTP côté serveur — pas de
-//  besoin urgent d'un cache client. À reconsidérer post-V1 si la doc
-//  grandit ou si feedback utilisateur sur la latence.
+//  Pas de cache : chaque `loadList()` / `loadPage(id:)` relit le bundle
+//  — lecture locale de fichiers de quelques Ko, instantanée.
 //
 
 import Foundation
@@ -60,15 +58,11 @@ final class DocumentationManager: ObservableObject {
 
     // MARK: - Public API
 
-    /// Fetch la liste des pages publiées. Met à jour `pages`,
-    /// `isLoadingList` et `listError`. Pas d'exception levée — toutes
-    /// les erreurs sont stockées dans `listError` pour être consommées
-    /// par la UI.
-    ///
-    /// Décision MVP : pas de cache. Chaque appel re-fetche, même si
-    /// `pages` était déjà peuplée d'un précédent succès. À l'usage la
-    /// UI appellera typiquement cette méthode une fois à l'ouverture
-    /// de la fenêtre doc et au pull-to-refresh manuel (si introduit).
+    /// Charge la liste des tutos depuis le manifest du bundle. Met à
+    /// jour `pages`, `isLoadingList` et `listError`. Pas d'exception
+    /// levée — toutes les erreurs sont stockées dans `listError` pour
+    /// être consommées par la UI. Appelée par le `.task` de
+    /// `DocumentationView` à chaque entrée dans l'onglet Doc.
     func loadList() async {
         isLoadingList = true
         listError = nil
@@ -85,12 +79,10 @@ final class DocumentationManager: ObservableObject {
         }
     }
 
-    /// Fetch le contenu d'une page. Met à jour `currentPage`,
-    /// `isLoadingPage` et `pageError`. Pas d'exception levée — toutes
-    /// les erreurs sont stockées dans `pageError` pour la UI.
-    ///
-    /// `id` doit être un UUID — sinon `DocumentationService.fetchPage`
-    /// lève `.invalidPageID` qu'on capture et stocke dans `pageError`.
+    /// Charge le contenu Markdown d'un tuto (par slug manifest). Met à
+    /// jour `currentPage`, `isLoadingPage` et `pageError`. Pas
+    /// d'exception levée — toutes les erreurs sont stockées dans
+    /// `pageError` pour la UI.
     func loadPage(id: String) async {
         isLoadingPage = true
         pageError = nil
