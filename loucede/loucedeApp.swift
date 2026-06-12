@@ -937,10 +937,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // F.4 : taille initiale = taille cible de l'onglet demandé
+        // (⌘, → Général 800×540, ⌘D → Doc 860×700) — création directe à
+        // la bonne taille, sans animation parasite.
+        let initialSize = SettingsView.size(forTab: tab)
         let window = NSWindow(
-            // F.3 : aligné sur le .frame(1000×700) de SettingsView (la
-            // hosting view dicte la taille finale de toute façon).
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: initialSize.width, height: initialSize.height),
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -948,13 +950,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = ""
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.contentView = NSHostingView(rootView: SettingsView(initialTab: tab))
+        let hosting = NSHostingView(rootView: SettingsView(initialTab: tab))
+        // F.4 : pilotage UNIQUE de la frame fenêtre par
+        // resizeSettingsWindow — la hosting view ne redimensionne pas la
+        // fenêtre d'elle-même (sinon double animation quand le .frame
+        // SwiftUI change en même temps que l'animator AppKit).
+        hosting.sizingOptions = []
+        window.contentView = hosting
         window.center()
         window.isReleasedWhenClosed = false
 
         settingsWindow = window
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Redimensionne la fenêtre Réglages vers la taille cible de
+    /// l'onglet actif (F.4, resize dynamique style Things 3). Ancrage :
+    /// bord HAUT fixe + centre horizontal préservé — la fenêtre grandit
+    /// vers le bas et symétriquement en largeur. Appelée par le
+    /// `.onChange(of: selectedTab)` de SettingsView (couvre clics ET
+    /// deeplinks ⌘D / notification).
+    ///
+    /// `contentSize` == frame size ici : styleMask `.fullSizeContentView`
+    /// + titlebar transparente, la hosting view couvre toute la fenêtre.
+    func resizeSettingsWindow(to contentSize: CGSize, duration: Double = 0.25) {
+        guard let window = settingsWindow else { return }
+        let cur = window.frame
+        let newFrame = NSRect(
+            x: cur.midX - contentSize.width / 2,
+            y: cur.maxY - contentSize.height,
+            width: contentSize.width,
+            height: contentSize.height
+        )
+        // Discipline Q.2.g : ne pas (ré)animer un resize no-op (re-clic
+        // sur l'onglet courant, deeplink vers l'onglet déjà affiché,
+        // transitions 800×540 → 800×540) — évite les NSAnimationContext
+        // concurrentes sur la même fenêtre.
+        let e: CGFloat = 0.5
+        if abs(cur.minX - newFrame.minX) < e, abs(cur.minY - newFrame.minY) < e,
+           abs(cur.width - newFrame.width) < e, abs(cur.height - newFrame.height) < e {
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(newFrame, display: true)
+        }
     }
 
     // F.3 (2026-06-12) : `openDocumentation()` et la fenêtre doc dédiée

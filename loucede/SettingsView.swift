@@ -113,11 +113,39 @@ struct SettingsView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
         }
-        // F.3 : 800×540 → 1000×700 pour accueillir l'onglet Documentation
-        // (sidebar 280 + zone de lecture). Taille UNIFORME pour tous les
-        // onglets — dette transitoire assumée jusqu'à F.4 (resize
-        // dynamique par onglet, style Things 3).
-        .frame(width: 1000, height: 700)
+        // F.4 : taille par onglet (style Things 3). Le frame SwiftUI
+        // s'anime via le withAnimation qui enveloppe déjà tout changement
+        // de selectedTab (clics + notification deeplink) ; la NSWindow est
+        // animée en parallèle par AppDelegate.resizeSettingsWindow
+        // (.onChange ci-dessous), seul propriétaire de la frame fenêtre
+        // (sizingOptions = [] sur la hosting view côté openSettings).
+        .frame(width: currentSize.width, height: currentSize.height)
+        .onChange(of: selectedTab) { _, newTab in
+            globalAppDelegate?.resizeSettingsWindow(to: Self.size(forTab: newTab))
+        }
+    }
+
+    private var currentSize: CGSize { Self.size(forTab: selectedTab) }
+
+    // MARK: - Tailles par onglet (F.4)
+
+    /// Tailles cibles de la fenêtre Réglages par onglet (style Things 3,
+    /// resize dynamique F.4). Source unique consommée par le .frame du
+    /// body (contenu SwiftUI) ET par AppDelegate.openSettings /
+    /// resizeSettingsWindow (frame NSWindow).
+    static let tabSizes: [Int: CGSize] = [
+        0: CGSize(width: 800, height: 540),    // Général
+        1: CGSize(width: 1000, height: 700),   // Actions (sidebar 38/62)
+        2: CGSize(width: 800, height: 540),    // Licence
+        3: CGSize(width: 800, height: 540),    // Mises à jour
+        4: CGSize(width: 800, height: 540),    // À propos
+        5: CGSize(width: 860, height: 700),    // Doc
+    ]
+
+    /// Taille cible d'un onglet, défaut 800×540 (filet pour un index
+    /// inconnu — ne devrait pas arriver, les onglets sont hardcodés).
+    static func size(forTab tab: Int) -> CGSize {
+        tabSizes[tab] ?? CGSize(width: 800, height: 540)
     }
 }
 
