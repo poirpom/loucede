@@ -262,11 +262,13 @@ struct APIKeyStep: View {
     }
 
     /// Échec silencieux assumé si le PDF manque au bundle (improbable :
-    /// embarqué via la folder reference Resources/Documentation/).
+    /// copié à la racine du bundle par le groupe synchronisé). Le PDF
+    /// vit à la racine de Resources/ — PAS dans Documentation/, dossier
+    /// intégralement régénéré par migrate-notion-docs.py (un run du
+    /// script l'y avait supprimé, leçon F.1 12/06).
     private func openAPIKeyTutorial() {
         guard let url = Bundle.main.url(forResource: "Tuto-cle-API-loucede",
-                                        withExtension: "pdf",
-                                        subdirectory: "Documentation") else { return }
+                                        withExtension: "pdf") else { return }
         NSWorkspace.shared.open(url)
     }
 
