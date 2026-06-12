@@ -34,36 +34,33 @@ struct AboutView: View {
             Text("loucedé")
                 .font(.system(size: 28, weight: .bold))
 
-            Text("Une IA au bout de tes doigts")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 4) {
-                Text("Version \(appVersion) (build \(buildNumber))")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-
-                if updateChecker.updateAvailable, let latest = updateChecker.latestVersion {
-                    Button {
-                        updateChecker.openDownloadPage()
-                    } label: {
-                        Text("Version \(latest) disponible — télécharger")
-                            .font(.system(size: 12))
-                    }
-                    .buttonStyle(.link)
-                }
-            }
-
-            Divider().frame(width: 300)
-
+            // F.4 C4 (retour runtime) : tagline + version + lien code
+            // source resserrés (spacing 8 vs 24 du VStack racine).
             VStack(spacing: 8) {
-                Text("Logiciel libre sous licence GPL v3")
-                    .font(.system(size: 12))
-                Text("Fork de TexTab par ELPROFUG0")
-                    .font(.system(size: 11))
+                Text("Une IA au bout de tes doigts")
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
 
-                Link("Code source sur GitHub",
+                VStack(spacing: 4) {
+                    Text("Version \(appVersion) (build \(buildNumber))")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+
+                    if updateChecker.updateAvailable, let latest = updateChecker.latestVersion {
+                        Button {
+                            updateChecker.openDownloadPage()
+                        } label: {
+                            Text("Version \(latest) disponible — télécharger")
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.link)
+                    }
+                }
+
+                // F.4 C4 : lien remonté ici depuis le bloc GPL (ex-libellé
+                // « Code source sur GitHub », supprimé là-bas — pas de
+                // doublon).
+                Link("Code source",
                      destination: URL(string: "https://github.com/poirpom/loucede")!)
                     .font(.system(size: 12))
             }
@@ -73,6 +70,7 @@ struct AboutView: View {
             // mail par défaut. Plus de formulaire ni de webhook (cf.
             // décision n°4) : infra minimale, transparence pour
             // l'utilisateur, pas de license-gating.
+            // F.4 C4 : remonté à la place de l'ex-Divider (retour runtime).
             Button {
                 openSuggestionMail()
             } label: {
@@ -87,6 +85,14 @@ struct AboutView: View {
             }
             .buttonStyle(.bordered)
             .help("Partage une idée ou une remarque par email")
+
+            VStack(spacing: 8) {
+                Text("Logiciel libre sous licence GPL v3")
+                    .font(.system(size: 12))
+                Text("Fork de TexTab par ELPROFUG0")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
         }
