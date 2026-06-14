@@ -45,8 +45,7 @@ struct ActivationStep: View {
             // template — sans ça, le PNG s'aligne sur la bounding box du
             // Text (flotte au-dessus de la ligne) au lieu de la baseline.
             (Text("Les réglages sont accessibles depuis la barre des menus → ")
-             + Text(Image("MenuBarIcon")).baselineOffset(-4)
-             + Text(" (= logo loucedé)"))
+             + Text(Image("MenuBarIcon")).baselineOffset(-4))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
