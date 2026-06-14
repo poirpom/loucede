@@ -6,59 +6,39 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @State private var currentStep = 0
+    /// Phase R (2026-06-14) : refonte mono-écran. Les 5 écrans de config
+    /// séquentiels (Features/Permissions/Shortcut/APIKey/LaunchAtLogin) sont
+    /// remplacés par un seul écran accordéon `ConfigureView`. Séquence finale :
+    /// Splash → Configure → Final.
+    private enum Stage { case splash, configure, final }
+    @State private var stage: Stage = .splash
 
     var onComplete: () -> Void
-    /// Déclenché par « Faire le tuto » (écran 7). En M.1, câblé au même
-    /// finalize que `onComplete` côté `showOnboarding` ; rebranché en M.2
-    /// vers l'ouverture du tuto interactif.
+    /// Déclenché par « Faire le tuto » (écran final). Câblé côté
+    /// `showOnboarding` : finalise l'onboarding PUIS ouvre le tuto WKWebView.
     var onStartTutorial: () -> Void
-
-    /// Phase 7.2 (2026-04-29) : ajout de `APIKeyStep` entre Shortcut (3)
-    /// et LaunchAtLogin (5). Séquence finale : 7 écrans.
-    private let totalSteps = 7
 
     var body: some View {
         Group {
-            switch currentStep {
-            case 0:
-                WelcomeStep(onNext: nextStep)
-            case 1:
-                FeaturesStep(onNext: nextStep, onBack: previousStep)
-            case 2:
-                PermissionsStep(onNext: nextStep, onBack: previousStep)
-            case 3:
-                ShortcutStep(onNext: nextStep, onBack: previousStep)
-            case 4:
-                APIKeyStep(onNext: nextStep, onBack: previousStep)
-            case 5:
-                LaunchAtLoginStep(onNext: nextStep, onBack: previousStep)
-            case 6:
+            switch stage {
+            case .splash:
+                WelcomeStep(onNext: { go(.configure) })
+            case .configure:
+                ConfigureView(onNext: { go(.final) }, onBack: { go(.splash) })
+            case .final:
                 ActivationStep(
                     onComplete: onComplete,
                     onStartTutorial: onStartTutorial,
-                    onBack: previousStep
+                    onBack: { go(.configure) }
                 )
-            default:
-                EmptyView()
             }
         }
-        .frame(width: 800, height: 520)
+        .frame(width: 880, height: 640)
     }
 
-    private func nextStep() {
+    private func go(_ next: Stage) {
         withAnimation(.easeInOut(duration: 0.3)) {
-            if currentStep < totalSteps - 1 {
-                currentStep += 1
-            }
-        }
-    }
-
-    private func previousStep() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            if currentStep > 0 {
-                currentStep -= 1
-            }
+            stage = next
         }
     }
 }

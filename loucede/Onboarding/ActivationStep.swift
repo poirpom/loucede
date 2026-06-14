@@ -54,13 +54,15 @@ struct ActivationStep: View {
 
             Spacer()
 
+            // Phase R : hiérarchie boutons allégée — Retour discret (.plain),
+            // « Pas de tuto » secondaire, « Faire le tuto » seul proéminent.
             HStack(spacing: 16) {
                 Button("Retour", action: onBack)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 Button("Pas de tuto", action: onComplete)
                     .buttonStyle(.bordered)
-                    .controlSize(.regular)
+                    .controlSize(.large)
                 Button("Faire le tuto", action: onStartTutorial)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
