@@ -33,7 +33,7 @@ struct OnboardingView: View {
                 )
             }
         }
-        .frame(width: 1100, height: 640)
+        .frame(width: 920, height: 640)
     }
 
     private func go(_ next: Stage) {

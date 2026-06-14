@@ -13,7 +13,8 @@
 import SwiftUI
 
 struct ConfigureRightPanel: View {
-    let card: OnboardingCard
+    /// `nil` = accordéon tout replié (tout complété) → panneau « C'est prêt ».
+    let card: OnboardingCard?
     let accessibilityGranted: Bool
     let shortcutModifiers: [String]
     let shortcutKey: String
@@ -33,6 +34,7 @@ struct ConfigureRightPanel: View {
         case .shortcut:      return Color("OnboardPastelShortcut")
         case .apiKey:        return Color("OnboardPastelApiKey")
         case .launch:        return Color("OnboardPastelLaunch")
+        case .none:          return Color(NSColor.controlBackgroundColor)
         }
     }
 
@@ -47,6 +49,27 @@ struct ConfigureRightPanel: View {
             ProviderCardsIllustration()
         case .launch:
             LaunchPowerIllustration()
+        case .none:
+            DonePanel()
+        }
+    }
+}
+
+// MARK: - Panneau « tout est prêt » (accordéon replié)
+
+private struct DonePanel: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 64, weight: .light))
+                .foregroundStyle(.green)
+                .symbolEffect(.bounce)
+            Text("C'est prêt !")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+            Text("Clique « Terminer » pour lancer loucedé.")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
         }
     }
 }

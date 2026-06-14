@@ -24,9 +24,10 @@ struct AZERTYKeyboard: View {
 
     // MARK: - Dimensions
 
-    private let unit: CGFloat = 30      // largeur d'une touche « 1u »
-    private let keyHeight: CGFloat = 32
-    private let gap: CGFloat = 5
+    // Dimensions calées pour tenir dans le panneau droit ~480 (proto 920×640).
+    private let unit: CGFloat = 26      // largeur d'une touche « 1u »
+    private let keyHeight: CGFloat = 28
+    private let gap: CGFloat = 4
 
     /// Identités à mettre en surbrillance = modifiers ∪ { touche }.
     /// Les valeurs correspondent aux `id` des KeyCap (cf. `rows`).
@@ -50,7 +51,7 @@ struct AZERTYKeyboard: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(NSColor.windowBackgroundColor))
@@ -119,14 +120,14 @@ struct AZERTYKeyboard: View {
         let id: String
         let label: String
         var width: CGFloat = 1
-        var fontSize: CGFloat = 13
-        init(_ idLabel: String, width: CGFloat = 1, fontSize: CGFloat = 13) {
+        var fontSize: CGFloat = 12
+        init(_ idLabel: String, width: CGFloat = 1, fontSize: CGFloat = 12) {
             self.id = idLabel
             self.label = idLabel
             self.width = width
             self.fontSize = fontSize
         }
-        init(id: String, label: String, width: CGFloat = 1, fontSize: CGFloat = 13) {
+        init(id: String, label: String, width: CGFloat = 1, fontSize: CGFloat = 12) {
             self.id = id
             self.label = label
             self.width = width
@@ -149,8 +150,8 @@ struct AZERTYKeyboard: View {
             // Rangée modificateurs (id = symbole stocké par le recorder).
             [
                 KeyCap(id: "fn", label: "fn", fontSize: 10),
-                KeyCap(id: "^", label: "\u{2303}", fontSize: 13),          // control
-                KeyCap(id: "\u{2325}", label: "\u{2325}", fontSize: 13),   // option
+                KeyCap(id: "^", label: "\u{2303}", fontSize: 12),          // control
+                KeyCap(id: "\u{2325}", label: "\u{2325}", fontSize: 12),   // option
                 KeyCap(id: "\u{2318}", label: "\u{2318}", width: 1.4),     // command
                 KeyCap(id: "space", label: "", width: 4.2),
                 KeyCap(id: "\u{2318}R", label: "\u{2318}", width: 1.4),    // command droit (id distinct, non matché)

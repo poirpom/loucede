@@ -56,7 +56,9 @@ struct ConfigureView: View {
     @StateObject private var completion = OnboardingCompletion()
     @StateObject private var recorder = ShortcutRecorder()
 
-    @State private var openCard: OnboardingCard = .accessibility
+    // `nil` = toutes les cards repliées (auto-avancement : plus rien
+    // d'incomplet → on signale « clique Terminer »).
+    @State private var openCard: OnboardingCard? = .accessibility
     @State private var launchEnabled = false
 
     // Card Raccourci : la coche n'apparaît qu'après un geste explicite
@@ -75,7 +77,7 @@ struct ConfigureView: View {
     var body: some View {
         HStack(spacing: 0) {
             leftPanel
-                .frame(width: 550)
+                .frame(width: 440)
             ConfigureRightPanel(
                 card: openCard,
                 accessibilityGranted: completion.accessibilityGranted,
@@ -88,6 +90,14 @@ struct ConfigureView: View {
             completion.start()
             launchEnabled = LaunchAtLoginManager.shared.isEnabled
             openCard = firstIncomplete()
+        }
+        .onChange(of: completion.accessibilityGranted) { _, granted in
+            // Accessibilité accordée pendant qu'on est sur sa card → on
+            // enchaîne sur la 1ère incomplète restante (sans voler le focus
+            // si l'utilisateur travaille déjà ailleurs).
+            if granted && openCard == .accessibility {
+                advanceToNextIncomplete()
+            }
         }
         .onDisappear {
             completion.stop()
@@ -282,10 +292,9 @@ struct ConfigureView: View {
             Button {
                 recorder.start {
                     // Geste explicite : raccourci custom capturé.
-                    withAnimation {
-                        shortcutUsedDefault = false
-                        shortcutAcknowledged = true
-                    }
+                    shortcutUsedDefault = false
+                    shortcutAcknowledged = true
+                    advanceToNextIncomplete()
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -349,10 +358,9 @@ struct ConfigureView: View {
         store.mainShortcut = "&"
         store.mainShortcutKeyCode = 18
         store.saveMainShortcut()
-        withAnimation {
-            shortcutUsedDefault = true
-            shortcutAcknowledged = true
-        }
+        shortcutUsedDefault = true
+        shortcutAcknowledged = true
+        advanceToNextIncomplete()
     }
 
     private var apiKeyContent: some View {
@@ -464,6 +472,8 @@ struct ConfigureView: View {
                 set: { newValue in
                     LaunchAtLoginManager.shared.setEnabled(newValue)
                     withAnimation { launchEnabled = LaunchAtLoginManager.shared.isEnabled }
+                    // Activé = card complétée → enchaîne (souvent dernière → tout replier).
+                    if launchEnabled { advanceToNextIncomplete() }
                 }
             )) {
                 Text(launchEnabled ? "Activé — toujours là quand tu en as besoin" : "Lancer loucedé au démarrage")
@@ -506,10 +516,7 @@ struct ConfigureView: View {
             store.saveApiKey(trimmed, for: target)
             store.saveProvider(target)
             isValidating = false
-            // Clé OK → ouvre la première card encore incomplète (souvent Démarrage).
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                openCard = firstIncomplete()
-            }
+            advanceToNextIncomplete()
         } catch {
             isValidating = false
             withAnimation {
@@ -528,9 +535,7 @@ struct ConfigureView: View {
             store.saveApiKey(trimmed, for: p)
             store.saveProvider(p)
         }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            openCard = firstIncomplete()
-        }
+        advanceToNextIncomplete()
     }
 
     // MARK: - Completion logic (dérivée live)
@@ -559,6 +564,15 @@ struct ConfigureView: View {
 
     private func firstIncomplete() -> OnboardingCard {
         OnboardingCard.allCases.first { !focusComplete($0) } ?? .accessibility
+    }
+
+    /// Auto-avancement : après validation d'une card, ouvre la première card
+    /// encore incomplète (au sens de la coche explicite `headerComplete`) ;
+    /// `nil` quand tout est complété → toutes les cards se replient.
+    private func advanceToNextIncomplete() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            openCard = OnboardingCard.allCases.first { !headerComplete($0) }
+        }
     }
 
     private var canFinish: Bool {
