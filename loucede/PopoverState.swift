@@ -39,6 +39,10 @@ final class PopoverState: ObservableObject {
     var tutorialPasteHandler: ((String) -> Void)?
     /// Notifie le lancement d'une action (→ coche « action ») en mode tuto.
     var tutorialActionRunHandler: (() -> Void)?
+    /// Phase R-tuto — notifie la sauvegarde ⌘S d'une action générée
+    /// (→ coche « save », écran 3). Distinct de `tutorialActionRunHandler` :
+    /// run-first exécute l'action automatiquement, on coche au ⌘S réel.
+    var tutorialSaveHandler: (() -> Void)?
     /// M.2.5 — notifie la FIN d'un stream réussi (→ coche « magic ») en mode tuto.
     var tutorialStreamDoneHandler: (() -> Void)?
     /// M.2.5-fix — notifie une copie (⏎) (→ coche « copy ») en mode tuto.
@@ -356,6 +360,7 @@ final class PopoverState: ObservableObject {
         let store = ActionsStore.shared
         action.displayOrder = (store.actions.map(\.displayOrder).max() ?? 0) + 1
         store.addAction(action)
+        if tutorialMode { tutorialSaveHandler?() }   // R-tuto : coche « save » (écran 3)
         pendingGeneratedAction = nil
     }
 

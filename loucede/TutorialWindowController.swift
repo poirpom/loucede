@@ -92,6 +92,8 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
             self?.tick("paste")   // M.2.5 — coche « paste » (écran 2 ; no-op ailleurs)
         }
         state.tutorialActionRunHandler = { [weak self] in self?.tick("action") }
+        // R-tuto — coche « save » sur ⌘S (sauvegarde de l'action générée, écran 3).
+        state.tutorialSaveHandler = { [weak self] in self?.tick("save") }
         // M.2.5 — coche « magic » à la fin d'un stream réussi.
         state.tutorialStreamDoneHandler = { [weak self] in self?.tick("magic") }
         // M.2.5-fix — coche « copy » sur ⏎ Copier (écran 1 ; no-op ailleurs).
@@ -193,6 +195,7 @@ final class TutorialWindowController: NSWindowController, NSWindowDelegate {
         state.tutorialMode = false
         state.tutorialPasteHandler = nil
         state.tutorialActionRunHandler = nil
+        state.tutorialSaveHandler = nil
         state.tutorialStreamDoneHandler = nil
         state.tutorialCopyHandler = nil
         state.tutorialClosedHandler = nil
