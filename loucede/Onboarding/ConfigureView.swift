@@ -59,6 +59,12 @@ struct ConfigureView: View {
     @State private var openCard: OnboardingCard = .accessibility
     @State private var launchEnabled = false
 
+    // Card Raccourci : la coche n'apparaît qu'après un geste explicite
+    // (saisie d'un raccourci custom OU « Utiliser le raccourci par défaut »).
+    // Le raccourci reste optionnel — n'entre jamais dans `canFinish`.
+    @State private var shortcutAcknowledged = false
+    @State private var shortcutUsedDefault = false
+
     // Card Clé API
     @State private var keyInput = ""
     @State private var detectedProvider: AIProvider?
@@ -69,7 +75,7 @@ struct ConfigureView: View {
     var body: some View {
         HStack(spacing: 0) {
             leftPanel
-                .frame(width: 440)
+                .frame(width: 550)
             ConfigureRightPanel(
                 card: openCard,
                 accessibilityGranted: completion.accessibilityGranted,
@@ -232,7 +238,7 @@ struct ConfigureView: View {
 
     private var accessibilityContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("L'autorisation d'accessibilité est requise pour que loucedé fonctionne.")
+            Text("Permet les raccourcis globaux, la détection du texte sélectionné et le collage du texte transformé.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -268,13 +274,19 @@ struct ConfigureView: View {
 
     private var shortcutContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Pour invoquer loucedé partout. Clique la case pour en définir un autre.")
+            Text("Clique ci-dessous pour le définir (ou garde celui par défaut qui est très bien).")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
-                recorder.start()
+                recorder.start {
+                    // Geste explicite : raccourci custom capturé.
+                    withAnimation {
+                        shortcutUsedDefault = false
+                        shortcutAcknowledged = true
+                    }
+                }
             } label: {
                 HStack(spacing: 6) {
                     let keys = recorder.isRecording ? recorder.liveKeys
@@ -312,13 +324,34 @@ struct ConfigureView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: recorder.isRecording)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: recorder.liveKeys)
 
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(.green)
-                Text("Un raccourci est déjà configuré (modifiable ici ou dans les réglages).")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if shortcutAcknowledged {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(.green)
+                    Text(shortcutUsedDefault ? "Raccourci par défaut conservé" : "Raccourci enregistré")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .transition(.opacity)
+            } else {
+                Button("Utiliser le raccourci par défaut", action: useDefaultShortcut)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .transition(.opacity)
             }
+        }
+        .animation(.easeInOut(duration: 0.2), value: shortcutAcknowledged)
+    }
+
+    /// Écrit explicitement le raccourci par défaut (⌥&) dans ActionsStore et
+    /// marque la card comme acquittée. Geste explicite équivalent à une saisie.
+    private func useDefaultShortcut() {
+        store.mainShortcutModifiers = ["\u{2325}"]
+        store.mainShortcut = "&"
+        store.mainShortcutKeyCode = 18
+        store.saveMainShortcut()
+        withAnimation {
+            shortcutUsedDefault = true
+            shortcutAcknowledged = true
         }
     }
 
@@ -508,7 +541,7 @@ struct ConfigureView: View {
         switch card {
         case .accessibility: return completion.accessibilityGranted
         case .apiKey:        return store.hasUsableProvider
-        case .shortcut:      return true
+        case .shortcut:      return shortcutAcknowledged   // coche explicite (geste requis)
         case .launch:        return launchEnabled
         }
     }

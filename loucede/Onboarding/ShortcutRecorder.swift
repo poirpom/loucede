@@ -25,9 +25,13 @@ final class ShortcutRecorder: ObservableObject {
 
     private var eventMonitor: Any?
     private let store = ActionsStore.shared
+    private var onCommit: (() -> Void)?
 
-    func start() {
+    /// `onCommit` est appelé une fois le raccourci custom capturé + persisté
+    /// (geste explicite de l'utilisateur — utilisé pour la coche de la card).
+    func start(onCommit: @escaping () -> Void = {}) {
         stop() // Clean up any existing monitor
+        self.onCommit = onCommit
         isRecording = true
         liveKeys = []
 
@@ -74,6 +78,7 @@ final class ShortcutRecorder: ObservableObject {
                         self.store.mainShortcutKeyCode = capturedKeyCode
                         self.store.saveMainShortcut()
                         withAnimation { self.isRecording = false }
+                        self.onCommit?()
                         self.stop()
                     }
                     return nil
