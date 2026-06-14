@@ -15,7 +15,6 @@ struct ActivationStep: View {
     /// (cf. `OnboardingView` / `showOnboarding`). En M.2, sera rebranché
     /// vers l'ouverture de la fenêtre tuto WKWebView, sans toucher à cette UI.
     var onStartTutorial: () -> Void
-    var onBack: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -45,21 +44,18 @@ struct ActivationStep: View {
             // Note alignement vertical : `.baselineOffset(-4)` sur le PNG
             // template — sans ça, le PNG s'aligne sur la bounding box du
             // Text (flotte au-dessus de la ligne) au lieu de la baseline.
-            (Text("Les réglages sont accessibles depuis la barre des menus ")
+            (Text("Les réglages sont accessibles depuis la barre des menus → ")
              + Text(Image("MenuBarIcon")).baselineOffset(-4)
-             + Text("."))
+             + Text(" (= logo loucedé)"))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             Spacer()
 
-            // Phase R : hiérarchie boutons allégée — Retour discret (.plain),
-            // « Pas de tuto » secondaire, « Faire le tuto » seul proéminent.
+            // Phase R : onboarding terminé → pas de Retour. « Pas de tuto »
+            // secondaire, « Faire le tuto » seul proéminent.
             HStack(spacing: 16) {
-                Button("Retour", action: onBack)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
                 Button("Pas de tuto", action: onComplete)
                     .buttonStyle(.bordered)
                     .controlSize(.large)
@@ -76,6 +72,6 @@ struct ActivationStep: View {
 }
 
 #Preview {
-    ActivationStep(onComplete: {}, onStartTutorial: {}, onBack: {})
-        .frame(width: 800, height: 520)
+    ActivationStep(onComplete: {}, onStartTutorial: {})
+        .frame(width: 920, height: 640)
 }

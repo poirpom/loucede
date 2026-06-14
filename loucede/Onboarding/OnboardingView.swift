@@ -28,8 +28,7 @@ struct OnboardingView: View {
             case .final:
                 ActivationStep(
                     onComplete: onComplete,
-                    onStartTutorial: onStartTutorial,
-                    onBack: { go(.configure) }
+                    onStartTutorial: onStartTutorial
                 )
             }
         }
