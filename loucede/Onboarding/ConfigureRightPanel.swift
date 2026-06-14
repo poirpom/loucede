@@ -34,7 +34,7 @@ struct ConfigureRightPanel: View {
         case .shortcut:      return Color("OnboardPastelShortcut")
         case .apiKey:        return Color("OnboardPastelApiKey")
         case .launch:        return Color("OnboardPastelLaunch")
-        case .none:          return Color(NSColor.controlBackgroundColor)
+        case .none:          return Color("OnboardPastelAccessibility")
         }
     }
 
@@ -64,12 +64,11 @@ private struct DonePanel: View {
                 .font(.system(size: 64, weight: .light))
                 .foregroundStyle(.green)
                 .symbolEffect(.bounce)
-            Text("C'est prêt !")
+            Text("Bien ouèj !")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
-            Text("Clique « Terminer » pour lancer loucedé.")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
+                // Pastel fixe (clair dans les 2 modes) → texte forcé sombre
+                // pour rester lisible en dark (même parti pris que ProviderCard).
+                .foregroundStyle(Color.black)
         }
     }
 }
