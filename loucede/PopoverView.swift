@@ -108,12 +108,14 @@ struct PopoverView: View {
                 mainView
             }
         }
-        // Phase 1.4b : largeur responsive (compact → agrandi). Nécessaire pour
-        // que le contenu SwiftUI suive l'animation de la NSWindow ; sinon on
-        // verrait une bande transparente de chaque côté. Source unique partagée
-        // avec le frame de la NSWindow (`AppDelegate.resizePopover`) via le même
-        // helper → valeurs garanties identiques.
-        .frame(width: AppDelegate.popoverDefaultWidth)
+        // Largeur du contenu SwiftUI. DOIT suivre le frame de la NSWindow
+        // (`AppDelegate.resizePopover`) sinon bande transparente latérale.
+        // Phase S (C2) : la fenêtre de réponse (lecture) est plus large que la
+        // liste/générateur (scan) → conditionnel sur le mode résultat, miroir
+        // exact de la largeur posée par `resizePopover(.resultCompact)`.
+        .frame(width: (state.generatorPhase == nil && state.activeAction != nil)
+                      ? PolishTokens.resultWindowWidth
+                      : AppDelegate.popoverDefaultWidth)
         // Q.1.d : panneau loucedé canonique = vibrancy hudWindow + clip coins
         // arrondis + bordure intérieure, le tout via `.polishVibrancy()`
         // (inconditionnel — les 3 surfaces mainView/generator/result partagent
@@ -1424,16 +1426,15 @@ struct PopoverView: View {
                     // `PopoverState.suspendFlush()` appelé pendant les
                     // animations de resize (cf. `onChange(of: state.activeAction)`).
                     Markdown(state.resultText)
-                        // Phase S : corps via token (typo dédiée en C2).
-                        .markdownTextStyle(\.text) {
-                            FontSize(PolishTokens.resultBodyFontSize)
-                        }
+                        // Phase S (C2) : thème de lecture dédié (corps 16,
+                        // interligne ~1,5×, titres resserrés, code WRAP,
+                        // blockquote à barre). Cf. ResultTheme.swift.
+                        .markdownTheme(.loucedeResult)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        // Q.1.d : padding corps via tokens (h16/v12) — le markdown
-                        // ne touche plus les bords (defect « texte aux bords »).
-                        .padding(.horizontal, PolishTokens.paddingHorizontal)
-                        .padding(.vertical, PolishTokens.paddingVertical)
+                        // Phase S (C2) : paddings généreux dédiés lecture (h32/v24).
+                        .padding(.horizontal, PolishTokens.resultPaddingHorizontal)
+                        .padding(.vertical, PolishTokens.resultPaddingVertical)
                     }   // fin if/else spinner d'attente (Q.2.h.1)
                 }
                 // Phase S : fenêtre de réponse unique, scroll plafonné à 300pt

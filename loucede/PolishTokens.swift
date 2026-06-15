@@ -34,12 +34,52 @@ enum PolishTokens {
     static let paddingHorizontal: CGFloat = 16
     static let paddingVertical: CGFloat = 12
 
-    // MARK: Typo — corps markdown de la réponse IA
+    // MARK: Typo — fenêtre de réponse (Phase S — C2)
+    //
+    // Valeurs STRUCTURANTES de la fenêtre de réponse (lecture longue). Le
+    // RENDU des styles markdown vit dans `Theme.loucedeResult` (ResultTheme.swift),
+    // posé via `.markdownTheme(...)`. Caveat assumé : le fond du code inline est
+    // plat (radius/padding non supportés par l'API text-style MarkdownUI).
 
-    /// Taille du corps markdown de la réponse IA (MarkdownUI `\.text`).
-    /// Phase S : fenêtre unique, plus de variante agrandie. La typo dédiée
-    /// (corps 16 + thème) arrive en commit C2.
-    static let resultBodyFontSize: CGFloat = 13
+    /// Largeur de la fenêtre de réponse. Source UNIQUE partagée par le frame
+    /// NSWindow (`resizePopover` .resultCompact) ET le frame du contenu SwiftUI
+    /// (PopoverView) → pas de bande transparente latérale. Distincte de
+    /// `popoverDefaultWidth` (400, liste/générateur = surfaces de scan).
+    static let resultWindowWidth: CGFloat = 575
+    /// Padding latéral du corps markdown (généreux — mesure de lecture).
+    static let resultPaddingHorizontal: CGFloat = 32
+    static let resultPaddingVertical: CGFloat = 24
+
+    /// Corps markdown (MarkdownUI `\.text`). 16pt = confort lecture écran.
+    static let resultBodyFontSize: CGFloat = 16
+    /// Interligne ADDITIF relatif (`relativeLineSpacing(.em(_))`). 0.3 ≈ 1,5×
+    /// effectif (leading SF naturel ~1,2× + 0,3). À caler à l'œil.
+    static let resultLineSpacingEm: CGFloat = 0.3
+    /// Marge basse de paragraphe (rythme vertical de la prose). Les items de
+    /// liste « tight » l'ignorent (MarkdownUI) → espacement propre via
+    /// `resultListItemSpacing`.
+    static let resultParagraphSpacing: CGFloat = 16
+    /// Espacement entre items de liste (léger — surface de scan dans la lecture).
+    static let resultListItemSpacing: CGFloat = 5
+
+    /// Échelle des titres (H1→H4). H4 = taille du corps, distingué par la
+    /// GRAISSE (.bold) vs les H1-H3 (.semibold) — cf. ResultTheme.
+    static let resultH1FontSize: CGFloat = 24
+    static let resultH2FontSize: CGFloat = 20
+    static let resultH3FontSize: CGFloat = 18
+    static let resultH4FontSize: CGFloat = 16
+
+    /// Fond plat du code (inline + bloc). Adaptatif light/dark via `.secondary`.
+    static let resultInlineCodeBackground: Color = .secondary.opacity(0.12)
+    static let resultCodeBlockBackground: Color = .secondary.opacity(0.15)
+    static let resultCodeBlockCornerRadius: CGFloat = 8
+    static let resultCodeBlockPadding: CGFloat = 12
+
+    /// Blockquote — barre verticale gauche. Gris neutre par défaut
+    /// (`separatorColor`) ; variante bleue `Color(hex: "3F84F7")` à tester à l'œil.
+    static let resultBlockquoteBarColor: Color = Color(nsColor: .separatorColor)
+    static let resultBlockquoteBarWidth: CGFloat = 3
+    static let resultBlockquoteIndent: CGFloat = 12
 
     // MARK: Barre d'actions sur l'action (fenêtre de réponse — ResultActionsBar)
 

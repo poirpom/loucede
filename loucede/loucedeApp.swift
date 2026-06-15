@@ -620,7 +620,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // builder reconstruit la liste (en-têtes + lignes) pour mesurer.
             height = Self.calculatedPopoverHeight(searchQuery: searchQuery)
         case .resultCompact:
-            width = Self.popoverDefaultWidth
+            // Phase S (C2) : fenêtre de réponse plus large (lecture). Miroir
+            // exact du `.frame(width:)` du contenu SwiftUI (PopoverView).
+            width = PolishTokens.resultWindowWidth
             // Q.2.h.2 v2 : +32pt quand la barre d'actions sur l'action
             // (ResultActionsBar) est visible — automatique sur tous les
             // chemins (entrée run-first notamment).
