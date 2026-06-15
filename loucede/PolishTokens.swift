@@ -45,9 +45,11 @@ enum PolishTokens {
     /// NSWindow (`resizePopover` .resultCompact) ET le frame du contenu SwiftUI
     /// (PopoverView) → pas de bande transparente latérale. Distincte de
     /// `popoverDefaultWidth` (400, liste/générateur = surfaces de scan).
-    static let resultWindowWidth: CGFloat = 575
+    /// 618 = bloc texte ~528pt (≈66 car. × 8pt, longueur de ligne optimale)
+    /// + 2×45 padding latéral. Calé runtime C2-fix.
+    static let resultWindowWidth: CGFloat = 618
     /// Padding latéral du corps markdown (généreux — mesure de lecture).
-    static let resultPaddingHorizontal: CGFloat = 32
+    static let resultPaddingHorizontal: CGFloat = 45
     static let resultPaddingVertical: CGFloat = 24
 
     /// Corps markdown (MarkdownUI `\.text`). 16pt = confort lecture écran.
@@ -75,10 +77,11 @@ enum PolishTokens {
     static let resultCodeBlockCornerRadius: CGFloat = 8
     static let resultCodeBlockPadding: CGFloat = 12
 
-    /// Blockquote — barre verticale gauche. Gris neutre par défaut
-    /// (`separatorColor`) ; variante bleue `Color(hex: "3F84F7")` à tester à l'œil.
-    static let resultBlockquoteBarColor: Color = Color(nsColor: .separatorColor)
-    static let resultBlockquoteBarWidth: CGFloat = 3
+    /// Blockquote — barre verticale gauche. Bleu loucedé #3F84F7 (identité)
+    /// en trait FIN (2pt) pour la retenue. C2-fix : la coquetterie validée à
+    /// l'œil ; repli `Color(nsColor: .separatorColor)` si jamais trop présente.
+    static let resultBlockquoteBarColor: Color = Color(hex: "3F84F7")
+    static let resultBlockquoteBarWidth: CGFloat = 2
     static let resultBlockquoteIndent: CGFloat = 12
 
     // MARK: Barre d'actions sur l'action (fenêtre de réponse — ResultActionsBar)
