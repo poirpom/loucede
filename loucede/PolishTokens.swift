@@ -37,35 +37,9 @@ enum PolishTokens {
     // MARK: Typo — corps markdown de la réponse IA
 
     /// Taille du corps markdown de la réponse IA (MarkdownUI `\.text`).
-    /// `...Expanded` s'applique en mode agrandi (touche F) pour une lecture
-    /// plus confortable. La cascade sur titres/code/listes est ASSUMÉE
-    /// (Chemin A1) : le thème MarkdownUI par défaut les dimensionne en `.em`
-    /// relatifs au corps, donc ils grossissent proportionnellement.
+    /// Phase S : fenêtre unique, plus de variante agrandie. La typo dédiée
+    /// (corps 16 + thème) arrive en commit C2.
     static let resultBodyFontSize: CGFloat = 13
-    static let resultBodyFontSizeExpanded: CGFloat = 15
-
-    // MARK: Pastille F flottante (fenêtre de réponse — composant ResultActionPill)
-
-    /// Pastille F flottante centrée au bas du scroll de la fenêtre de réponse
-    /// (Q.2.c, position restaurée par le pivot Option C de Q.2.h.2 v2).
-    /// Capsule `.ultraThinMaterial` (pattern `ConfirmationToast`), SF Symbol
-    /// contextualisé (agrandir/réduire) + `KeyboardKey` pour cohérence footer.
-    /// Le composant `ResultActionPill` reste généralisé (symbol/key/shortcut)
-    /// pour d'éventuels usages futurs.
-    static let resultActionPillHeight: CGFloat = 28
-    static let resultActionPillIconSize: CGFloat = 13
-    static let resultActionPillIconWeight: Font.Weight = .medium
-    /// = épaisseur de trait du picto (poids medium) pour un accord visuel.
-    static let resultActionPillBorderWidth: CGFloat = 1.5
-    /// Marge entre la pastille et le bord bas du scroll.
-    static let resultActionPillBottomMargin: CGFloat = 10
-    static let resultActionPillFadeDuration: Double = 0.18
-    /// Padding horizontal interne de la capsule. Donne de l'air entre la
-    /// bordure de la capsule et son contenu (le `KeyboardKey` ayant déjà sa
-    /// propre boîte, un padding trop serré créait un effet « double bordure »).
-    static let resultActionPillHorizontalPadding: CGFloat = 12
-    /// Espace picto ↔ touche dans la capsule.
-    static let resultActionPillSpacing: CGFloat = 8
 
     // MARK: Barre d'actions sur l'action (fenêtre de réponse — ResultActionsBar)
 
@@ -89,17 +63,6 @@ enum PolishTokens {
     /// Durée de l'animation NSWindow `resizePopover` par défaut (transitions
     /// liste↔résultat, phases du générateur). Restée snappy.
     static let popoverResizeDuration: Double = 0.25
-    /// Q.2.e — durée de l'animation pour l'agrandissement/réduction de la
-    /// fenêtre de réponse (touche F). Ralentie vs le défaut (0.25 perçue trop
-    /// brutale au runtime). Ne s'applique QU'au toggle résultat (passée
-    /// explicitement par `toggleResultExpanded`).
-    static let popoverResultResizeDuration: Double = 0.5
-    /// Q.2.e — délai de « settle » post-resize du résultat (légèrement > la
-    /// durée d'anim 0.5s). Consolide trois délais autrefois distincts, tous
-    /// calés sur la fin de l'anim NSWindow du toggle F : reset de la grâce de
-    /// shrink (clamp Q.2.a), reprise du flush LLM, et swap différé du picto de
-    /// la pastille (anti-« promenade », Q.2.c).
-    static let resultSettleDelay: Double = 0.55
 
     /// Q.3 — hauteur de la zone réservée au spinner de génération d'action
     /// (mini-popover Générateur, phase `.loading`). Gabarit volontairement

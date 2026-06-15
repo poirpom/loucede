@@ -64,24 +64,8 @@ struct PopoverView: View {
     // Armé à l'entrée en `.resultEditable` (premier des 4 champs à
     // retoucher, prompt en bas). Désarmé dans toutes les autres phases.
     @FocusState private var isEditableTitleFocused: Bool
-    // Phase 1.4b : état « fenêtre résultat agrandie » (touche F).
-    // Reset à false dès qu'on quitte la vue résultat (retour liste ou réouverture
-    // du popup), pour que chaque nouvelle action reparte en format compact.
-    @State private var resultExpanded: Bool = false
-    // Q.2.a : grâce de rétrécissement. Maintient la hauteur de contenu pleine
-    // pendant que la NSWindow descend (cf. `toggleResultExpanded`), pour que le
-    // contenu masque progressivement la fenêtre au lieu de claquer à compact.
-    @State private var resultShrinkGrace: Bool = false
-    // Q.2.a : invalide les clamps différés orphelins (toggle plus récent, reset,
-    // mashing F). Incrémenté à chaque toggle ; la closure différée n'agit que si
-    // son token capturé est toujours le courant. `&+=` = wrap-around safe.
-    @State private var resultClampToken: Int = 0
-    // Mode AFFICHÉ par la pastille F flottante. Suit `resultExpanded`
-    // instantanément partout (reset ouverture, sortie résultat) SAUF dans
-    // `toggleResultExpanded`, où il est posé en différé après le settle de
-    // l'anim NSWindow → le picto reste plein et stable pendant le glissement,
-    // puis crossfade in-place une fois la fenêtre statique (anti-« promenade »).
-    @State private var pillExpanded: Bool = false
+    // Phase S : fenêtre de réponse UNIQUE — le double mode normal/agrandi
+    // (touche F + pastille flottante + clamp différé Q.2.a) a été supprimé.
     // Q.2.h.2 v2 — révélation différée du CONTENU de la ResultActionsBar
     // (fade + slide-down). La barre occupe sa hauteur dès le montage (la
     // fenêtre arrive à 426 d'un coup) ; ce flag passe à true ~0.3s après
@@ -129,7 +113,7 @@ struct PopoverView: View {
         // verrait une bande transparente de chaque côté. Source unique partagée
         // avec le frame de la NSWindow (`AppDelegate.resizePopover`) via le même
         // helper → valeurs garanties identiques.
-        .frame(width: resultExpanded ? AppDelegate.expandedResultWidth() : AppDelegate.popoverDefaultWidth)
+        .frame(width: AppDelegate.popoverDefaultWidth)
         // Q.1.d : panneau loucedé canonique = vibrancy hudWindow + clip coins
         // arrondis + bordure intérieure, le tout via `.polishVibrancy()`
         // (inconditionnel — les 3 surfaces mainView/generator/result partagent
@@ -176,16 +160,8 @@ struct PopoverView: View {
                 DispatchQueue.main.async { isSearchFocused = true }
             }
             confirmation = nil
-            // Reset : showPopover remet déjà la fenêtre à 400×500, on n'a
-            // qu'à synchroniser l'état local.
-            resultExpanded = false
-            // Q.2.a : neutralise une grâce de shrink en cours (réouverture
-            // pendant les 0.28 s) — sinon le contenu resterait plein dans une
-            // fenêtre compacte. Reset instantané, pas de conceal sur réouverture.
-            resultShrinkGrace = false
-            // Pastille : set instantané miroir (pas de swap différé hors toggle F).
-            pillExpanded = false
-            // Barre d'actions : contenu masqué, re-révélé au prochain montage.
+            // Reset : showPopover remet déjà la fenêtre à 400×500, la barre
+            // d'actions est masquée et re-révélée au prochain montage.
             actionsBarVisible = false
         }
         // Focus initial au premier affichage (avant le premier openCounter).
@@ -212,7 +188,8 @@ struct PopoverView: View {
             // doit recalculer la hauteur (les actions ont pu changer depuis).
             //
             // Phase 6.14-fix (2026-04-26) : suspend/resume flush autour du
-            // resize, même raison que `toggleResultExpanded` ci-dessous.
+            // resize (la mutation de `resultText` à 60Hz pendant l'anim
+            // NSWindow déclenche un crash « Update Constraints »).
             // Particulièrement critique au passage liste→résultat : le
             // streaming démarre, et le premier flush peut atterrir pile
             // pendant l'animation NSWindow.
@@ -222,22 +199,12 @@ struct PopoverView: View {
                 // pour que la popup retrouve sa taille dynamique (le builder
                 // K.unify.3 reconstruit la liste pour mesurer la hauteur).
                 globalAppDelegate?.resizePopover(to: .list, searchQuery: state.searchQuery)
-                // Phase 6.14-fix-2 : set instantané, pas de withAnimation
-                // (cf. `toggleResultExpanded` pour l'analyse complète).
-                if resultExpanded {
-                    resultExpanded = false
-                }
-                // Q.2.a : reset instantané de la grâce — un retour liste pendant
-                // un conceal en cours ne doit pas laisser le contenu plein.
-                resultShrinkGrace = false
-                // Pastille : set instantané miroir (sortie du mode résultat).
-                pillExpanded = false
                 // Barre d'actions : contenu masqué (sortie du mode résultat).
                 actionsBarVisible = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }
-            } else if !resultExpanded && state.pendingGeneratedAction == nil {
+            } else if state.pendingGeneratedAction == nil {
                 // Q.2.h.1 : le flow « run first » (action générée exécutée
                 // directement) gère son propre resize, différé après le
                 // démontage du spinner TimelineView du générateur (cf.
@@ -252,10 +219,6 @@ struct PopoverView: View {
                     state.resumeFlush()
                 }
             }
-            // Si newValue != nil ET resultExpanded == true, on ne resize pas :
-            // l'utilisateur reste en mode résultat agrandi (cas extrême : il
-            // déclenche une nouvelle action depuis le résultat agrandi, ce
-            // qui n'arrive pas dans l'UX actuelle mais reste safe).
         }
         // K.2-B lot 2a — Transitions du mode Générateur :
         // 1) Resize la NSWindow selon la phase (compact vs resultEditable).
@@ -423,75 +386,6 @@ struct PopoverView: View {
         }
     }
 
-    /// Phase 1.4b : bascule le format de la fenêtre résultat (compact ↔ agrandi).
-    ///
-    /// La NSWindow s'anime symétriquement dans les deux sens (0.25 s easeInEaseOut,
-    /// via `AppDelegate.resizePopover`). La hauteur du contenu SwiftUI, elle, est
-    /// pilotée par le **timing** du clamp `maxHeight` (cf. `resultView`) :
-    /// - **agrandissement** : contenu à pleine hauteur immédiatement → la fenêtre
-    ///   grandit pour le révéler (reveal fluide) ;
-    /// - **rétrécissement** : le contenu reste plein pendant la descente de la
-    ///   fenêtre (grâce `resultShrinkGrace`), qui le masque progressivement
-    ///   (conceal fluide, miroir du reveal), puis clampe à compact une fois la
-    ///   fenêtre arrivée (clamp invisible, fenêtre déjà à sa taille finale).
-    ///
-    /// Q.2.a (2026-06-08) : ce **clamp différé** restaure la symétrie visuelle
-    /// que la Phase 6.14-fix-2 avait perdue. On n'utilise PAS `withAnimation` sur
-    /// la frame — pourtant le réflexe SwiftUI naturel — car ce pattern a été retiré
-    /// en 6.14-fix-2 suite à un crash `NSInternalInconsistencyException` :
-    /// l'interpolation SwiftUI de la frame (300↔2000pt) en parallèle de l'anim
-    /// NSWindow forçait le solver de constraints à ~15 re-renders concurrents
-    /// pendant les 250 ms (race condition fatale). Le clamp différé **décorrèle**
-    /// les deux animations dans le temps (frame mutée seulement après la fin de
-    /// l'anim window) → aucun chevauchement, donc aucune réintroduction du risque.
-    /// Effet de bord : la « fine bande noire » à la réduction (trade-off assumé
-    /// en 6.14-fix-2) disparaît, le contenu remplissant la fenêtre tout du long.
-    private func toggleResultExpanded() {
-        let newExpanded = !resultExpanded
-        // Token capturé pour la closure différée : tout toggle ultérieur
-        // l'invalide (double-F, mashing F, reset → cf. chemins onChange).
-        resultClampToken &+= 1
-        let token = resultClampToken
-        // Phase 6.14-fix (2026-04-26) : suspend le flush du buffer LLM pendant
-        // l'animation NSWindow. Sans ça, la mutation de `state.resultText` à
-        // 60Hz pendant que AppKit anime la fenêtre déclenche un crash
-        // NSInternalInconsistencyException « The window has been marked as
-        // needing another Update Constraints ».
-        state.suspendFlush()
-        // Q.2.e : le toggle résultat utilise une durée d'anim ralentie (0.5s,
-        // perçue moins brutale) — spécifique à cette transition, le reste de
-        // l'app garde le défaut snappy 0.25s.
-        globalAppDelegate?.resizePopover(to: newExpanded ? .resultExpanded : .resultCompact,
-                                         duration: PolishTokens.popoverResultResizeDuration)
-        resultExpanded = newExpanded
-        if newExpanded {
-            // Reveal : contenu plein immédiat, la fenêtre grandit par-dessus.
-            resultShrinkGrace = false
-        } else {
-            // Conceal : on maintient la hauteur pleine pendant la descente de la
-            // fenêtre (0.5 s), puis on clampe à compact. `resultSettleDelay`
-            // (0.55 s) = après l'arrivée de la NSWindow (clamp invisible) et le
-            // flush encore suspendu → la passe de layout tombe sur une fenêtre
-            // statique (aucune anim window concurrente : le risque 6.14 reste écarté).
-            resultShrinkGrace = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) {
-                guard token == resultClampToken else { return } // toggle plus récent → abandon
-                resultShrinkGrace = false
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) { [state] in
-            state.resumeFlush()
-        }
-        // Pastille : swap du picto DIFFÉRÉ après le settle de la fenêtre (les
-        // deux sens), gardé par le token (mashing F → seul le dernier toggle
-        // pose la valeur finale). Pendant le glide, la pastille montre l'ancien
-        // picto plein et stable ; à l'arrivée, crossfade in-place (anti-« promenade »).
-        DispatchQueue.main.asyncAfter(deadline: .now() + PolishTokens.resultSettleDelay) {
-            guard token == resultClampToken else { return }
-            pillExpanded = newExpanded
-        }
-    }
-
     private func showConfirmation(_ message: String, duration: Double = 1.2,
                                   style: ConfirmationToast.Style = .standard,
                                   then completion: (() -> Void)? = nil) {
@@ -531,36 +425,23 @@ struct PopoverView: View {
     /// `showsResultActionsBar`) SYNCHRONISÉ avec le resize NSWindow 426→394
     /// (pattern K.2-B lot 2b : withAnimation + NSAnimationContext même
     /// durée, suspendFlush autour — ⌘S possible pendant le streaming).
-    /// En mode agrandi : collapse seul, pas de resize fenêtre (hauteur
-    /// écran×0.7 indépendante de la barre).
     private func saveGeneratedActionFromBar() {
         guard state.showsResultActionsBar else { return }   // anti double-⌘S
         state.suspendFlush()
         withAnimation(.easeInOut(duration: PolishTokens.resultActionsBarFadeDuration)) {
             state.saveGeneratedAction()
         }
-        if !resultExpanded {
-            globalAppDelegate?.resizePopover(to: .resultCompact)
-        }
+        globalAppDelegate?.resizePopover(to: .resultCompact)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [state] in
             state.resumeFlush()
         }
         showConfirmation("Action sauvegardée", style: .compact)
     }
 
-    /// Q.2.h.3 — ⌘E : resets « retour toujours compact » puis ré-entrée
-    /// dans la fiche d'édition (PopoverState.enterEditFromResult, qui fait
-    /// basculer le body et résize via le .onChange(generatorPhase) existant).
-    /// Depuis l'agrandi : `resultExpanded = false` ramène le frame SwiftUI
-    /// à 400 pendant que la fenêtre anime vers 400×680 — set instantané,
-    /// même pattern (6.14-fix-2) que le retour liste depuis l'agrandi. Le
-    /// retour post-validation/Esc repart donc toujours compact (F dispo
-    /// pour ré-agrandir).
+    /// Q.2.h.3 — ⌘E : ré-entrée dans la fiche d'édition
+    /// (PopoverState.enterEditFromResult, qui fait basculer le body et résize
+    /// via le .onChange(generatorPhase) existant).
     private func enterEditFromResultBar() {
-        resultClampToken &+= 1        // invalide grace/swap différés en vol
-        resultExpanded = false
-        resultShrinkGrace = false
-        pillExpanded = false
         state.enterEditFromResult()
     }
 
@@ -1537,19 +1418,15 @@ struct PopoverView: View {
                     // Phase 6.14-fix (2026-04-26) : on revient au rendu
                     // Markdown live pendant le streaming (préférence UX).
                     // Le crash AppKit qui motivait la Phase 6.14 était en
-                    // fait causé par les transitions de fenêtre (touche F)
-                    // qui mutaient `resultText` pendant un layout en cours,
-                    // pas par le re-parse Markdown lui-même. Le vrai fix
-                    // est dans `PopoverState.suspendFlush()` appelé pendant
-                    // les animations de resize (cf. `toggleResultExpanded`
-                    // et `onChange(of: state.activeAction)` plus haut).
+                    // fait causé par les transitions de fenêtre qui mutaient
+                    // `resultText` pendant un layout en cours, pas par le
+                    // re-parse Markdown lui-même. Le vrai fix est dans
+                    // `PopoverState.suspendFlush()` appelé pendant les
+                    // animations de resize (cf. `onChange(of: state.activeAction)`).
                     Markdown(state.resultText)
-                        // Chemin A1 : corps agrandi en mode F (lecture confort).
-                        // La cascade sur titres/code (thème MarkdownUI par défaut
-                        // en `.em`) est assumée — ils grossissent proportionnellement.
+                        // Phase S : corps via token (typo dédiée en C2).
                         .markdownTextStyle(\.text) {
-                            FontSize(resultExpanded ? PolishTokens.resultBodyFontSizeExpanded
-                                                    : PolishTokens.resultBodyFontSize)
+                            FontSize(PolishTokens.resultBodyFontSize)
                         }
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1559,37 +1436,9 @@ struct PopoverView: View {
                         .padding(.vertical, PolishTokens.paddingVertical)
                     }   // fin if/else spinner d'attente (Q.2.h.1)
                 }
-                // Phase 1.4b : en format agrandi, le scrollview flex pour remplir
-                // la hauteur disponible. En format compact, plafonné à 300.
-                // Valeur finie (2000) plutôt que .infinity (depuis/vers .infinity
-                // produit un saut abrupt).
-                // Q.2.a : la hauteur suit `resultExpanded` OU la grâce de shrink
-                // (`resultShrinkGrace`), qui maintient le contenu plein pendant la
-                // descente de la fenêtre au rétrécissement (cf. `toggleResultExpanded`).
-                .frame(maxHeight: (resultExpanded || resultShrinkGrace) ? 2000 : 300)
-                // Pastille F flottante centrée au bas du scroll (position
-                // Q.2.c d'origine, restaurée par le pivot Option C — les
-                // actions ⌘S/⌘E vivent désormais dans la ResultActionsBar
-                // sous le header, pas en pills). Overlay pur → ne touche
-                // aucune frame, le clamp Q.2.a (maxHeight ci-dessus) reste
-                // intact.
-                .overlay(alignment: .bottom) {
-                    // `pillExpanded` (mode AFFICHÉ, différé) ≠ `resultExpanded`
-                    // pendant le glide → picto stable, crossfade après settle.
-                    // Q.2.j : raccourci F porté par le Button (niveau fenêtre,
-                    // sans focus — fix « F mort sans clic »). N'existe que
-                    // quand la pastille est rendue (= resultView uniquement :
-                    // « f » en liste/éditable va aux TextFields). Perte
-                    // Shift+F/Caps-F assumée (KeyEquivalent sensible).
-                    ResultActionPill(symbol: pillExpanded
-                                     ? "arrow.down.right.and.arrow.up.left"
-                                     : "arrow.up.left.and.arrow.down.right",
-                                     key: "F",
-                                     shortcut: KeyboardShortcut("f", modifiers: [])) {
-                        toggleResultExpanded()
-                    }
-                    .padding(.bottom, PolishTokens.resultActionPillBottomMargin)
-                }
+                // Phase S : fenêtre de réponse unique, scroll plafonné à 300pt
+                // (la hauteur dynamique live-grow arrive en commit C3).
+                .frame(maxHeight: 300)
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
 
@@ -1601,8 +1450,8 @@ struct PopoverView: View {
                     // (même ordre que le footer nav de la liste : touche → libellé).
                     //
                     // Phase 6.15 (2026-04-26) : réarrangement et inversion.
-                    // - Esc Fermer (anciennement « Retour ») et F Agrandir
-                    //   à GAUCHE = actions contextuelles secondaires.
+                    // - Esc Fermer (anciennement « Retour »)
+                    //   à GAUCHE = action contextuelle secondaire.
                     // - ⌘⏎ Coller et ⏎ Copier à DROITE = actions principales,
                     //   convention macOS (action par défaut à droite, comme
                     //   Save dialog).
@@ -1623,10 +1472,6 @@ struct PopoverView: View {
                         }
                     }
                     .buttonStyle(.plain)
-
-                    // L'affordance F Agrandir/Réduire est désormais portée par
-                    // la pastille flottante (ResultExpandPill), retirée du footer.
-                    // Le raccourci clavier F reste géré par `.onKeyPress` plus bas.
 
                     Spacer()
 
@@ -1688,16 +1533,9 @@ struct PopoverView: View {
             }
             // Q.1.d : fond opaque retiré — corps = zone neutre (vibrancy body).
         }
-        // Q.2.j : le raccourci F est désormais porté par le Button de la
-        // pastille (`keyboardShortcut("f")`, niveau fenêtre — même mécanique
-        // que ↵ Copier / ⌘↵ Coller). L'ancien `.onKeyPress` exigeait que la
-        // vue tienne le focus SwiftUI, or le set `focus = .result` synchrone
-        // échouait sur la NSWindow préchargée (cold start) et lors de la
-        // bascule generatorView → resultView (run-first) : la vue n'était pas
-        // encore montée quand le binding s'appliquait → F mort sans clic
-        // préalable. Avec le shortcut window-level, plus aucune dépendance au
-        // focus — la machinerie `.focusable()/.focused(.result)` orpheline a
-        // été retirée. Esc reste géré par le NSEvent monitor (Phase 6.15).
+        // Esc reste géré par le NSEvent monitor (Phase 6.15). Phase S : le
+        // raccourci F et toute sa machinerie (pastille, focus window-level,
+        // double mode) ont été retirés — la fenêtre de réponse est unique.
         // Overlay du toast de confirmation (copie / collage). S'affiche brièvement
         // au centre de la vue résultat et se dissipe automatiquement.
         .overlay(alignment: .center) {
@@ -1736,53 +1574,6 @@ struct KeyboardKey: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(onAccent ? Color.white.opacity(0.4) : Color.gray.opacity(0.3), lineWidth: 1)
             )
-    }
-}
-
-// MARK: - Result Action Pill (pills flottantes de la fenêtre de réponse)
-
-/// Q.2.h.2 — généralisation de l'ex-`ResultExpandPill` (Q.2.c). Pill
-/// flottante posée en overlay au bas du scroll de la fenêtre de réponse :
-/// SF Symbol + `KeyboardKey` (rappel raccourci, cohérent footer) dans une
-/// capsule `.ultraThinMaterial` (pattern `ConfirmationToast` — seul effet
-/// translucide restant après le retrait de la vibrancy du panneau en Q.4).
-///
-/// Cas d'usage : F (agrandir/réduire — `symbol` contextualisé par
-/// `pillExpanded`, crossfade au changement), ⌘S Sauvegarder et ⌘E Éditer
-/// (actions générées non sauvegardées, h.2/h.3 — `symbol` fixe, crossfade
-/// inerte). `shortcut` câble un raccourci SwiftUI sur le Button (S/E) ;
-/// F reste sur le `.onKeyPress` historique de la vue résultat → `nil`.
-struct ResultActionPill: View {
-    let symbol: String
-    let key: String
-    var shortcut: KeyboardShortcut? = nil
-    let action: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: PolishTokens.resultActionPillSpacing) {
-                Image(systemName: symbol)
-                    .font(.system(size: PolishTokens.resultActionPillIconSize,
-                                  weight: PolishTokens.resultActionPillIconWeight))
-                    .foregroundColor(.secondary)
-                    // Crossfade du symbole au changement (le KeyboardKey reste stable).
-                    .contentTransition(.opacity)
-                KeyboardKey(key)
-            }
-            .padding(.horizontal, PolishTokens.resultActionPillHorizontalPadding)
-            .frame(height: PolishTokens.resultActionPillHeight)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(
-                Capsule().strokeBorder(PolishTokens.innerBorderColor(colorScheme),
-                                       lineWidth: PolishTokens.resultActionPillBorderWidth)
-            )
-        }
-        .buttonStyle(.plain)
-        .keyboardShortcut(shortcut)
-        .animation(.easeInOut(duration: PolishTokens.resultActionPillFadeDuration),
-                   value: symbol)
     }
 }
 

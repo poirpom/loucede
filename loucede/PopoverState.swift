@@ -369,8 +369,6 @@ final class PopoverState: ObservableObject {
     /// générée non sauvegardée et bascule `generatorPhase` → le body remonte
     /// `generatorView`, le `.onChange(generatorPhase)` existant fait le
     /// resize 426→680 (avec `suspendFlush` — couvre ⌘E pendant le streaming).
-    /// Les resets « retour toujours compact » (resultExpanded etc.) sont
-    /// faits par le call site PopoverView (état de vue).
     func enterEditFromResult() {
         guard let pending = pendingGeneratedAction else { return }
         editableTitle = pending.name
@@ -495,9 +493,7 @@ final class PopoverState: ObservableObject {
     /// `pendingGeneratedAction = nil` EN TÊTE : les handlers `.onChange`
     /// lisent l'état final du bloc (mutations batchées) → la garde h.1 de
     /// `.onChange(activeAction)` laisse passer le resize `.resultCompact`
-    /// (394, barre disparue) — aucun resize explicite nécessaire. Le
-    /// `resultExpanded` a été resetté par le call site du ⌘E (retour
-    /// toujours compact).
+    /// (394, barre disparue) — aucun resize explicite nécessaire.
     ///
     /// Edge assumé : prompt modifié + trial épuisé → l'action est sauvée
     /// mais `runAction` présente le modal sans lancer (acceptable, signalé).

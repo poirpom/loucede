@@ -391,23 +391,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// actions + selection) pour la création initiale de la fenêtre.
     static let popoverDefaultWidth: CGFloat = 400
     static let popoverDefaultHeight: CGFloat = 540
-    /// Phase 1.4b : format « agrandi » (touche F sur la vue résultat).
-    /// Largeur via `expandedResultWidth(for:)` (garde-fou écran) ; hauteur
-    /// = 70 % de la visibleFrame de l'écran (15 % de marge haut + 15 % bas).
-    /// Recentré à chaque resize pour rester équilibré.
-    ///
-    /// Plafond de largeur de la fenêtre résultat agrandie.
-    static let popoverExpandedWidthCap: CGFloat = 620
-    /// Largeur effective de la fenêtre résultat agrandie. Plafonnée par
-    /// `popoverExpandedWidthCap`, mais jamais plus de la moitié de la largeur
-    /// visible de l'écran (garde-fou petits écrans). Source unique partagée
-    /// par le frame de la NSWindow (`resizePopover`) ET le frame du contenu
-    /// SwiftUI (`PopoverView`) → les deux ne peuvent pas diverger (sinon bande
-    /// transparente sur les côtés, cf. PopoverView `.frame(width:)`).
-    static func expandedResultWidth(for screen: NSScreen? = NSScreen.main) -> CGFloat {
-        let screenWidth = (screen ?? NSScreen.main)?.visibleFrame.width ?? popoverExpandedWidthCap
-        return min(popoverExpandedWidthCap, screenWidth * 0.5)
-    }
 
     // MARK: - Hauteur dynamique du popup (Phase 6.9b, 2026-04-25)
 
@@ -531,10 +514,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         /// Liste d'actions (entrée du popup). Hauteur dynamique via
         /// `calculatedPopoverHeight()` selon `actions.count` + selection.
         case list
-        /// Vue résultat en format compact. Hauteur fixe (= chrome + 300pt scroll).
+        /// Vue résultat (fenêtre unique). Hauteur = chrome + 300pt scroll.
         case resultCompact
-        /// Vue résultat en format agrandi (touche F). 70 % de la hauteur écran.
-        case resultExpanded
         /// K.2-B lot 2a — mode Générateur d'actions AI. Largeur identique
         /// à `.list` (400pt), hauteur fonction de la phase courante.
         case generator(GeneratorPopupPhase)
@@ -642,15 +623,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             width = Self.popoverDefaultWidth
             // Q.2.h.2 v2 : +32pt quand la barre d'actions sur l'action
             // (ResultActionsBar) est visible — automatique sur tous les
-            // chemins (entrée run-first, retour F agrandi→compact). Le
-            // mode agrandi n'est pas concerné (hauteur écran×0.7, la
-            // barre prend sa place sur le scroll flexible).
+            // chemins (entrée run-first notamment).
             height = Self.popoverResultCompactHeight
                 + (PopoverState.shared.showsResultActionsBar
                    ? PolishTokens.resultActionsBarHeight : 0)
-        case .resultExpanded:
-            width = Self.expandedResultWidth(for: screen)
-            height = screenRect.height * 0.7
         case .generator(let phase):
             // K.2-B lot 2a — Mode Générateur. Largeur identique à .list
             // pour continuité visuelle. Hauteur fonction de la phase.
