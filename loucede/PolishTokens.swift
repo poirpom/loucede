@@ -50,9 +50,9 @@ enum PolishTokens {
     static let resultWindowWidth: CGFloat = 618
     /// Padding latéral du corps markdown (généreux — mesure de lecture).
     static let resultPaddingHorizontal: CGFloat = 45
-    /// Équilibré avec le latéral (C2-fix-2). Entre dans le calcul du chrome
-    /// pour la hauteur (C3) → figé avant la mécanique de hauteur.
-    static let resultPaddingVertical: CGFloat = 40
+    /// Équilibré avec le latéral 45 (calé runtime C2-fix-3 à 36). Entre dans
+    /// le calcul du chrome pour la hauteur (C3) → figé avant la mécanique.
+    static let resultPaddingVertical: CGFloat = 36
 
     /// Corps markdown (MarkdownUI `\.text`). 16pt = confort lecture écran.
     static let resultBodyFontSize: CGFloat = 16
