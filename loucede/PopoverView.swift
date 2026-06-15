@@ -1661,18 +1661,17 @@ struct PopoverView: View {
 
                     // Copier : ↵ — copie le résultat dans le presse-papier.
                     // Q.2.d : ferme la fenêtre après la copie (toast bref puis
-                    // hidePopover), symétrique du « Coller » ⌘↵. En tutorialMode,
-                    // comportement inchangé (toast 1.2s + coche, sans fermeture).
+                    // hidePopover), symétrique du « Coller » ⌘↵. R-tuto : le mode
+                    // tuto ferme désormais comme le mode normal (le retrait de la
+                    // ligne « Esc pour fermer » de l'écran 1 a rendu caduque
+                    // l'ancienne fenêtre maintenue ouverte). La coche « copy » est
+                    // posée AVANT la fermeture (synchrone) → jamais perdue.
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(state.resultText, forType: .string)
-                        if state.tutorialMode {
-                            showConfirmation("Copié")
-                            state.tutorialCopyHandler?()  // M.2.5-fix — coche « copy »
-                        } else {
-                            showConfirmation("Copié", duration: 0.3) {
-                                globalAppDelegate?.hidePopover()
-                            }
+                        if state.tutorialMode { state.tutorialCopyHandler?() }  // coche « copy »
+                        showConfirmation("Copié", duration: 0.3) {
+                            globalAppDelegate?.hidePopover()
                         }
                     } label: {
                         HStack(spacing: 6) {
