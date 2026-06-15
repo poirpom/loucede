@@ -473,9 +473,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// `popoverActionRowHeight`. Note : `settingsRow` qui partageait
     /// historiquement la même hauteur a été retiré au Point 2 pre-V1.
     static let popoverUpdateRowHeight: CGFloat = 36
-    /// Hauteur du popup en mode résultat compact (header action + ScrollView
-    /// 300pt + footer boutons). Mesurée empiriquement.
-    static let popoverResultCompactHeight: CGFloat = 394
+
+    // MARK: - Fenêtre de réponse — géométrie live-grow (Phase S — C3)
+
+    /// Chrome FIXE de la fenêtre de réponse = header (≈44) + footer (≈44) +
+    /// marge. Mesuré empiriquement (= ancien `popoverResultCompactHeight` 394
+    /// − 300 de scroll). La barre d'actions (⌘S/⌘E, +32) s'y ajoute quand visible.
+    static let resultChromeHeight: CGFloat = 94
+    /// Hauteur minimale de la zone de contenu (plancher de la fenêtre avant le
+    /// 1er token / réponse très courte). Calable runtime si trop vide.
+    static let resultMinContentHeight: CGFloat = 130
+    /// Pas minimal de croissance (≈1 interligne) — throttle des `setFrame`
+    /// instantanés pendant le stream (anti-saccade / anti-spam).
+    static let resultGrowThrottle: CGFloat = 24
+    /// Plafond de hauteur = fraction de l'écran visible. Au-delà, la fenêtre
+    /// se fige et le ScrollView interne prend le relais.
+    static let resultPlafondRatio: CGFloat = 0.7
+
+    /// Hauteur de scroll maximale (= plafond − chrome). Plancher à
+    /// `resultMinContentHeight` (garde-fou petits écrans).
+    static func resultMaxScrollHeight(screen: NSScreen? = NSScreen.main) -> CGFloat {
+        let h = (screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        let plafond = h * resultPlafondRatio
+        let chrome = resultChromeHeight
+            + (PopoverState.shared.showsResultActionsBar ? PolishTokens.resultActionsBarHeight : 0)
+        return max(resultMinContentHeight, plafond - chrome)
+    }
+
+    /// Hauteur cible de la fenêtre de réponse = chrome + contenu mesuré
+    /// (clampé entre minimal et maxScroll). Source unique consommée par
+    /// l'entrée animée (`resizePopover .resultCompact`) ET la croissance
+    /// instantanée (`growResultWindow`).
+    static func resultTargetHeight(screen: NSScreen? = NSScreen.main) -> CGFloat {
+        let chrome = resultChromeHeight
+            + (PopoverState.shared.showsResultActionsBar ? PolishTokens.resultActionsBarHeight : 0)
+        let content = min(max(PopoverState.shared.measuredResultContentHeight, resultMinContentHeight),
+                          resultMaxScrollHeight(screen: screen))
+        return chrome + content
+    }
+
+    /// Frame ancrée de la fenêtre de réponse : largeur fixe, **bord HAUT fixe**
+    /// (croissance vers le bas, sans saut du contenu déjà rendu — précédent F.4).
+    /// Top calé sur la ligne du haut d'une fenêtre plafond CENTRÉE → une fenêtre
+    /// pleine est centrée à l'écran et rien ne déborde jamais ; une réponse
+    /// courte s'affiche en zone haute (compromis « pas de saut » > « centrage »).
+    static func resultWindowFrame(screen: NSScreen) -> NSRect {
+        let r = screen.visibleFrame
+        let plafond = r.height * resultPlafondRatio
+        let h = resultTargetHeight(screen: screen)
+        let w = PolishTokens.resultWindowWidth
+        return NSRect(x: r.midX - w / 2, y: r.midY + plafond / 2 - h, width: w, height: h)
+    }
 
     // K.2-B lot 2a (2026-05-26) — Mode Générateur, hauteurs par phase.
     /// Hauteur du popover générateur en mode compact (saisie / loading /
@@ -620,15 +668,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // builder reconstruit la liste (en-têtes + lignes) pour mesurer.
             height = Self.calculatedPopoverHeight(searchQuery: searchQuery)
         case .resultCompact:
-            // Phase S (C2) : fenêtre de réponse plus large (lecture). Miroir
-            // exact du `.frame(width:)` du contenu SwiftUI (PopoverView).
+            // Phase S (C2/C3) : largeur fixe lecture (618). Hauteur
+            // CONTENT-AWARE (chrome + contenu mesuré clampé) → à l'entrée le
+            // contenu est vide/minimal donc la fenêtre arrive minimale, puis
+            // `growResultWindow` la fait grandir avec le stream (live-grow).
+            // Même source (`resultTargetHeight`) que la croissance → cohérence.
             width = PolishTokens.resultWindowWidth
-            // Q.2.h.2 v2 : +32pt quand la barre d'actions sur l'action
-            // (ResultActionsBar) est visible — automatique sur tous les
-            // chemins (entrée run-first notamment).
-            height = Self.popoverResultCompactHeight
-                + (PopoverState.shared.showsResultActionsBar
-                   ? PolishTokens.resultActionsBarHeight : 0)
+            height = Self.resultTargetHeight(screen: screen)
         case .generator(let phase):
             // K.2-B lot 2a — Mode Générateur. Largeur identique à .list
             // pour continuité visuelle. Hauteur fonction de la phase.
@@ -639,7 +685,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let x = (screenRect.width - width) / 2 + screenRect.minX
-        let y = (screenRect.height - height) / 2 + screenRect.minY
+        var y = (screenRect.height - height) / 2 + screenRect.minY
+        // Phase S (C3) : la fenêtre de réponse est ancrée par le HAUT (bord
+        // haut fixe, croissance vers le bas) — cohérent avec `growResultWindow`
+        // pour qu'aucun saut de contenu n'apparaisse au 1er pas de croissance.
+        // Les autres modes restent centrés verticalement.
+        if case .resultCompact = mode {
+            let plafond = screenRect.height * Self.resultPlafondRatio
+            y = screenRect.midY + plafond / 2 - height
+        }
         let newFrame = NSRect(x: x, y: y, width: width, height: height)
         // Q.2.g (A.1) : ne pas (ré)animer un resize qui ne change pas la fenêtre.
         // compact / loading / error mappent tous vers la MÊME taille (.compact) :
@@ -659,6 +713,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(newFrame, display: true)
         }
+    }
+
+    /// Phase S (C3) — croissance LIVE de la fenêtre de réponse pendant le
+    /// stream. `setFrame(animate: false)` INSTANTANÉ → AUCUNE `NSAnimationContext`
+    /// concurrente de la mutation de `resultText` (la cause racine du crash
+    /// 6.14/Q.2.g est supprimée, pas mitigée). Ancrage par le haut (frame
+    /// partagée avec l'entrée animée). Garde no-op sub-pixel (Q.2.g). Le call
+    /// site (PopoverView) garantit : mode résultat, hors suspension de flush
+    /// (= hors animation), et throttle ≥ 1 interligne.
+    func growResultWindow() {
+        guard let screen = NSScreen.main, let window = popoverWindow else { return }
+        let newFrame = Self.resultWindowFrame(screen: screen)
+        let cur = window.frame
+        let e: CGFloat = 0.5
+        if abs(cur.minX - newFrame.minX) < e, abs(cur.minY - newFrame.minY) < e,
+           abs(cur.width - newFrame.width) < e, abs(cur.height - newFrame.height) < e {
+            return
+        }
+        window.setFrame(newFrame, display: true)
     }
 
     private func installOutsideClickMonitor() {

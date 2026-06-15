@@ -159,6 +159,20 @@ final class PopoverState: ObservableObject {
     /// le mashing F pendant un stream).
     private var flushSuspendCount: Int = 0
 
+    /// Phase S (C3) — true tant qu'une suspension de flush est active, c.-à-d.
+    /// tant qu'une animation NSWindow est en cours (toutes les transitions
+    /// animées appellent `suspendFlush`). Le live-grow lit ce flag pour NE
+    /// JAMAIS poser un `setFrame` instantané par-dessus une animation (leçon
+    /// 6.14/Q.2.g — c'est la garde anti-réentrance centrale du chantier).
+    var isFlushSuspended: Bool { flushSuspendCount > 0 }
+
+    /// Phase S (C3) — hauteur naturelle MESURÉE du contenu de la fenêtre de
+    /// réponse (Markdown + paddings, via GeometryReader dans PopoverView).
+    /// Source unique consommée par `AppDelegate.resultTargetHeight` (entrée
+    /// animée `.resultCompact` ET croissance instantanée `growResultWindow`).
+    /// Remise à 0 au lancement d'une action (le stream repart vide → minimal).
+    var measuredResultContentHeight: CGFloat = 0
+
     private init() {}
 
     /// Réinitialise l'état avant un nouvel affichage du popup.
@@ -624,6 +638,9 @@ final class PopoverState: ObservableObject {
         resultText = ""
         isProcessing = true
         pendingChunkBuffer = ""
+        // Phase S (C3) : le stream repart vide → la fenêtre doit revenir à sa
+        // hauteur minimale avant de grandir avec le contenu (live-grow).
+        measuredResultContentHeight = 0
 
         // M.2.3 — coche « action » côté tuto dès le lancement.
         if tutorialMode { tutorialActionRunHandler?() }

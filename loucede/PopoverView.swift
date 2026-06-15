@@ -75,6 +75,10 @@ struct PopoverView: View {
     // Copié/Collé (géant ×3), .compact pour « Action sauvegardée » (qui
     // déborderait la fenêtre 400pt à 39pt de typo).
     @State private var confirmationStyle: ConfirmationToast.Style = .standard
+    // Phase S (C3) — dernière hauteur de fenêtre appliquée par le live-grow.
+    // Throttle : on ne resize que si la cible s'en écarte d'≥ 1 interligne.
+    // Remis à 0 à l'entrée/réouverture (le 1er pas de croissance recale).
+    @State private var lastResultWindowHeight: CGFloat = 0
 
     init(
         onClose: @escaping () -> Void = {},
@@ -165,6 +169,8 @@ struct PopoverView: View {
             // Reset : showPopover remet déjà la fenêtre à 400×500, la barre
             // d'actions est masquée et re-révélée au prochain montage.
             actionsBarVisible = false
+            // C3 : recale le throttle live-grow pour la prochaine ouverture.
+            lastResultWindowHeight = 0
         }
         // Focus initial au premier affichage (avant le premier openCounter).
         .onAppear {
@@ -183,6 +189,8 @@ struct PopoverView: View {
                 isSearchFocused = false
             }
             confirmation = nil
+            // C3 : recale le throttle live-grow à chaque entrée/sortie résultat.
+            lastResultWindowHeight = 0
             // Phase 6.9b (2026-04-25) : la fenêtre est désormais dimensionnée
             // dynamiquement selon le mode. Sans resize au passage liste→résultat,
             // le résultat (~394pt) déborderait d'une fenêtre liste compacte
@@ -445,6 +453,34 @@ struct PopoverView: View {
     /// via le .onChange(generatorPhase) existant).
     private func enterEditFromResultBar() {
         state.enterEditFromResult()
+    }
+
+    // MARK: - Phase S (C3) — live-grow de la fenêtre de réponse
+
+    /// Reçoit la hauteur naturelle mesurée du contenu (GeometryReader dans le
+    /// ScrollView) et fait grandir la fenêtre EN TEMPS RÉEL pendant le stream.
+    ///
+    /// Trois gardes empilées rendent le `setFrame` instantané sûr (le terrain
+    /// crash 6.14/Q.2.g) :
+    /// 1. **Mode résultat uniquement** — pas en liste/générateur.
+    /// 2. **Hors suspension de flush** — `isFlushSuspended` est vrai pendant
+    ///    TOUTE animation NSWindow (entrée, ⌘S, générateur…) : on ne pose
+    ///    jamais un `setFrame` instantané par-dessus une `NSAnimationContext`.
+    /// 3. **Throttle ≥ 1 interligne** — limite la fréquence des pas ; le
+    ///    `setFrame` est de plus DIFFÉRÉ (`async`, hors passe de layout) et
+    ///    gardé no-op sub-pixel côté `growResultWindow`.
+    private func handleResultContentHeight(_ height: CGFloat) {
+        guard state.generatorPhase == nil, state.activeAction != nil else { return }
+        // Mémorise la mesure (consommée aussi par l'entrée animée / ⌘S /
+        // Esc-retour via `resultTargetHeight`), même quand on n'agit pas ici.
+        state.measuredResultContentHeight = height
+        guard !state.isFlushSuspended else { return }
+        let target = AppDelegate.resultTargetHeight()
+        guard abs(target - lastResultWindowHeight) >= AppDelegate.resultGrowThrottle else { return }
+        lastResultWindowHeight = target
+        DispatchQueue.main.async {
+            globalAppDelegate?.growResultWindow()
+        }
     }
 
     // MARK: - Main
@@ -1392,22 +1428,26 @@ struct PopoverView: View {
             // Phase 1.4i : zone basse du résultat (texte + footer boutons).
             VStack(spacing: 0) {
                 ScrollView {
+                  // Phase S (C3) : mesure de la hauteur naturelle du contenu
+                  // (Markdown + paddings, OU spinner d'attente). À l'intérieur
+                  // du ScrollView → hauteur NON clippée. Pilote le live-grow
+                  // via `ResultContentHeightKey` → `.onPreferenceChange` ↓.
+                  Group {
                     // Q.2.h.1 : attente du 1er token d'une action générée
                     // (« run first ») — la génération est finie, l'exécution
                     // streamée démarre. Plain ProgressView (PAS de
-                    // TimelineView) → inerte pendant le resize 200→394
-                    // (leçon Q.2.g). Disparaît au 1er flush (condition de
-                    // vue dérivée de resultText, aucun signal dédié).
-                    // Les actions du catalogue (pending == nil) ne passent
-                    // jamais ici.
+                    // TimelineView) → inerte pendant le resize (leçon Q.2.g).
+                    // Disparaît au 1er flush (condition de vue dérivée de
+                    // resultText, aucun signal dédié). Les actions du catalogue
+                    // (pending == nil) ne passent jamais ici.
                     if state.resultText.isEmpty && state.isProcessing
                         && state.pendingGeneratedAction != nil {
                         ProgressView()
                             .controlSize(.large)
                             .frame(height: PolishTokens.generationSpinnerHeight)
-                            // ≈ viewport compact (300) − paddings verticaux :
-                            // centre le spinner dans la zone de scroll.
-                            .frame(maxWidth: .infinity, minHeight: 260)
+                            // C3 : zone d'attente = hauteur minimale (alignée
+                            // sur l'entrée minimale → pas de flicker au 1er token).
+                            .frame(maxWidth: .infinity, minHeight: AppDelegate.resultMinContentHeight)
                     } else {
                     // Phase 6.5 (2026-04-23) : rendu Markdown via MarkdownUI
                     // (gonzalezreal/swift-markdown-ui, MIT). L'action
@@ -1436,10 +1476,20 @@ struct PopoverView: View {
                         .padding(.horizontal, PolishTokens.resultPaddingHorizontal)
                         .padding(.vertical, PolishTokens.resultPaddingVertical)
                     }   // fin if/else spinner d'attente (Q.2.h.1)
+                  }   // fin Group mesuré (C3)
+                  .background(GeometryReader { geo in
+                      Color.clear.preference(key: ResultContentHeightKey.self,
+                                             value: geo.size.height)
+                  })
                 }
-                // Phase S : fenêtre de réponse unique, scroll plafonné à 300pt
-                // (la hauteur dynamique live-grow arrive en commit C3).
-                .frame(maxHeight: 300)
+                // Phase S (C3) : la fenêtre grandit avec le contenu (live-grow,
+                // ancrage haut) jusqu'au plafond écran×0,7 ; au-delà, ce cap
+                // engage le scroll interne. La hauteur de la FENÊTRE est pilotée
+                // par `growResultWindow` (via la mesure ci-dessous), pas ici.
+                .frame(maxHeight: AppDelegate.resultMaxScrollHeight())
+                .onPreferenceChange(ResultContentHeightKey.self) { h in
+                    handleResultContentHeight(h)
+                }
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
 
@@ -1546,6 +1596,18 @@ struct PopoverView: View {
                     .allowsHitTesting(false)
             }
         }
+    }
+}
+
+// MARK: - Result content height (Phase S — C3, live-grow)
+
+/// Remonte la hauteur naturelle du contenu de la fenêtre de réponse depuis le
+/// ScrollView jusqu'à `PopoverView`. `reduce` garde la DERNIÈRE valeur (une
+/// seule source — le `GeometryReader` du contenu).
+private struct ResultContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
