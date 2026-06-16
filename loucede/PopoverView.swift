@@ -691,6 +691,20 @@ struct PopoverView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
 
+                // Phase 6.3 / H.3 : ligne « Mise à jour disponible »
+                // conditionnelle, épinglée en TÊTE de la zone liste (sous la
+                // barre de recherche, au-dessus du ScrollView) quand une version
+                // plus récente est détectée (via la façade Sparkle
+                // LoucedeUpdater). Hors ScrollView → toujours visible, ne défile
+                // pas. La hauteur est comptée dans `calculatedPopoverHeight`
+                // (loucedeApp, `popoverUpdateRowHeight`), indépendamment de la
+                // position. Clic → ouvre Réglages → onglet Mises à jour.
+                if updater.updateAvailable {
+                    updateRow()
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 2)
+                }
+
                 // Point 2 pre-V1 (2026-05-07) : popup à hauteur dynamique
                 // (cf. AppDelegate.calculatedPopoverHeight). Le ScrollView
                 // s'adapte à l'espace alloué par la NSWindow. K.unify.3 :
@@ -751,22 +765,6 @@ struct PopoverView: View {
                             proxy.scrollTo(sel[newIndex].id)
                         }
                     }
-                }
-
-                // Phase 6.3 : ligne « Mise à jour disponible » conditionnelle
-                // au-dessus du footer quand une version plus récente est
-                // détectée (H.2 : via la façade Sparkle LoucedeUpdater).
-                // Point 2 pre-V1 (2026-05-07) : settingsRow retiré, Réglages
-                // accessible via ⌘, (raccourci ; K.4-lot1 a retiré son
-                // affichage du footer).
-                // Q.1.b-bis : Dividers retirés (au-dessus de l'updateRow et du
-                // footer) — la séparation se fait par le ton (footer accent vs
-                // zone neutre), pas par bordure.
-                // H.3 (à venir) : repositionnement en tête de liste d'actions.
-                if updater.updateAvailable {
-                    updateRow()
-                        .padding(.horizontal, 8)
-                        .padding(.top, 2)
                 }
 
                 // Footer 1 ligne (K.4-lot1, 2026-05-22) : navigation popup
