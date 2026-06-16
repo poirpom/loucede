@@ -149,20 +149,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await LicenseManager.shared.validate(silent: true)
         }
 
-        // Phase 6.3 (2026-04-28) : vérification des mises à jour au
-        // démarrage, en arrière-plan, non-bloquante. Le résultat met à
-        // jour UpdateChecker.shared (ObservableObject) ; la popup et
-        // l'onglet Mises à jour réagissent automatiquement via @Published.
+        // Phase H.2 (Sparkle-first) : vérification des mises à jour au
+        // démarrage, silencieuse (pas d'UI sur erreur réseau). Premier accès
+        // à LoucedeUpdater.shared → instancie aussi SPUStandardUpdaterController
+        // (startingUpdater: true + scheduler natif via SUEnableAutomaticChecks).
+        // La popup et l'onglet Mises à jour réagissent via @Published.
         Task {
-            UpdateChecker.shared.checkForUpdates()
+            LoucedeUpdater.shared.checkForUpdatesInBackground()
         }
-
-        // Phase H.1 (Sparkle-first) : instanciation de la façade Sparkle en
-        // PARALLÈLE de UpdateChecker (cohabitation volontaire). UpdateChecker
-        // reste le système ACTIF consommé par les vues ; LoucedeUpdater est
-        // dormant jusqu'à H.2 (bascule des vues). startingUpdater: true démarre
-        // l'updater ; SUEnableAutomaticChecks gère la vérif background.
-        _ = LoucedeUpdater.shared
     }
 
     func showOnboarding() {

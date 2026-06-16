@@ -7,7 +7,7 @@ import SwiftUI
 import AppKit
 
 struct AboutView: View {
-    @StateObject private var updateChecker = UpdateChecker.shared
+    @StateObject private var updater = LoucedeUpdater.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -46,11 +46,12 @@ struct AboutView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
 
-                    if updateChecker.updateAvailable, let latest = updateChecker.latestVersion {
+                    if updater.updateAvailable, let latest = updater.latestVersion {
                         Button {
-                            updateChecker.openDownloadPage()
+                            // Flux natif Sparkle (dialog install).
+                            updater.checkForUpdates()
                         } label: {
-                            Text("Version \(latest) disponible — télécharger")
+                            Text("Mettre à jour vers v\(latest)")
                                 .font(.system(size: 12))
                         }
                         .buttonStyle(.link)

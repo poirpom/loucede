@@ -24,7 +24,7 @@ extension Notification.Name {
 
 struct SettingsView: View {
     @StateObject private var store = ActionsStore.shared
-    @StateObject private var updateChecker = UpdateChecker.shared
+    @StateObject private var updater = LoucedeUpdater.shared
     // Phase 1.5a : onglet "Général" (index 0) par défaut au lieu de "Actions" (1).
     // Phase 6.3 : accepte un `initialTab` pour le deeplink depuis la popup.
     @State private var selectedTab: Int
@@ -68,7 +68,7 @@ struct SettingsView: View {
                     title: "Mises à jour",
                     systemImage: "arrow.triangle.2.circlepath",
                     isSelected: selectedTab == 3,
-                    showBadge: updateChecker.updateAvailable
+                    showBadge: updater.updateAvailable
                 ) {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = 3 }
                 }
@@ -82,7 +82,11 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .onAppear { updateChecker.checkForUpdates() }
+            // Phase H.2 : plus de check user-initiated à l'ouverture des
+            // Réglages (il popperait le dialog Sparkle). Le check au lancement
+            // (checkForUpdatesInBackground) + le scheduler natif Sparkle
+            // (SUEnableAutomaticChecks) + le bouton « Vérifier à nouveau »
+            // couvrent tous les besoins.
             .onReceive(NotificationCenter.default.publisher(for: .loucedeSwitchSettingsTab)) { note in
                 if let tab = note.object as? Int {
                     withAnimation(.easeInOut(duration: 0.25)) { selectedTab = tab }
@@ -91,9 +95,9 @@ struct SettingsView: View {
 
             Divider()
 
-            if updateChecker.updateAvailable {
-                UpdateBanner(version: updateChecker.latestVersion ?? "") {
-                    updateChecker.openDownloadPage()
+            if updater.updateAvailable {
+                UpdateBanner(version: updater.latestVersion ?? "") {
+                    updater.checkForUpdates()
                 }
             }
 
@@ -345,7 +349,7 @@ struct UpdateBanner: View {
                 .foregroundColor(.white)
             Spacer()
             Button(action: onDownload) {
-                Text("Télécharger")
+                Text("Mettre à jour vers v\(version)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.accentColor)
                     .padding(.horizontal, 14)
