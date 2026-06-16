@@ -349,7 +349,7 @@ struct UpdateBanner: View {
                 .foregroundColor(.white)
             Spacer()
             Button(action: onDownload) {
-                Text("Mettre à jour vers v\(version)")
+                Text("Mettre à jour")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.accentColor)
                     .padding(.horizontal, 14)
