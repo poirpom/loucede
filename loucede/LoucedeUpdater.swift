@@ -26,8 +26,19 @@ final class LoucedeUpdater: NSObject, ObservableObject {
     @Published private(set) var canCheckForUpdates = false
     /// Passe à `true` quand l'appcast annonce une version plus récente.
     @Published private(set) var updateAvailable = false
+    /// Version annoncée par l'appcast quand une mise à jour est trouvée.
+    @Published private(set) var latestVersion: String?
+    /// Notes de la version disponible (`<description>` de l'item appcast).
+    /// `nil` tant qu'aucune mise à jour n'est trouvée → UpdatesView retombe
+    /// alors sur les notes bundlées de la version installée.
+    @Published private(set) var releaseNotes: String?
     /// Dernier message d'erreur d'une vérification (réseau, appcast, etc.).
     @Published var lastError: String?
+
+    /// Version installée (CFBundleShortVersionString), pour l'affichage UI.
+    var currentVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
 
     private var updaterController: SPUStandardUpdaterController!
     private var cancellable: AnyCancellable?
@@ -68,6 +79,8 @@ extension LoucedeUpdater: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         DispatchQueue.main.async { [weak self] in
             self?.updateAvailable = true
+            self?.latestVersion = item.displayVersionString
+            self?.releaseNotes = item.itemDescription
             self?.lastError = nil
         }
     }
@@ -75,6 +88,8 @@ extension LoucedeUpdater: SPUUpdaterDelegate {
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
         DispatchQueue.main.async { [weak self] in
             self?.updateAvailable = false
+            self?.latestVersion = nil
+            self?.releaseNotes = nil
         }
     }
 
