@@ -41,7 +41,7 @@ struct PopoverView: View {
 
     @StateObject private var store = ActionsStore.shared
     @StateObject private var textManager = CapturedTextManager.shared
-    @StateObject private var updateChecker = UpdateChecker.shared
+    @StateObject private var updater = LoucedeUpdater.shared
     @ObservedObject private var state = PopoverState.shared
     @FocusState private var focus: PopoverFocus?
     // Message du toast de confirmation (ex. "Copié", "Collé"). Nil = pas de toast.
@@ -754,14 +754,16 @@ struct PopoverView: View {
                 }
 
                 // Phase 6.3 : ligne « Mise à jour disponible » conditionnelle
-                // au-dessus du footer quand UpdateChecker détecte une version
-                // plus récente. Point 2 pre-V1 (2026-05-07) : settingsRow
-                // retiré, Réglages accessible via ⌘, (raccourci ; K.4-lot1 a
-                // retiré son affichage du footer).
+                // au-dessus du footer quand une version plus récente est
+                // détectée (H.2 : via la façade Sparkle LoucedeUpdater).
+                // Point 2 pre-V1 (2026-05-07) : settingsRow retiré, Réglages
+                // accessible via ⌘, (raccourci ; K.4-lot1 a retiré son
+                // affichage du footer).
                 // Q.1.b-bis : Dividers retirés (au-dessus de l'updateRow et du
                 // footer) — la séparation se fait par le ton (footer accent vs
                 // zone neutre), pas par bordure.
-                if updateChecker.updateAvailable {
+                // H.3 (à venir) : repositionnement en tête de liste d'actions.
+                if updater.updateAvailable {
                     updateRow()
                         .padding(.horizontal, 8)
                         .padding(.top, 2)
@@ -959,7 +961,7 @@ struct PopoverView: View {
     }
 
     /// Ligne « Mise à jour disponible » (Phase 6.3). Visible uniquement quand
-    /// `UpdateChecker.shared.updateAvailable == true`. Orange #F59E0B pour se
+    /// `LoucedeUpdater.shared.updateAvailable == true`. Orange #F59E0B pour se
     /// distinguer du bouton Réglages (bleu). Clic → ouvre l'onglet Mises à jour.
     private func updateRow() -> some View {
         HStack(spacing: 10) {
