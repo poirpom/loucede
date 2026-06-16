@@ -11,6 +11,7 @@
 		5A2A1E0100000000000000B1 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A2A1E0100000000000000B2 /* Sparkle */; };
 		85C4DE062FB2744E001AD737 /* Documentation in Resources */ = {isa = PBXBuildFile; fileRef = 85C4DE052FB2744E001AD737 /* Documentation */; };
 		85C4DE0B2FB2744E001AD737 /* Tutorial in Resources */ = {isa = PBXBuildFile; fileRef = 85C4DE0A2FB2744E001AD737 /* Tutorial */; };
+		5A2A1E0200000000000000C1 /* release-notes in Resources */ = {isa = PBXBuildFile; fileRef = 5A2A1E0200000000000000C2 /* release-notes */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +39,7 @@
 		40C0F16200000000000000A2 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		85C4DE052FB2744E001AD737 /* Documentation */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Documentation; path = loucede/Resources/Documentation; sourceTree = "<group>"; };
 		85C4DE0A2FB2744E001AD737 /* Tutorial */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Tutorial; path = loucede/Resources/Tutorial; sourceTree = "<group>"; };
+		5A2A1E0200000000000000C2 /* release-notes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "release-notes"; path = "release-notes"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -128,6 +130,7 @@
 				40C0F16200000000000000A2 /* Secrets.xcconfig.example */,
 				85C4DE052FB2744E001AD737 /* Documentation */,
 				85C4DE0A2FB2744E001AD737 /* Tutorial */,
+				5A2A1E0200000000000000C2 /* release-notes */,
 				409C5B132F23E0F90088B219 /* loucede */,
 				409C5B212F23E0FA0088B219 /* loucedeTests */,
 				409C5B2B2F23E0FA0088B219 /* loucedeUITests */,
@@ -274,6 +277,7 @@
 			files = (
 				85C4DE062FB2744E001AD737 /* Documentation in Resources */,
 				85C4DE0B2FB2744E001AD737 /* Tutorial in Resources */,
+				5A2A1E0200000000000000C1 /* release-notes in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
