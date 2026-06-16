@@ -478,8 +478,12 @@ struct PopoverView: View {
         let target = AppDelegate.resultTargetHeight()
         guard abs(target - lastResultWindowHeight) >= AppDelegate.resultGrowThrottle else { return }
         lastResultWindowHeight = target
+        // Target CAPTURÉ et passé explicitement : `growResultWindow` ne relit
+        // PAS `measuredResultContentHeight` en async — sinon une mesure
+        // transitoire haute relue entre la décision et l'exécution gelait la
+        // fenêtre à une taille trop grande (overshoot réponse courte).
         DispatchQueue.main.async {
-            globalAppDelegate?.growResultWindow()
+            globalAppDelegate?.growResultWindow(toHeight: target)
         }
     }
 
@@ -1476,19 +1480,24 @@ struct PopoverView: View {
                         .padding(.horizontal, PolishTokens.resultPaddingHorizontal)
                         .padding(.vertical, PolishTokens.resultPaddingVertical)
                     }   // fin if/else spinner d'attente (Q.2.h.1)
-                  }   // fin Group mesuré (C3)
-                  .background(GeometryReader { geo in
-                      Color.clear.preference(key: ResultContentHeightKey.self,
-                                             value: geo.size.height)
-                  })
+                  }   // fin Group contenu (C3)
                 }
                 // Phase S (C3) : la fenêtre grandit avec le contenu (live-grow,
                 // ancrage haut) jusqu'au plafond écran×0,7 ; au-delà, ce cap
                 // engage le scroll interne. La hauteur de la FENÊTRE est pilotée
                 // par `growResultWindow` (via la mesure ci-dessous), pas ici.
                 .frame(maxHeight: AppDelegate.resultMaxScrollHeight())
-                .onPreferenceChange(ResultContentHeightKey.self) { h in
-                    handleResultContentHeight(h)
+                // C3 : mesure FIABLE via la géométrie du SCROLL lui-même
+                // (`contentSize` = taille réelle du contenu scrollable, qui
+                // grandit avec le Markdown pendant le stream). Les mesures de
+                // sous-vue (`.background(GeometryReader)` puis `onGeometryChange`)
+                // rapportaient 0 et ne se redéclenchaient jamais — quirk
+                // mesure-dans-ScrollView. `onScrollGeometryChange` (macOS 15)
+                // est l'API dédiée.
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.contentSize.height
+                } action: { _, newHeight in
+                    handleResultContentHeight(newHeight)
                 }
 
                 // Q.1.d : Divider retiré — footer accent différencie par ton.
@@ -1596,18 +1605,6 @@ struct PopoverView: View {
                     .allowsHitTesting(false)
             }
         }
-    }
-}
-
-// MARK: - Result content height (Phase S — C3, live-grow)
-
-/// Remonte la hauteur naturelle du contenu de la fenêtre de réponse depuis le
-/// ScrollView jusqu'à `PopoverView`. `reduce` garde la DERNIÈRE valeur (une
-/// seule source — le `GeometryReader` du contenu).
-private struct ResultContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

@@ -481,8 +481,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// − 300 de scroll). La barre d'actions (⌘S/⌘E, +32) s'y ajoute quand visible.
     static let resultChromeHeight: CGFloat = 94
     /// Hauteur minimale de la zone de contenu (plancher de la fenêtre avant le
-    /// 1er token / réponse très courte). Calable runtime si trop vide.
-    static let resultMinContentHeight: CGFloat = 130
+    /// 1er token / réponse très courte). Abaissé à 90 (C3 calage runtime) pour
+    /// une fenêtre snug sur réponse minuscule sans paraître vide.
+    static let resultMinContentHeight: CGFloat = 90
     /// Pas minimal de croissance (≈1 interligne) — throttle des `setFrame`
     /// instantanés pendant le stream (anti-saccade / anti-spam).
     static let resultGrowThrottle: CGFloat = 24
@@ -512,17 +513,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return chrome + content
     }
 
-    /// Frame ancrée de la fenêtre de réponse : largeur fixe, **bord HAUT fixe**
-    /// (croissance vers le bas, sans saut du contenu déjà rendu — précédent F.4).
-    /// Top calé sur la ligne du haut d'une fenêtre plafond CENTRÉE → une fenêtre
-    /// pleine est centrée à l'écran et rien ne déborde jamais ; une réponse
-    /// courte s'affiche en zone haute (compromis « pas de saut » > « centrage »).
-    static func resultWindowFrame(screen: NSScreen) -> NSRect {
+    /// Frame ancrée de la fenêtre de réponse pour une hauteur donnée : largeur
+    /// fixe, **bord HAUT fixe** (croissance vers le bas, sans saut du contenu
+    /// déjà rendu — précédent F.4). Top calé sur la ligne du haut d'une fenêtre
+    /// plafond CENTRÉE → une fenêtre pleine est centrée à l'écran et rien ne
+    /// déborde jamais ; une réponse courte s'affiche en zone haute (compromis
+    /// « pas de saut » > « centrage »). La hauteur est passée EXPLICITEMENT
+    /// (pas relue) pour éviter toute race avec une mesure transitoire.
+    static func resultWindowFrame(height: CGFloat, screen: NSScreen) -> NSRect {
         let r = screen.visibleFrame
         let plafond = r.height * resultPlafondRatio
-        let h = resultTargetHeight(screen: screen)
         let w = PolishTokens.resultWindowWidth
-        return NSRect(x: r.midX - w / 2, y: r.midY + plafond / 2 - h, width: w, height: h)
+        return NSRect(x: r.midX - w / 2, y: r.midY + plafond / 2 - height,
+                      width: w, height: height)
     }
 
     // K.2-B lot 2a (2026-05-26) — Mode Générateur, hauteurs par phase.
@@ -722,9 +725,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// partagée avec l'entrée animée). Garde no-op sub-pixel (Q.2.g). Le call
     /// site (PopoverView) garantit : mode résultat, hors suspension de flush
     /// (= hors animation), et throttle ≥ 1 interligne.
-    func growResultWindow() {
+    func growResultWindow(toHeight target: CGFloat) {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
-        let newFrame = Self.resultWindowFrame(screen: screen)
+        let newFrame = Self.resultWindowFrame(height: target, screen: screen)
         let cur = window.frame
         let e: CGFloat = 0.5
         if abs(cur.minX - newFrame.minX) < e, abs(cur.minY - newFrame.minY) < e,
