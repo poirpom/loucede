@@ -616,7 +616,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let withSelection = CapturedTextManager.shared.hasSelection
         // Phase 6.3 : ajout conditionnel de la ligne « Mise à jour disponible »
         // (+ 1 Divider = ~1pt, absorbé dans la marge empirique de la constante).
-        let withUpdate = UpdateChecker.shared.updateAvailable
+        let withUpdate = LoucedeUpdater.shared.updateAvailable
         let contentHeight = popoverChromeHeight
              + listHeight
              + (withSelection ? popoverPreviewHeight : 0)

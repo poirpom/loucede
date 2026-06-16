@@ -2,13 +2,12 @@
 //  LoucedeUpdater.swift
 //  loucede
 //
-//  Phase H.1 — Façade mince autour de Sparkle (SPUStandardUpdaterController).
+//  Façade mince autour de Sparkle (SPUStandardUpdaterController).
 //
-//  DORMANTE en H.1 : instanciée en parallèle de `UpdateChecker.shared`
-//  (le système custom GitHub-Releases reste le système ACTIF consommé par
-//  les vues). H.2 rebranchera les vues sur cette façade puis supprimera
-//  `UpdateChecker`. La façade découple le code app du SDK Sparkle et
-//  préserve le pattern Combine (@Published) déjà utilisé par les vues.
+//  Unique moteur de mise à jour de loucedé depuis H.2 (l'ancien système
+//  custom GitHub-Releases a été supprimé). La façade découple le code app du
+//  SDK Sparkle et expose le pattern Combine (@Published) consommé par les vues
+//  (UpdatesView, AboutView, SettingsView, PopoverView).
 //
 //  App non sandboxée (ENABLE_APP_SANDBOX = NO) → pas de service XPC requis,
 //  SPUStandardUpdaterController fonctionne directement.
