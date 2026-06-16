@@ -23,5 +23,11 @@
 			</array>
 		</dict>
 	</array>
+	<key>SUFeedURL</key>
+	<string>https://poirpom.github.io/loucede/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>0uze10ZxX7Y16eHP21/AV5uhrvcjSxe7cQDarncW6k4=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>
