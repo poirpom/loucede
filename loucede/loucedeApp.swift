@@ -156,6 +156,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             UpdateChecker.shared.checkForUpdates()
         }
+
+        // Phase H.1 (Sparkle-first) : instanciation de la façade Sparkle en
+        // PARALLÈLE de UpdateChecker (cohabitation volontaire). UpdateChecker
+        // reste le système ACTIF consommé par les vues ; LoucedeUpdater est
+        // dormant jusqu'à H.2 (bascule des vues). startingUpdater: true démarre
+        // l'updater ; SUEnableAutomaticChecks gère la vérif background.
+        _ = LoucedeUpdater.shared
     }
 
     func showOnboarding() {
