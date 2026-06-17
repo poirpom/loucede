@@ -1204,11 +1204,11 @@ struct PopoverView: View {
 
                 // --- Section B : 4 champs éditables ---
                 // Emoji + Titre sur la MÊME ligne. EmojiPickerButton à
-                // gauche (carré 36×36, identique à l'éditeur de Réglages
-                // → Actions — pattern unifié), Titre prend tout le reste.
-                // alignment: .top → les 2 labels alignés en haut ; les 2
-                // champs (carré 36pt + TextField forcé à 36pt via
-                // .frame(height: 36)) alignés top ET bottom, pas de
+                // gauche (carré 40×40 — Phase T, agrandi par rapport au 36
+                // de l'éditeur Réglages pour matcher le corps 16pt), Titre
+                // prend tout le reste. alignment: .top → les 2 labels alignés
+                // en haut ; les 2 champs (carré 40pt + TextField forcé à 40pt
+                // via .frame(height: 40)) alignés top ET bottom, pas de
                 // déséquilibre visuel.
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1227,9 +1227,12 @@ struct PopoverView: View {
                         // perdu. Filet de sécurité 15s ; réinstallation
                         // anticipée via .onChange(editableEmoji) plus
                         // bas dès qu'un emoji est choisi.
+                        // Phase T (C5) : cartouche agrandi (40×40, glyphe 28 ≈
+                        // 1,75× du corps 16pt) pour la cohérence avec la fenêtre
+                        // de réponse. Le champ Titre voisin suit à 40pt (carré-aligné).
                         EmojiPickerButton(icon: $state.editableEmoji,
-                                          boxSize: 36,
-                                          fontSize: 24,
+                                          boxSize: 40,
+                                          fontSize: 28,
                                           onPaletteOpen: {
                                               globalAppDelegate?
                                                   .suspendOutsideClickMonitor(for: 15)
@@ -1247,7 +1250,8 @@ struct PopoverView: View {
                             // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                             .tint(PolishTokens.cursorColor)
                             .padding(.horizontal, 10)
-                            .frame(height: 36)
+                            // Phase T (C5) : hauteur 40 = carré de l'emoji voisin.
+                            .frame(height: 40)
                             .polishFieldFill()
                             .focused($isEditableTitleFocused)
                     }
