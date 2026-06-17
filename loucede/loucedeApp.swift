@@ -514,6 +514,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return chrome + content
     }
 
+    /// Phase T (C2) — hauteur PLEINE de la fenêtre de réponse (= plafond, la
+    /// hauteur max qu'une réponse longue atteint). Source unique consommée par
+    /// la fiche d'édition du Générateur (`.generator(.resultEditable)`), qui
+    /// s'ouvre directement à hauteur pleine (décision : un prompt généré est
+    /// toujours long → offrir l'espace plutôt que scroller). Même `resultPlafondRatio`
+    /// que la croissance de D → D et E partagent exactement la même hauteur max.
+    static func resultPlafondHeight(screen: NSScreen? = NSScreen.main) -> CGFloat {
+        let h = (screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        return h * resultPlafondRatio
+    }
+
     /// Frame ancrée de la fenêtre de réponse pour une hauteur donnée : largeur
     /// fixe, **bord HAUT fixe** (croissance vers le bas, sans saut du contenu
     /// déjà rendu — précédent F.4). Top calé sur la ligne du haut d'une fenêtre
@@ -537,20 +548,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// phases (compact / loading / error). Léger espace vide en bas en
     /// saisie normale, accepté (prix de la stabilité).
     static let popoverGeneratorCompactHeight: CGFloat = 200
-    /// K.2-B lot 2b — hauteur du popover générateur en mode résultat
-    /// ÉDITABLE (les 4 champs Titre/Emoji/Description/Prompt + champ
-    /// « Action à générer » + bouton Regénérer + sélecteur de catégorie
-    /// + barre Annuler/Valider). Post-fignolage 2b : Emoji devient
-    /// EmojiPickerButton (carré 36×36, identique à l'éditeur de Réglages)
-    /// FUSIONNÉ avec Titre sur la même ligne — espace libéré reversé au
-    /// Prompt (plafond 200→250pt). Décomposition recalculée :
-    /// top bar 52 + divider 1 + padTop 10 + section « Action à générer »
-    /// (68) + spacing 14 + ligne Emoji+Titre (56) + spacing 14 +
-    /// Description (48) + spacing 14 + Prompt label+TextEditor 250 (270)
-    /// + spacing 14 + Catégorie (48) + padBottom 12 + divider + bottom
-    /// bar (52) ≈ 674pt → buffer 6pt = 680pt. ScrollView interne
-    /// absorbe les variabilités de rendu.
-    static let popoverGeneratorEditableHeight: CGFloat = 680
+    // Phase T (C2) : la hauteur de `.resultEditable` n'est plus une constante
+    // (l'ancien `popoverGeneratorEditableHeight = 680`). La fiche d'édition
+    // s'ouvre à hauteur pleine, alignée sur le plafond de la fenêtre de réponse
+    // — cf. `resultPlafondHeight(screen:)` consommé dans `resizePopover`.
 
     /// Phase du popover générateur, sert à dimensionner la fenêtre.
     /// Compact couvre `.compact`, `.loading`, `.error` de PopoverState ;
@@ -690,7 +691,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height = Self.popoverGeneratorCompactHeight
             case .resultEditable:
                 width = PolishTokens.resultWindowWidth
-                height = Self.popoverGeneratorEditableHeight
+                height = Self.resultPlafondHeight(screen: screen)
             }
         }
         let x = (screenRect.width - width) / 2 + screenRect.minX
@@ -698,8 +699,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Phase S (C3) : la fenêtre de réponse est ancrée par le HAUT (bord
         // haut fixe, croissance vers le bas) — cohérent avec `growResultWindow`
         // pour qu'aucun saut de contenu n'apparaisse au 1er pas de croissance.
-        // Les autres modes restent centrés verticalement.
-        if case .resultCompact = mode {
+        // Phase T (C2) : la fiche d'édition du Générateur (`.resultEditable`)
+        // partage cet ancrage haut → la transition D↔E (618 des deux côtés) ne
+        // déplace pas la fenêtre, seul le bord bas descend. Les autres modes
+        // (liste, générateur compact) restent centrés verticalement.
+        let anchoredTop: Bool
+        switch mode {
+        case .resultCompact:               anchoredTop = true
+        case .generator(.resultEditable):  anchoredTop = true
+        default:                           anchoredTop = false
+        }
+        if anchoredTop {
             let plafond = screenRect.height * Self.resultPlafondRatio
             y = screenRect.midY + plafond / 2 - height
         }
