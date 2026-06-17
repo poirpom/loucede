@@ -1146,13 +1146,18 @@ struct PopoverView: View {
     ///   « Regénérer » (relance la génération, écrase les éditions
     ///   manuelles, décision actée).
     /// - Section B : 4 champs éditables (Titre/Emoji/Description mono-lignes,
-    ///   Prompt multi-ligne plafonné à 200pt scrollable).
+    ///   Prompt multi-ligne qui PREND LA HAUTEUR RESTANTE — Phase T C6).
     /// - Section C : sélecteur de catégorie (« Sans catégorie » par défaut
     ///   + 6 catégories réelles, `.custom` DEPRECATED exclu).
-    /// Wrappé dans un ScrollView pour safety si l'écran est très petit.
-    /// La bottom bar Annuler/Valider est en dehors (côté `generatorView`),
-    /// pour rester fixée en bas.
+    /// Phase T (C6) : pattern « remplit-ou-scrolle ». Le GeometryReader fournit
+    /// la hauteur du viewport ; le VStack est forcé à au moins cette hauteur
+    /// (`.frame(minHeight:)`) → le champ Prompt (`maxHeight: .infinity`) absorbe
+    /// tout l'espace libre. Si le contenu dépasse (petit écran), le ScrollView
+    /// reprend son rôle de filet. Le bloc interne garde son indentation d'origine
+    /// (wrap purement additif). La bottom bar Annuler/Valider est en dehors (côté
+    /// `generatorView`), pour rester fixée en bas.
     private var generatorEditableContent: some View {
+        GeometryReader { geo in
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 // --- Section A : Action à générer + Regénérer ---
@@ -1268,6 +1273,9 @@ struct PopoverView: View {
             .padding(.horizontal, PolishTokens.resultPaddingHorizontal)
             .padding(.top, 10)
             .padding(.bottom, 12)
+            // Phase T (C6) : remplit au moins la hauteur du viewport → le Prompt
+            // (maxHeight: .infinity) prend l'espace restant ; scroll si dépassement.
+            .frame(minHeight: geo.size.height)
         }
         // K.2-B lot 2b fix — réinstallation anticipée du monitor de clic
         // extérieur dès que l'emoji change. Deux scénarios :
@@ -1284,6 +1292,7 @@ struct PopoverView: View {
         .onChange(of: state.editableEmoji) { _, _ in
             globalAppDelegate?.resumeOutsideClickMonitorIfSuspended()
         }
+        }   // fin GeometryReader (Phase T C6)
     }
 
     /// Champ éditable mono-ligne (utilisé pour Description). Label 12pt
@@ -1311,10 +1320,11 @@ struct PopoverView: View {
         }
     }
 
-    /// Champ Prompt — multi-ligne via TextEditor. Plafonné à 250pt
-    /// (au-delà, scroll interne natif). Plafond augmenté de 200 → 250
-    /// dans le fignolage 2b post-fusion Emoji+Titre (espace vertical
-    /// libéré reversé au Prompt — champ de loin le plus long en usage).
+    /// Champ Prompt — multi-ligne via TextEditor. Phase T (C6) : PREND LA
+    /// HAUTEUR RESTANTE (`maxHeight: .infinity`) — l'ancien plafond 250pt est
+    /// retiré, la fiche s'ouvrant à hauteur pleine, le Prompt (champ de loin le
+    /// plus long en usage) occupe tout l'espace libre sous les autres champs.
+    /// Le scroll interne natif du TextEditor reste le filet si le texte dépasse.
     /// ↵ insère un saut de ligne — pas de risque de validation
     /// accidentelle, la validation passe par ⌘↵ sur la bottom bar.
     private var editablePromptField: some View {
@@ -1333,7 +1343,9 @@ struct PopoverView: View {
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
-                .frame(maxHeight: 250)
+                // Phase T (C6) : prend la hauteur restante (cf. pattern
+                // remplit-ou-scrolle de generatorEditableContent).
+                .frame(maxHeight: .infinity)
                 .polishFieldFill()
         }
     }
