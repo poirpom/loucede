@@ -247,7 +247,12 @@ struct PopoverView: View {
                 case .resultEditable:            popupPhase = .resultEditable
                 }
                 state.suspendFlush()
-                globalAppDelegate?.resizePopover(to: .generator(popupPhase))
+                // Phase T (C3) : D→E (⌘E vers `.resultEditable`) en transition
+                // INSTANTANÉE — D et E sont à 618 + ancrage haut, le bord bas
+                // descend sans glissement animé. Les autres phases (compact /
+                // loading / error) gardent l'animation (entrée du générateur).
+                globalAppDelegate?.resizePopover(to: .generator(popupPhase),
+                                                 animated: popupPhase != .resultEditable)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     state.resumeFlush()
                 }

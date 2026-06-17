@@ -414,12 +414,15 @@ final class PopoverState: ObservableObject {
             // proxy). Resize explicite : aucun .onChange ne couvre ce chemin
             // (activeAction inchangé ; la garde K.2-B du
             // .onChange(generatorPhase → nil) skip quand activeAction != nil).
-            // `.resultCompact` redonne 426 (pending non-nil → barre comptée).
+            // `.resultCompact` redonne la hauteur content-aware de D (pending
+            // non-nil → barre ⌘S/⌘E comptée). Phase T (C3) : retour E→D
+            // INSTANTANÉ (symétrique du ⌘E D→E) — principe « real-time or not
+            // at all », pas de glissement animé sur le round-trip d'édition.
             generatorPhase = nil
             generatorInputText = ""
             clearEditableFields()
             suspendFlush()
-            globalAppDelegate?.resizePopover(to: .resultCompact)
+            globalAppDelegate?.resizePopover(to: .resultCompact, animated: false)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.resumeFlush()
             }

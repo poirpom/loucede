@@ -659,7 +659,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// une `PopoverMode`, ce qui empêche le call site de prendre la mauvaise
     /// décision pour la hauteur cible.
     func resizePopover(to mode: PopoverMode, searchQuery: String = "",
-                       duration: Double = PolishTokens.popoverResizeDuration) {
+                       duration: Double = PolishTokens.popoverResizeDuration,
+                       animated: Bool = true) {
         guard let screen = NSScreen.main, let window = popoverWindow else { return }
         let screenRect = screen.visibleFrame
         let width: CGFloat
@@ -725,6 +726,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let e: CGFloat = 0.5   // tolérance sub-pixel
         if abs(cur.minX - newFrame.minX) < e, abs(cur.minY - newFrame.minY) < e,
            abs(cur.width - newFrame.width) < e, abs(cur.height - newFrame.height) < e {
+            return
+        }
+        // Phase T (C3) : transition instantanée (setFrame sans NSAnimationContext)
+        // pour le round-trip d'édition D↔E (⌘E / Esc) — principe Phase S « real-time
+        // or not at all », même mécanique que `growResultWindow`. Aucune animation
+        // concurrente d'une mutation de contenu → hors terrain crash 6.14/Q.2.g.
+        guard animated else {
+            window.setFrame(newFrame, display: true)
             return
         }
         NSAnimationContext.runAnimationGroup { context in
