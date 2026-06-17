@@ -1335,6 +1335,12 @@ struct PopoverView: View {
             TextEditor(text: $state.editablePrompt)
                 // Phase T (C4) : contenu 16pt (corps Phase S, prose longue).
                 .font(.system(size: PolishTokens.resultBodyFontSize))
+                // Phase T (C7) : interligne ~1,5× comme le corps de la fenêtre
+                // de réponse. `resultLineSpacingEm` (em MarkdownUI) n'est pas
+                // transposable au TextEditor → on le convertit en points
+                // (= 16 × 0,3 ≈ 4,8pt), en réutilisant les deux tokens Phase S
+                // (pas de littéral, lié sémantiquement à D).
+                .lineSpacing(PolishTokens.resultBodyFontSize * PolishTokens.resultLineSpacingEm)
                 .foregroundStyle(.primary)
                 // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                 // `.scrollContentBackground(.hidden)` neutralise le fond natif de
