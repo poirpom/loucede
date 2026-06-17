@@ -117,7 +117,11 @@ struct PopoverView: View {
         // Phase S (C2) : la fenêtre de réponse (lecture) est plus large que la
         // liste/générateur (scan) → conditionnel sur le mode résultat, miroir
         // exact de la largeur posée par `resizePopover(.resultCompact)`.
+        // Phase T (C1) : la fiche d'édition du générateur (`.resultEditable`)
+        // s'aligne aussi sur 618 — sinon bande transparente (le `.frame` doit
+        // suivre la largeur posée par `resizePopover(.generator(.resultEditable))`).
         .frame(width: (state.generatorPhase == nil && state.activeAction != nil)
+                       || state.generatorPhase == .resultEditable
                       ? PolishTokens.resultWindowWidth
                       : AppDelegate.popoverDefaultWidth)
         // Q.1.d : panneau loucedé canonique = vibrancy hudWindow + clip coins

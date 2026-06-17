@@ -680,12 +680,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             width = PolishTokens.resultWindowWidth
             height = Self.resultTargetHeight(screen: screen)
         case .generator(let phase):
-            // K.2-B lot 2a — Mode Générateur. Largeur identique à .list
-            // pour continuité visuelle. Hauteur fonction de la phase.
-            width = Self.popoverDefaultWidth
+            // K.2-B lot 2a — Mode Générateur. `.compact` (saisie / loading /
+            // erreur) garde la largeur liste (scan). Phase T : `.resultEditable`
+            // (fiche d'édition) s'aligne sur la fenêtre de réponse (618, lecture)
+            // — même source que `.resultCompact`, pour la cohérence D↔E.
             switch phase {
-            case .compact:         height = Self.popoverGeneratorCompactHeight
-            case .resultEditable:  height = Self.popoverGeneratorEditableHeight
+            case .compact:
+                width = Self.popoverDefaultWidth
+                height = Self.popoverGeneratorCompactHeight
+            case .resultEditable:
+                width = PolishTokens.resultWindowWidth
+                height = Self.popoverGeneratorEditableHeight
             }
         }
         let x = (screenRect.width - width) / 2 + screenRect.minX
