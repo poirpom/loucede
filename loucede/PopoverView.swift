@@ -1170,7 +1170,10 @@ struct PopoverView: View {
                     HStack(spacing: 8) {
                         TextField("", text: $state.generatorInputText)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 13))
+                            // Phase T (C4) : contenu en corps de lecture (16pt),
+                            // source Phase S partagée. Le label/helper au-dessus
+                            // reste à 12pt (garde-fou : seuls les CONTENUS grandissent).
+                            .font(.system(size: PolishTokens.resultBodyFontSize))
                             .foregroundStyle(.primary)
                             // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                             .tint(PolishTokens.cursorColor)
@@ -1238,7 +1241,8 @@ struct PopoverView: View {
                             .foregroundStyle(.secondary)
                         TextField("", text: $state.editableTitle)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 13))
+                            // Phase T (C4) : contenu 16pt (corps Phase S).
+                            .font(.system(size: PolishTokens.resultBodyFontSize))
                             .foregroundStyle(.primary)
                             // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                             .tint(PolishTokens.cursorColor)
@@ -1255,7 +1259,9 @@ struct PopoverView: View {
                 // --- Section C : sélecteur de catégorie ---
                 editableCategoryPicker
             }
-            .padding(.horizontal, 12)
+            // Phase T (C4) : padding latéral 45 (= resultPaddingHorizontal Phase S)
+            // → champs ~528pt utiles, alignés sur le corps de la fenêtre de réponse.
+            .padding(.horizontal, PolishTokens.resultPaddingHorizontal)
             .padding(.top, 10)
             .padding(.bottom, 12)
         }
@@ -1290,7 +1296,8 @@ struct PopoverView: View {
                 .foregroundStyle(.secondary)
             TextField("", text: text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                // Phase T (C4) : contenu 16pt (corps Phase S).
+                .font(.system(size: PolishTokens.resultBodyFontSize))
                 .foregroundStyle(.primary)
                 // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                 .tint(PolishTokens.cursorColor)
@@ -1312,7 +1319,8 @@ struct PopoverView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             TextEditor(text: $state.editablePrompt)
-                .font(.system(size: 13))
+                // Phase T (C4) : contenu 16pt (corps Phase S, prose longue).
+                .font(.system(size: PolishTokens.resultBodyFontSize))
                 .foregroundStyle(.primary)
                 // Q.1.c-bis : fill subtil (fiche structurée) + curseur d'accent.
                 // `.scrollContentBackground(.hidden)` neutralise le fond natif de
