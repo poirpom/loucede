@@ -105,7 +105,16 @@ struct PopoverView: View {
             // générateur > résultat > main : si une génération est en
             // cours, elle prime sur tout le reste.
             if state.generatorPhase != nil {
+                // Phase T (C8) : fade-in du contenu E à l'apparition. La
+                // transition ne s'anime QUE si l'insertion/retrait de
+                // generatorView se produit dans un `withAnimation` — seul
+                // `enterEditFromResult` (⌘E, D→E) en pose un. Les autres
+                // bascules (entrée compact, sortie run-first) restent instantanées.
+                // Le resize fenêtre reste instantané (C3) ; ici seul le contenu
+                // interne se fond, par-dessus le fond de panneau (polishVibrancy
+                // du body), pas de flash transparent.
                 generatorView
+                    .transition(.opacity)
             } else if let action = state.activeAction {
                 resultView(for: action)
             } else {

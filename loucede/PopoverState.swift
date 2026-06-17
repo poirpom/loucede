@@ -390,7 +390,12 @@ final class PopoverState: ObservableObject {
         editableDescription = pending.shortDescription ?? ""
         editablePrompt = pending.prompt
         editableCategory = nil
-        generatorPhase = .resultEditable
+        // Phase T (C8) : fade-in rapide du contenu E (la transition .opacity de
+        // generatorView côté PopoverView ne s'anime que dans ce withAnimation).
+        // Le resize fenêtre reste instantané (C3, hors de ce bloc).
+        withAnimation(.easeInOut(duration: 0.15)) {
+            generatorPhase = .resultEditable
+        }
     }
 
     /// Esc en mode Générateur — comportement dépendant de la phase :
