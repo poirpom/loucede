@@ -34,6 +34,7 @@ PERMALINK="https://github.com/poirpom/loucede/releases/latest/download/loucede.d
 # Chemins de travail
 BUILD_DIR="$REPO_ROOT/build"
 RELEASE_NOTES_DIR="$REPO_ROOT/release-notes"
+PBXPROJ="$REPO_ROOT/loucede.xcodeproj/project.pbxproj"
 
 # --- Logging ----------------------------------------------------------------
 info() { printf '\033[1;34m▶ %s\033[0m\n' "$*"; }
@@ -54,12 +55,21 @@ EOF
 VERSION=""
 TAG=""
 IS_TEST=0
+NEW_BUILD=""          # CURRENT_PROJECT_VERSION après bump
+PBXPROJ_BACKUP=""     # copie de sauvegarde du pbxproj (restore éventuel)
+RESTORE_PBXPROJ=0     # 1 ⇒ cleanup restaure le pbxproj depuis le backup
 
 # --- Cleanup / trap ---------------------------------------------------------
-# Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast,
-# restauration pbxproj). Idempotent : sans danger si une ressource est absente.
+# Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast).
+# Idempotent : sans danger si une ressource est absente.
 cleanup() {
-  :
+  # Restauration du pbxproj : toujours en mode TEST ; en mode PROD seulement
+  # si le bump n'a pas été commité (échec avant C5 → on ne laisse pas l'arbre sale).
+  if [ "$RESTORE_PBXPROJ" -eq 1 ] && [ -n "$PBXPROJ_BACKUP" ] && [ -f "$PBXPROJ_BACKUP" ]; then
+    cp "$PBXPROJ_BACKUP" "$PBXPROJ"
+    rm -f "$PBXPROJ_BACKUP"
+    warn "pbxproj restauré (bump non conservé)"
+  fi
 }
 trap cleanup EXIT
 
@@ -119,12 +129,43 @@ preflight() {
   ok "Pré-checks OK — version=$VERSION · tag=$TAG · mode=$([ "$IS_TEST" -eq 1 ] && echo TEST || echo PROD)"
 }
 
+# --- Versionning ------------------------------------------------------------
+# Versions portées par le pbxproj (GENERATE_INFOPLIST_FILE=YES : pas de
+# CFBundle*Version dans l'Info.plist statique). On édite le pbxproj au sed.
+read_current_build() {
+  # Premier CURRENT_PROJECT_VERSION rencontré (toutes les cibles sont alignées)
+  local b
+  b="$(grep -m1 -E 'CURRENT_PROJECT_VERSION = [0-9]+;' "$PBXPROJ" \
+       | sed -E 's/.*CURRENT_PROJECT_VERSION = ([0-9]+);.*/\1/')"
+  [[ "$b" =~ ^[0-9]+$ ]] || die "CURRENT_PROJECT_VERSION introuvable/illisible dans le pbxproj"
+  printf '%s' "$b"
+}
+
+bump_version() {
+  info "Versionning…"
+  local cur
+  cur="$(read_current_build)"
+  NEW_BUILD=$((cur + 1))
+
+  # Sauvegarde avant édition (restore en mode test, ou si échec avant commit)
+  PBXPROJ_BACKUP="$(mktemp -t loucede-pbxproj-backup)"
+  cp "$PBXPROJ" "$PBXPROJ_BACKUP"
+  RESTORE_PBXPROJ=1
+
+  # MARKETING_VERSION (3 cibles alignées) + CURRENT_PROJECT_VERSION (bump)
+  sed -i '' -E "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $VERSION;/g" "$PBXPROJ"
+  sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g" "$PBXPROJ"
+
+  ok "Version posée : MARKETING_VERSION=$VERSION · CURRENT_PROJECT_VERSION=$cur→$NEW_BUILD"
+}
+
 # --- main -------------------------------------------------------------------
 main() {
   parse_args "$@"
   preflight
-  # Étapes build / notarize / release / appcast ajoutées aux commits C2→C6.
-  ok "release.sh — squelette OK"
+  bump_version
+  # Étapes build / notarize / release / appcast ajoutées aux commits C3→C6.
+  ok "release.sh — versionning OK"
 }
 
 main "$@"
