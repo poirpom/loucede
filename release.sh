@@ -61,6 +61,8 @@ RESTORE_PBXPROJ=0     # 1 ⇒ cleanup restaure le pbxproj depuis le backup
 APP_PATH=""           # .app signé Developer ID exporté
 DMG_PATH=""           # DMG final (sous build/, gitignoré)
 STAGING_DIR=""        # dossier temporaire de montage du DMG
+ED_SIGNATURE=""       # signature EdDSA Sparkle du DMG
+LENGTH=""             # taille du DMG en octets (enclosure appcast)
 
 # --- Cleanup / trap ---------------------------------------------------------
 # Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast).
@@ -230,6 +232,48 @@ make_dmg() {
   ok "DMG créé : $DMG_PATH"
 }
 
+# --- Notarisation + staple + signature Sparkle ------------------------------
+notarize_dmg() {
+  info "Notarisation du DMG (peut prendre quelques minutes)…"
+  local out
+  if ! out="$(xcrun notarytool submit "$DMG_PATH" \
+                --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)"; then
+    printf '%s\n' "$out" >&2
+    die "soumission notarytool échouée"
+  fi
+  printf '%s\n' "$out"
+  if ! grep -q "status: Accepted" <<<"$out"; then
+    # Récupère le log détaillé de la soumission rejetée
+    local sub_id
+    sub_id="$(grep -m1 -E '^[[:space:]]*id:' <<<"$out" | sed -E 's/.*id:[[:space:]]*//')"
+    [ -n "$sub_id" ] && xcrun notarytool log "$sub_id" \
+      --keychain-profile "$NOTARY_PROFILE" >&2 || true
+    die "notarisation non acceptée"
+  fi
+
+  info "Staple…"
+  xcrun stapler staple "$DMG_PATH"   >/dev/null || die "stapler staple a échoué"
+  xcrun stapler validate "$DMG_PATH" >/dev/null || die "stapler validate a échoué"
+  ok "DMG notarisé + stapled"
+}
+
+sign_sparkle() {
+  info "Signature Sparkle (EdDSA)…"
+  # Chemin déterministe sous build/ (SPM via -derivedDataPath), fallback Downloads
+  local sign_tool="$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+  [ -x "$sign_tool" ] || sign_tool="$HOME/Downloads/Sparkle-2.9.3/bin/sign_update"
+  [ -x "$sign_tool" ] || die "sign_update introuvable (ni SPM build/ ni ~/Downloads)"
+
+  local out
+  out="$("$sign_tool" "$DMG_PATH")" || die "sign_update a échoué"
+  # Sortie attendue : sparkle:edSignature="…" length="…"
+  ED_SIGNATURE="$(sed -E 's/.*sparkle:edSignature="([^"]+)".*/\1/' <<<"$out")"
+  LENGTH="$(sed -E 's/.*length="([0-9]+)".*/\1/' <<<"$out")"
+  [ -n "$ED_SIGNATURE" ] && [ -n "$LENGTH" ] \
+    || die "signature/length Sparkle illisibles : $out"
+  ok "Signé Sparkle (length=$LENGTH octets)"
+}
+
 # --- main -------------------------------------------------------------------
 main() {
   parse_args "$@"
@@ -237,8 +281,10 @@ main() {
   bump_version
   build_app
   make_dmg
-  # Étapes notarize / release / appcast ajoutées aux commits C4→C6.
-  ok "release.sh — build + DMG OK"
+  notarize_dmg
+  sign_sparkle
+  # Étapes release / appcast ajoutées aux commits C5→C6.
+  ok "release.sh — DMG notarisé + signé OK"
 }
 
 main "$@"
