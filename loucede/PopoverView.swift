@@ -536,11 +536,13 @@ struct PopoverView: View {
             state.runAction(action)
         case .generator:
             state.enterGeneratorMode(prefilled: state.searchQuery)
-        case .quickAccess:
-            // Inbox 12/06 — activation câblée en C2 (fermeture popup +
-            // openSettings). Placeholder en C1 : la section est visible et
-            // navigable, ↵/clic sont encore inertes.
-            break
+        case .quickAccess(let qa):
+            // Inbox 12/06 — ferme le popup AVANT d'ouvrir Réglages (sinon la
+            // fenêtre s'ouvre derrière, le popoverWindow ayant un NSWindow level
+            // supérieur — même précaution que le chemin ⌘D). `openSettings`
+            // route vers l'onglet : Général (0) pour Réglages, Doc (5) pour Doc.
+            onClose()
+            globalAppDelegate?.openSettings(tab: qa.settingsTab)
         }
     }
 
