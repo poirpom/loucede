@@ -639,7 +639,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .sectionHeader:
                 h += popoverSectionHeaderHeight
                 if i > 0 { dividerCount += 1 }   // mirror du rendu PopoverView
-            case .action, .generator:
+            case .action, .generator, .quickAccess:
                 h += popoverActionRowHeight
             }
         }

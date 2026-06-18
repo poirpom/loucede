@@ -13,8 +13,9 @@
 import Foundation
 
 /// Titre d'une section de la liste popup (en-tête non sélectionnable).
-/// K.unify.3 : 9 sections possibles — FAVORIS, les 6 catégories
-/// sémantiques, Sans catégorie, et Générateur (mode recherche seul).
+/// K.unify.3 : 9 sections — FAVORIS, les 6 catégories sémantiques, Sans
+/// catégorie, et Générateur (mode recherche seul). Inbox 12/06 : +ACCÈS
+/// RAPIDES (entrées système, toujours en dernier).
 enum SectionTitle: String {
     case favorites = "FAVORIS"
     case translate = "TRADUIRE"
@@ -25,6 +26,7 @@ enum SectionTitle: String {
     case propose = "PROPOSER"
     case uncategorized = "SANS CATÉGORIE"
     case generator = "GÉNÉRATEUR"
+    case quickAccess = "ACCÈS RAPIDES"
 
     /// En-tête correspondant à une catégorie sémantique. `nil` pour
     /// `.custom` (déprécié depuis K.unify.2, exclu de la popup — les
@@ -43,20 +45,36 @@ enum SectionTitle: String {
     }
 }
 
+/// Entrée système « accès rapide » de la popup (inbox 12/06). Ce n'est
+/// PAS une `Action` (ni prompt, ni catégorie, ni persistance, exclue de
+/// Réglages → Actions) : elle ouvre une fenêtre de l'app. `CaseIterable`
+/// porte l'ordre d'affichage (Réglages avant Doc).
+enum QuickAccessItem: String, CaseIterable {
+    case settings
+    case doc
+
+    var title: String { self == .settings ? "Réglages" : "Doc" }
+    var icon: String  { self == .settings ? "⚙️" : "📖" }
+    /// Onglet Réglages ciblé : Général (0) pour Réglages, Doc (5) pour Doc.
+    var settingsTab: Int { self == .settings ? 0 : 5 }
+}
+
 /// Item unifié rendu dans la liste de la popup principale.
 /// `sectionHeader` est purement visuel (non navigable au clavier) ;
-/// `.action` et `.generator` sont sélectionnables (↑/↓/↵/clic).
+/// `.action`, `.generator` et `.quickAccess` sont sélectionnables (↑/↓/↵/clic).
 /// K.unify.3 : `.myAction` + `.modelSuggestion` fusionnés en `.action`.
 enum PopupItem: Identifiable {
     case sectionHeader(SectionTitle)
     case action(Action)
     case generator
+    case quickAccess(QuickAccessItem)
 
     var id: String {
         switch self {
         case .sectionHeader(let title): return "header-\(title.rawValue)"
         case .action(let action):       return "action-\(action.id.uuidString)"
         case .generator:                return "generator"
+        case .quickAccess(let item):    return "quickaccess-\(item.rawValue)"
         }
     }
 
@@ -64,8 +82,8 @@ enum PopupItem: Identifiable {
     /// (↑/↓) et la sélection les ignorent.
     var isSelectable: Bool {
         switch self {
-        case .sectionHeader:      return false
-        case .action, .generator: return true
+        case .sectionHeader:                    return false
+        case .action, .generator, .quickAccess: return true
         }
     }
 }
@@ -89,7 +107,12 @@ enum PopupItemBuilder {
     static func build(actions: [Action], searchQuery rawQuery: String) -> [PopupItem] {
         let visible = actions.filter { !$0.isHidden }
         let q = rawQuery.trimmingCharacters(in: .whitespaces)
-        return q.isEmpty ? buildDefault(visible) : buildSearch(visible, query: q)
+        var items = q.isEmpty ? buildDefault(visible) : buildSearch(visible, query: q)
+        // Inbox 12/06 — ACCÈS RAPIDES toujours en DERNIER (après Générateur en
+        // mode recherche, après Sans catégorie en mode défaut). Append centralisé
+        // ici pour garantir cette position dans les deux modes.
+        appendQuickAccess(query: q, to: &items)
+        return items
     }
 
     // MARK: Vue par défaut (champ vide)
@@ -153,6 +176,20 @@ enum PopupItemBuilder {
         guard !actions.isEmpty else { return }
         items.append(.sectionHeader(title))
         items += actions.map { .action($0) }
+    }
+
+    /// Inbox 12/06 — section ACCÈS RAPIDES (entrées système). Recherche vide :
+    /// les 2 items. Recherche active : items dont le titre matche (même
+    /// `ActionSearch.score` que les actions = basique `localizedStandardContains`
+    /// tant que le fuzzy est off). Section masquée si aucun match (cohérent
+    /// K.unify.3 « masquer si vide »).
+    private static func appendQuickAccess(query: String, to items: inout [PopupItem]) {
+        let matching = query.isEmpty
+            ? QuickAccessItem.allCases
+            : QuickAccessItem.allCases.filter { ActionSearch.score(query: query, against: $0.title) > 0 }
+        guard !matching.isEmpty else { return }
+        items.append(.sectionHeader(.quickAccess))
+        items += matching.map { .quickAccess($0) }
     }
 
     private static func byOrder(_ pool: [Action]) -> [Action] {

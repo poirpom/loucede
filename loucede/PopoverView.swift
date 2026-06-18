@@ -536,6 +536,11 @@ struct PopoverView: View {
             state.runAction(action)
         case .generator:
             state.enterGeneratorMode(prefilled: state.searchQuery)
+        case .quickAccess:
+            // Inbox 12/06 — activation câblée en C2 (fermeture popup +
+            // openSettings). Placeholder en C1 : la section est visible et
+            // navigable, ↵/clic sont encore inertes.
+            break
         }
     }
 
@@ -925,6 +930,9 @@ struct PopoverView: View {
                               selIndex: row.selIndex, item: row.item)
         case .generator:
             selectableItemRow(icon: "✨", name: "Générer cette action",
+                              selIndex: row.selIndex, item: row.item)
+        case .quickAccess(let qa):
+            selectableItemRow(icon: qa.icon, name: qa.title,
                               selIndex: row.selIndex, item: row.item)
         }
     }
