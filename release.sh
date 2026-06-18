@@ -170,7 +170,7 @@ bump_version() {
   sed -i '' -E "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $VERSION;/g" "$PBXPROJ"
   sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = $NEW_BUILD;/g" "$PBXPROJ"
 
-  ok "Version posée : MARKETING_VERSION=$VERSION · CURRENT_PROJECT_VERSION=$cur→$NEW_BUILD"
+  ok "Version posée : MARKETING_VERSION=$VERSION · CURRENT_PROJECT_VERSION=${cur}→${NEW_BUILD}"
 }
 
 # --- Build + export Developer ID + DMG --------------------------------------
