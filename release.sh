@@ -63,6 +63,7 @@ DMG_PATH=""           # DMG final (sous build/, gitignoré)
 STAGING_DIR=""        # dossier temporaire de montage du DMG
 ED_SIGNATURE=""       # signature EdDSA Sparkle du DMG
 LENGTH=""             # taille du DMG en octets (enclosure appcast)
+ENCLOSURE_URL=""      # URL de l'asset DMG référencée par l'appcast
 
 # --- Cleanup / trap ---------------------------------------------------------
 # Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast).
@@ -274,6 +275,45 @@ sign_sparkle() {
   ok "Signé Sparkle (length=$LENGTH octets)"
 }
 
+# --- Tag + GitHub Release + upload asset -------------------------------------
+# Publié AVANT l'appcast (C6) : l'enclosure doit pointer vers un asset déjà
+# en ligne, sinon Sparkle référencerait un 404.
+publish_release() {
+  info "Publication GitHub Release…"
+
+  if [ "$IS_TEST" -eq 0 ]; then
+    # PROD : on conserve le bump → commit + push sur main, le tag pointera dessus.
+    git -C "$REPO_ROOT" add "$PBXPROJ"
+    git -C "$REPO_ROOT" commit -m "chore(release): v$VERSION (build $NEW_BUILD)"
+    git -C "$REPO_ROOT" push origin "$CODE_BRANCH"
+    RESTORE_PBXPROJ=0          # bump conservé → cleanup ne restaure plus
+    rm -f "$PBXPROJ_BACKUP"
+    # PROD : lien permanent figé (la release devient "latest")
+    ENCLOSURE_URL="$PERMALINK"
+  else
+    # TEST : bump non commité (restauré au cleanup) ; le tag pointe sur HEAD.
+    # Enclosure = URL directe du tag (une pre-release n'est jamais "latest").
+    ENCLOSURE_URL="https://github.com/$REPO/releases/download/$TAG/$DMG_NAME"
+  fi
+
+  git -C "$REPO_ROOT" tag "$TAG"
+  git -C "$REPO_ROOT" push origin "$TAG"
+
+  local notes="$RELEASE_NOTES_DIR/v$VERSION.md"
+  if [ "$IS_TEST" -eq 1 ]; then
+    gh release create "$TAG" "$DMG_PATH" \
+      --repo "$REPO" --title "loucedé $VERSION" \
+      --notes-file "$notes" --prerelease \
+      || die "gh release create (pre-release) a échoué"
+  else
+    gh release create "$TAG" "$DMG_PATH" \
+      --repo "$REPO" --title "loucedé $VERSION" \
+      --notes-file "$notes" \
+      || die "gh release create a échoué"
+  fi
+  ok "Release $TAG publiée + asset $DMG_NAME uploadé"
+}
+
 # --- main -------------------------------------------------------------------
 main() {
   parse_args "$@"
@@ -283,8 +323,9 @@ main() {
   make_dmg
   notarize_dmg
   sign_sparkle
-  # Étapes release / appcast ajoutées aux commits C5→C6.
-  ok "release.sh — DMG notarisé + signé OK"
+  publish_release
+  # Étape appcast ajoutée au commit C6.
+  ok "release.sh — release publiée OK"
 }
 
 main "$@"
