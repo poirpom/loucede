@@ -58,6 +58,9 @@ IS_TEST=0
 NEW_BUILD=""          # CURRENT_PROJECT_VERSION après bump
 PBXPROJ_BACKUP=""     # copie de sauvegarde du pbxproj (restore éventuel)
 RESTORE_PBXPROJ=0     # 1 ⇒ cleanup restaure le pbxproj depuis le backup
+APP_PATH=""           # .app signé Developer ID exporté
+DMG_PATH=""           # DMG final (sous build/, gitignoré)
+STAGING_DIR=""        # dossier temporaire de montage du DMG
 
 # --- Cleanup / trap ---------------------------------------------------------
 # Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast).
@@ -70,6 +73,9 @@ cleanup() {
     rm -f "$PBXPROJ_BACKUP"
     warn "pbxproj restauré (bump non conservé)"
   fi
+  # Dossier de montage temporaire du DMG (mktemp). Les autres artefacts
+  # vivent sous build/ (gitignoré, écrasé au run suivant) → laissés pour debug.
+  [ -n "$STAGING_DIR" ] && [ -d "$STAGING_DIR" ] && rm -rf "$STAGING_DIR"
 }
 trap cleanup EXIT
 
@@ -159,13 +165,80 @@ bump_version() {
   ok "Version posée : MARKETING_VERSION=$VERSION · CURRENT_PROJECT_VERSION=$cur→$NEW_BUILD"
 }
 
+# --- Build + export Developer ID + DMG --------------------------------------
+build_app() {
+  info "Build + archive (Release)…"
+  rm -rf "$BUILD_DIR"
+
+  xcodebuild archive \
+    -project "$REPO_ROOT/loucede.xcodeproj" \
+    -scheme "$SCHEME" \
+    -configuration Release \
+    -destination 'generic/platform=macOS' \
+    -derivedDataPath "$BUILD_DIR" \
+    -archivePath "$BUILD_DIR/loucede.xcarchive" \
+    >/dev/null \
+    || die "échec de l'archive xcodebuild"
+
+  # Options d'export Developer ID (signature de distribution hors App Store).
+  # Notarisation NON déclenchée ici : faite manuellement sur le DMG (C4).
+  cat > "$BUILD_DIR/exportOptions.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>developer-id</string>
+    <key>teamID</key>
+    <string>$TEAM_ID</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+</dict>
+</plist>
+EOF
+
+  info "Export Developer ID…"
+  xcodebuild -exportArchive \
+    -archivePath "$BUILD_DIR/loucede.xcarchive" \
+    -exportOptionsPlist "$BUILD_DIR/exportOptions.plist" \
+    -exportPath "$BUILD_DIR/export" \
+    >/dev/null \
+    || die "échec de l'export Developer ID"
+
+  APP_PATH="$(find "$BUILD_DIR/export" -maxdepth 1 -name '*.app' | head -1)"
+  [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ] || die "app exportée introuvable sous build/export"
+  ok "App signée : $APP_PATH"
+}
+
+make_dmg() {
+  info "Création du DMG…"
+  STAGING_DIR="$(mktemp -d -t loucede-dmg)"
+  cp -R "$APP_PATH" "$STAGING_DIR/"
+  ln -s /Applications "$STAGING_DIR/Applications"
+
+  DMG_PATH="$BUILD_DIR/$DMG_NAME"
+  rm -f "$DMG_PATH"
+  hdiutil create \
+    -volname "loucedé" \
+    -srcfolder "$STAGING_DIR" \
+    -ov -format UDZO \
+    "$DMG_PATH" \
+    >/dev/null \
+    || die "échec de la création du DMG"
+
+  rm -rf "$STAGING_DIR"; STAGING_DIR=""
+  ok "DMG créé : $DMG_PATH"
+}
+
 # --- main -------------------------------------------------------------------
 main() {
   parse_args "$@"
   preflight
   bump_version
-  # Étapes build / notarize / release / appcast ajoutées aux commits C3→C6.
-  ok "release.sh — versionning OK"
+  build_app
+  make_dmg
+  # Étapes notarize / release / appcast ajoutées aux commits C4→C6.
+  ok "release.sh — build + DMG OK"
 }
 
 main "$@"
