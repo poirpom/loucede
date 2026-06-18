@@ -5,5 +5,20 @@
         <link>https://poirpom.github.io/loucede/appcast.xml</link>
         <description>Mises à jour de loucedé</description>
         <language>fr</language>
+        <item>
+            <title>loucedé 1.0.1-test</title>
+            <pubDate>Thu, 18 Jun 2026 20:20:27 +0200</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>1.0.1-test</sparkle:shortVersionString>
+            <description><![CDATA[# loucedé 1.0.1-test
+
+Test end-to-end de la chaîne de release Sparkle.
+
+Cette version n'est pas une vraie release — elle servira uniquement
+à valider que le script `release.sh` fonctionne de bout en bout.
+
+Elle sera supprimée à la fin du test.]]></description>
+            <enclosure url="https://github.com/poirpom/loucede/releases/download/v1.0.1-test/loucede.dmg" sparkle:edSignature="WK8cHRiP5eSa+gcOpzWNrnzMULZldmHaBytT2LG7TH92eH+Zhscpgvr4D2DrPXjIfdSzmr4b7c+VP52D03XkBw==" length="6335238" type="application/octet-stream" />
+        </item>
     </channel>
 </rss>
