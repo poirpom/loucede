@@ -554,16 +554,12 @@ struct ModelSpecsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Nom + icône provider
-            HStack(spacing: 8) {
-                Image(model.provider.iconName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 18, height: 18)
-                Text(model.name)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.primary)
-            }
+            // Nom du modèle. Le logo provider a été retiré (inbox 16/06) :
+            // redondant avec le selector Fournisseur au-dessus et avec la
+            // marque déjà présente dans le nom (« Mistral Medium »).
+            Text(model.name)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.primary)
 
             // Description courte
             Text(model.specs.description)
