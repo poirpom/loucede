@@ -64,6 +64,7 @@ STAGING_DIR=""        # dossier temporaire de montage du DMG
 ED_SIGNATURE=""       # signature EdDSA Sparkle du DMG
 LENGTH=""             # taille du DMG en octets (enclosure appcast)
 ENCLOSURE_URL=""      # URL de l'asset DMG référencée par l'appcast
+APPCAST_WT=""         # worktree git éphémère de la branche gh-pages
 
 # --- Cleanup / trap ---------------------------------------------------------
 # Étoffé aux étapes suivantes (build dir, staging DMG, worktree appcast).
@@ -79,6 +80,10 @@ cleanup() {
   # Dossier de montage temporaire du DMG (mktemp). Les autres artefacts
   # vivent sous build/ (gitignoré, écrasé au run suivant) → laissés pour debug.
   [ -n "$STAGING_DIR" ] && [ -d "$STAGING_DIR" ] && rm -rf "$STAGING_DIR"
+  # Worktree gh-pages éphémère : toujours démonté (jamais de checkout sur main).
+  if [ -n "$APPCAST_WT" ] && [ -d "$APPCAST_WT" ]; then
+    git -C "$REPO_ROOT" worktree remove --force "$APPCAST_WT" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -314,6 +319,69 @@ publish_release() {
   ok "Release $TAG publiée + asset $DMG_NAME uploadé"
 }
 
+# --- Mise à jour de l'appcast (branche gh-pages) -----------------------------
+# Via un worktree git éphémère : on ne fait JAMAIS « git checkout gh-pages »
+# dans l'arbre de travail principal (risque d'arbre cassé si échec en plein run).
+update_appcast() {
+  info "Mise à jour de l'appcast (gh-pages)…"
+  APPCAST_WT="$(mktemp -d -t loucede-appcast)"
+  git -C "$REPO_ROOT" worktree add "$APPCAST_WT" "$APPCAST_BRANCH" >/dev/null \
+    || die "échec du worktree gh-pages"
+
+  # Insertion d'un <item> en tête de canal (newest-first), description en CDATA.
+  # Valeurs passées par l'environnement (pas d'interpolation shell dans le heredoc).
+  APPCAST_FILE="$APPCAST_WT/appcast.xml" \
+  RN_FILE="$RELEASE_NOTES_DIR/v$VERSION.md" \
+  ITEM_VERSION="$VERSION" ITEM_BUILD="$NEW_BUILD" \
+  ITEM_URL="$ENCLOSURE_URL" ITEM_SIG="$ED_SIGNATURE" ITEM_LEN="$LENGTH" \
+  python3 <<'PY' || die "édition de l'appcast échouée"
+import os, re, sys
+from email.utils import formatdate
+
+f      = os.environ["APPCAST_FILE"]
+notes  = open(os.environ["RN_FILE"], encoding="utf-8").read()
+notes  = notes.replace("]]>", "]]]]><![CDATA[>")   # défense CDATA
+ver    = os.environ["ITEM_VERSION"]
+build  = os.environ["ITEM_BUILD"]
+url    = os.environ["ITEM_URL"]
+sig    = os.environ["ITEM_SIG"]
+length = os.environ["ITEM_LEN"]
+pub    = formatdate(localtime=True)   # RFC 822
+
+item = (
+    "        <item>\n"
+    f"            <title>loucedé {ver}</title>\n"
+    f"            <pubDate>{pub}</pubDate>\n"
+    f"            <sparkle:version>{build}</sparkle:version>\n"
+    f"            <sparkle:shortVersionString>{ver}</sparkle:shortVersionString>\n"
+    f"            <description><![CDATA[{notes}]]></description>\n"
+    f'            <enclosure url="{url}" sparkle:edSignature="{sig}" '
+    f'length="{length}" type="application/octet-stream" />\n'
+    "        </item>\n"
+)
+
+xml = open(f, encoding="utf-8").read()
+# re.sub avec remplacement par fonction : indentation existante absorbée
+# ([ \t]*), et contenu inséré traité littéralement (pas d'interprétation des
+# « \ » que pourraient contenir les notes markdown).
+if "<item>" in xml:                         # newest-first : avant le 1er item
+    xml = re.sub(r"[ \t]*<item>", lambda _: item + "        <item>", xml, count=1)
+elif "</channel>" in xml:                    # canal vide : avant la fermeture
+    xml = re.sub(r"[ \t]*</channel>", lambda _: item + "    </channel>", xml, count=1)
+else:
+    sys.exit("appcast.xml : ni <item> ni </channel> trouvés")
+open(f, "w", encoding="utf-8").write(xml)
+PY
+
+  git -C "$APPCAST_WT" add appcast.xml
+  git -C "$APPCAST_WT" commit -m "release: appcast v$VERSION (build $NEW_BUILD)" >/dev/null
+  git -C "$APPCAST_WT" push origin "$APPCAST_BRANCH"
+
+  git -C "$REPO_ROOT" worktree remove --force "$APPCAST_WT"
+  APPCAST_WT=""
+  ok "appcast.xml mis à jour + poussé sur $APPCAST_BRANCH"
+}
+
 # --- main -------------------------------------------------------------------
 main() {
   parse_args "$@"
@@ -324,8 +392,10 @@ main() {
   notarize_dmg
   sign_sparkle
   publish_release
-  # Étape appcast ajoutée au commit C6.
-  ok "release.sh — release publiée OK"
+  update_appcast
+  echo
+  ok "Release $TAG livrée ($([ "$IS_TEST" -eq 1 ] && echo 'TEST / pre-release' || echo 'PROD'))"
+  printf '   version=%s · build=%s · enclosure=%s\n' "$VERSION" "$NEW_BUILD" "$ENCLOSURE_URL"
 }
 
 main "$@"
