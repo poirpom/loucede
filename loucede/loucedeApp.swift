@@ -823,11 +823,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installOutsideClickMonitor()
     }
 
+    /// Lecture directe (synchrone) de la sélection courante via l'API
+    /// Accessibility : élément focus du système → `kAXSelectedTextAttribute`.
+    /// L9-FN-001 — voie privilégiée car elle n'implique PAS le presse-papiers
+    /// (donc aucun clobber, aucun `usleep`) et reflète l'état réel même sur
+    /// les apps lentes. Renvoie `nil` si l'AX est indisponible (permission
+    /// non accordée, app sans support AX, type inattendu) → le caller
+    /// retombe alors sur le ⌘C synthétique.
+    private func readSelectionViaAX() -> String? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide,
+                                            kAXFocusedUIElementAttribute as CFString,
+                                            &focusedRef) == .success,
+              let focused = focusedRef,
+              CFGetTypeID(focused) == AXUIElementGetTypeID()
+        else { return nil }
+        // swiftlint:disable:next force_cast
+        let element = focused as! AXUIElement
+
+        var selectedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element,
+                                            kAXSelectedTextAttribute as CFString,
+                                            &selectedRef) == .success,
+              let selected = selectedRef as? String
+        else { return nil }
+        return selected
+    }
+
     func captureSelectedText() {
-        // Guardar el contenido actual del clipboard
+        // Snapshot du presse-papiers AVANT toute manipulation, pour pouvoir le
+        // restaurer si on doit passer par le ⌘C synthétique (fallback).
         let pasteboard = NSPasteboard.general
         let oldContents = pasteboard.string(forType: .string)
         let oldChangeCount = pasteboard.changeCount
+
+        // L9-FN-001 — voie 1 (privilégiée) : lecture Accessibility. Si on
+        // obtient une sélection réelle (non vide après trim), on a terminé sans
+        // jamais toucher le presse-papiers → contenu utilisateur (y compris
+        // non-string : image, fichiers) intégralement préservé.
+        if let axText = readSelectionViaAX(),
+           !axText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            CapturedTextManager.shared.hasSelection = true
+            CapturedTextManager.shared.capturedText = axText
+            return
+        }
+
+        // L9-FN-001 — voie 2 (fallback) : ⌘C synthétique pour les apps où l'AX
+        // n'expose pas la sélection (ou la renvoie vide). On restaure ENSUITE
+        // `oldContents` dans tous les cas via `defer` : c'est la seule branche
+        // qui salit le presse-papiers, donc la seule à devoir le restaurer.
+        defer {
+            pasteboard.clearContents()
+            if let oldContents { pasteboard.setString(oldContents, forType: .string) }
+        }
 
         // Simular Cmd+C para copiar el texto seleccionado
         let source = CGEventSource(stateID: .combinedSessionState)
