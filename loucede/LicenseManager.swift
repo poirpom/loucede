@@ -269,7 +269,12 @@ final class LicenseManager: ObservableObject {
             case "granted":  status = .active
             case "revoked":  status = .revoked
             case "disabled": status = .disabled
-            default:         status = .active  // optimiste : licence présente, status inconnu = on suppose OK
+            default:
+                // status inconnu (migré pré-Session-3 / Keychain altéré) :
+                // on FERME la gate (`.validating` ⇒ hasLicense=false) en
+                // attendant que le validate() au démarrage tranche. Pas
+                // d'octroi optimiste. (audit lot 1, FN-002)
+                status = .validating
             }
         } else {
             status = .unlicensed
