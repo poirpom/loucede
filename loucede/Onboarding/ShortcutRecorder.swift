@@ -9,8 +9,10 @@
 //  touche pas au manager. Le re-register du hotkey Carbon est assuré par
 //  le publisher Combine de loucedeApp (debounce 500 ms).
 //
-//  Dette connue : GeneralSettingsView porte encore sa propre copie du
-//  recorder → dédup notée backlog Tech (hors périmètre Phase R).
+//  U.5.c (batch C) : helper canonique unique — adopté par l'onboarding
+//  (`ConfigureView`) ET les Réglages (`GeneralSettingsView`, ex-copie privée
+//  supprimée). La gestion du hotkey Carbon (suspend/resume) pendant la capture
+//  reste à la charge de l'appelant (les Réglages la câblent ; l'onboarding non).
 //
 
 import SwiftUI
@@ -26,17 +28,34 @@ final class ShortcutRecorder: ObservableObject {
     private var eventMonitor: Any?
     private let store = ActionsStore.shared
     private var onCommit: (() -> Void)?
+    private var onCancel: (() -> Void)?
+    /// Commit différé (0,5 s) du raccourci capturé. Stocké pour pouvoir
+    /// l'ANNULER si la capture est relancée/arrêtée avant son échéance
+    /// (L10-FN-001 : sans ça, un re-clic < 500 ms réécrivait l'ancien
+    /// raccourci hors séquence).
+    private var pendingCommit: DispatchWorkItem?
 
     /// `onCommit` est appelé une fois le raccourci custom capturé + persisté
     /// (geste explicite de l'utilisateur — utilisé pour la coche de la card).
-    func start(onCommit: @escaping () -> Void = {}) {
-        stop() // Clean up any existing monitor
+    /// `onCancel` est appelé si la capture est annulée par Esc (sans rien
+    /// persister) — l'appelant s'en sert p. ex. pour rétablir le hotkey Carbon.
+    func start(onCommit: @escaping () -> Void = {}, onCancel: @escaping () -> Void = {}) {
+        stop() // Clean up any existing monitor + commit différé en attente
         self.onCommit = onCommit
+        self.onCancel = onCancel
         isRecording = true
         liveKeys = []
 
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self, self.isRecording else { return event }
+
+            // Esc (keyCode 53) → annule la capture sans persister.
+            if event.type == .keyDown && event.keyCode == 53 {
+                withAnimation { self.isRecording = false }
+                self.onCancel?()
+                self.stop()
+                return nil
+            }
 
             let modifiers = event.modifierFlags
             var currentModifiers: [String] = []
@@ -68,11 +87,14 @@ final class ShortcutRecorder: ObservableObject {
                     }
 
                     // Persiste dans ActionsStore (source unique) puis enregistre ;
-                    // le publisher Combine re-register le hotkey Carbon.
+                    // le publisher Combine re-register le hotkey Carbon. Commit
+                    // différé ANNULABLE (cf. `pendingCommit`) : si la capture est
+                    // relancée avant l'échéance, `stop()` annule cette closure.
                     let capturedKey = key
                     let capturedModifiers = currentModifiers
                     let capturedKeyCode = event.keyCode
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    let work = DispatchWorkItem { [weak self] in
+                        guard let self else { return }
                         self.store.mainShortcutModifiers = capturedModifiers
                         self.store.mainShortcut = capturedKey
                         self.store.mainShortcutKeyCode = capturedKeyCode
@@ -81,6 +103,8 @@ final class ShortcutRecorder: ObservableObject {
                         self.onCommit?()
                         self.stop()
                     }
+                    self.pendingCommit = work
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
                     return nil
                 }
             }
@@ -89,6 +113,8 @@ final class ShortcutRecorder: ObservableObject {
     }
 
     func stop() {
+        pendingCommit?.cancel()
+        pendingCommit = nil
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
