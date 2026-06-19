@@ -562,12 +562,17 @@ final class LicenseManager: ObservableObject {
             return
         }
 
-        // Erreurs Polar « la clé n'existe plus » → wipe local pour
-        // cohérence (la clé en Keychain ne sert à rien).
         switch error {
+        // Erreurs Polar « clé invalide / introuvable » (404/422). NE PAS
+        // wiper le Keychain : un 404/422 peut être transitoire (hoquet
+        // proxy/Polar, misroute de la traduction /get-license-key) et le
+        // wipe serait irréversible — perte de licence d'un client payant
+        // sur un simple hoquet réseau. On ferme l'accès (status
+        // .unlicensed) en PRÉSERVANT la clé → le prochain validate()
+        // réussi restaure .active. Le seul chemin de wipe reste le
+        // deactivate() explicite de l'utilisateur. (audit lot 1, FN-001)
         case .keyNotFound, .invalidKey:
-            KeychainService.License.wipe()
-            resetLocalState()
+            status = .unlicensed
         case .activationLimitReached:
             // L'activation_id n'est plus reconnue (probablement désactivée
             // depuis un autre device ou limite atteinte). On garde la clé
