@@ -107,7 +107,7 @@ preflight() {
 
   # Outils requis
   local tool
-  for tool in gh xcodebuild codesign hdiutil stapler python3 git; do
+  for tool in gh curl xcodebuild codesign hdiutil stapler python3 git; do
     command -v "$tool" >/dev/null 2>&1 || die "outil requis absent : $tool"
   done
   xcrun --find notarytool >/dev/null 2>&1 || die "notarytool introuvable (xcrun)"
@@ -323,6 +323,27 @@ publish_release() {
 # Via un worktree git éphémère : on ne fait JAMAIS « git checkout gh-pages »
 # dans l'arbre de travail principal (risque d'arbre cassé si échec en plein run).
 update_appcast() {
+  # L3-FN-002 : en PROD l'enclosure = permalink "latest/download" qui n'est
+  # résolvable qu'une fois la release propagée comme "latest". On le vérifie
+  # AVANT de pousser l'appcast (sinon Sparkle pointerait un 404 transitoire).
+  # 3 tentatives espacées absorbent le délai de propagation GitHub ; sinon die.
+  # PROD uniquement : en TEST l'enclosure est l'URL tag-directe, non concernée.
+  if [ "$IS_TEST" -eq 0 ]; then
+    info "Vérification de l'enclosure (permalink résolvable)…"
+    local status="" attempt
+    for attempt in 1 2 3; do
+      # -I HEAD (pas de download), -L suit la redirection 302→200, -s silencieux.
+      # || true : sans ça, set -e tuerait le script sur un curl non-200 avant
+      # le die explicite. Échec réseau → http_code « 000 ».
+      status="$(curl -sIL -o /dev/null -w '%{http_code}' "$ENCLOSURE_URL" || true)"
+      [ "$status" = "200" ] && break
+      [ "$attempt" -lt 3 ] && { info "  tentative $attempt : statut $status — réessai dans 3 s…"; sleep 3; }
+    done
+    [ "$status" = "200" ] \
+      || die "Enclosure $ENCLOSURE_URL non résolvable (statut $status) — push de l'appcast avorté"
+    ok "Enclosure résolvable (200) — $ENCLOSURE_URL"
+  fi
+
   info "Mise à jour de l'appcast (gh-pages)…"
   APPCAST_WT="$(mktemp -d -t loucede-appcast)"
   git -C "$REPO_ROOT" worktree add "$APPCAST_WT" "$APPCAST_BRANCH" >/dev/null \
