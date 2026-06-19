@@ -254,6 +254,11 @@ class ActionsStore: ObservableObject {
     /// « Construis un plan » (catégorie Structurer, « structuré » redondant).
     /// Flag distinct (one-shot) — cf. `migrateProposePlanRenameIfNeeded()`.
     private let proposePlanRenameKey = "loucede_migration_propose_plan_rename_done"
+
+    /// V2 « Extrais les noms propres » (2026-06-18) : enrichissement du
+    /// prompt (Œuvres + Marques, définitions). One-shot —
+    /// cf. `migrateExtractNamesV2IfNeeded()`.
+    private let extractNamesV2MigrationKey = "loucede_migration_extract_names_v2_done"
     // Note : l'ancienne clé `loucede_migration_seed_27_done` (action
     // "Expliquer", Phase 2.7) n'est plus utilisée depuis la Phase 6.7 où
     // "Expliquer" a été retirée du seed. On ne supprime pas la clé
@@ -353,6 +358,7 @@ class ActionsStore: ObservableObject {
             migrateUnify2IfNeeded()
             migrateK4RecipePromptIfNeeded()
             migrateProposePlanRenameIfNeeded()
+            migrateExtractNamesV2IfNeeded()
         } else {
             actions = Self.defaultActions
             saveActions()
@@ -370,6 +376,7 @@ class ActionsStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
             UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
             UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
+            UserDefaults.standard.set(true, forKey: extractNamesV2MigrationKey)
         }
     }
 
@@ -631,6 +638,28 @@ class ActionsStore: ObservableObject {
             saveActions()
         }
         UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
+    }
+
+    /// Migration douce (2026-06-18) — enrichissement V2 du prompt « Extrais
+    /// les noms propres » (catégories Œuvres + Marques et produits,
+    /// définitions courtes). Match bit-exact sur le nom ET l'ancien prompt :
+    /// une édition custom de l'utilisateur n'est donc jamais écrasée.
+    private func migrateExtractNamesV2IfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: extractNamesV2MigrationKey) else { return }
+
+        var changed = false
+        for idx in actions.indices {
+            if actions[idx].name == "Extrais les noms propres"
+                && actions[idx].prompt == Self.legacyExtractNamesPrompt_preV2 {
+                actions[idx].prompt = Self.extractNamesPrompt
+                changed = true
+            }
+        }
+
+        if changed {
+            saveActions()
+        }
+        UserDefaults.standard.set(true, forKey: extractNamesV2MigrationKey)
     }
 
     /// Migration K.unify.2 (2026-05-20) — modèle unifié Actions/Modèles/
@@ -1239,6 +1268,76 @@ class ActionsStore: ObservableObject {
     - Répondre uniquement avec la recette structurée
     """
 
+    /// Prompt « Extrais les noms propres » — V2 (enrichissement : catégories
+    /// Œuvres + Marques et produits, définitions courtes en français, règles
+    /// de langue clarifiées). Partagé entre le seed et la migration douce
+    /// `migrateExtractNamesV2IfNeeded()`.
+    static let extractNamesPrompt: String = """
+    Rôle : expert en extraction d'entités nommées.
+
+    Tâche : extraire les noms propres du texte fourni, les regrouper par type, et accompagner chaque entrée d'une définition courte en français.
+
+    Procédure :
+    1. Repère tous les noms propres : personnes, lieux, organisations, œuvres, marques et produits.
+    2. Classe chaque nom dans sa catégorie.
+    3. Ajoute une définition courte en français entre parenthèses après chaque nom, sauf pour les évidences ultra-connues.
+    4. Présente les résultats sous forme de liste structurée par type.
+
+    Règles d'extraction :
+    - **Personnes** : prénoms, noms de famille, personnages, fonctions nommées (le président Macron, etc.).
+    - **Lieux** : villes, pays, régions, lieux-dits, monuments, adresses.
+    - **Organisations** : entreprises, institutions, associations, partis politiques, médias, sections de festivals.
+    - **Œuvres** : films, livres, pièces de théâtre, albums, émissions, ainsi que les prix et distinctions (Prix Goncourt, Palme d'or, Prix Nobel de littérature…).
+    - **Marques et produits** : noms de produits commerciaux (iPhone 15, Tesla Model Y…). Les entreprises elles-mêmes vont en Organisations, pas ici.
+    - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
+    - Ne pas inclure les gentilés employés comme adjectifs (Français, Polonais, Roumain) ; seuls les pays nommés vont en Lieux.
+    - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
+    - Les noms propres conservent leur graphie d'origine (Vladimir Poutine reste Vladimir Poutine, pas « Vladimir Putin »).
+    - Les titres de catégorie et les définitions sont rédigés en français, quelle que soit la langue du texte source.
+    - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
+
+    Règles de définition :
+    - Format : entre parenthèses, après le nom, séparée par une espace. Longueur : 2 à 6 mots.
+    - Personnes : métier/fonction + nationalité ou contexte. Ex. : « Pedro Almodóvar (cinéaste espagnol) », « Mathieu Macheret (critique au Monde) ».
+    - Lieux : type + situation si utile. Ex. : « Lille (ville du nord de la France) ».
+    - Organisations : type + origine ou secteur. Ex. : « Canal+ (chaîne de télévision française) », « OpinionWay (institut de sondage français) ».
+    - Œuvres : nature + auteur ou contexte. Ex. : « Fjord (film de Cristian Mungiu) », « Prix Goncourt (distinction littéraire française) ».
+    - Marques et produits : type + origine. Ex. : « iPhone 15 (smartphone Apple) ».
+    - Acronymes : développer entre parenthèses. Ex. : « ONU (Organisation des Nations Unies) ».
+    - Omettre la définition pour les évidences ultra-connues d'un lectorat francophone (France, Paris, États-Unis, Europe, Apple, Google…).
+    - En cas d'incertitude réelle sur l'identité ou la fonction, omettre la définition plutôt que d'inventer.
+
+    Format de sortie (Markdown) :
+
+    ## Personnes
+    - Pedro Almodóvar (cinéaste espagnol)
+    - Annie Ernaux (écrivaine française, prix Nobel)
+
+    ## Lieux
+    - Lille (ville du nord de la France)
+    - France
+
+    ## Organisations
+    - Canal+ (chaîne de télévision française)
+    - Le Monde (quotidien français)
+
+    ## Œuvres
+    - Fjord (film de Cristian Mungiu)
+    - Prix Goncourt (distinction littéraire française)
+
+    ## Marques et produits
+    - iPhone 15 (smartphone Apple)
+
+    Cas particuliers :
+    - Si une catégorie est vide, l'omettre du résultat.
+    - Si aucun nom propre n'est trouvé dans aucune catégorie, répondre uniquement : "Aucun nom propre identifié dans le texte."
+
+    Sortie attendue :
+    - Répondre uniquement avec la liste structurée par catégorie.
+    - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
+    - Pas d'introduction, pas de commentaire.
+    """
+
     // Prompt « Sois concis » (constante `concisePrompt`) supprimé en
     // B.2.d-fix-1 (2026-05-18) : action retirée du catalogue (test runtime
     // décevant, redondante avec « Résume ce texte »). Le bloc de migration
@@ -1425,6 +1524,52 @@ class ActionsStore: ObservableObject {
     - Aucune information ajoutée inventée
     - Aucune explication ou commentaire hors recette
     - Répondre uniquement avec la recette structurée
+    """
+
+    // MUST match exactly the prompt content shipped before V2 enrichment.
+    // Any character drift breaks the runtime match and the migration silently fails.
+    // Source : Models.swift:1775-1814 prior to this commit.
+    fileprivate static let legacyExtractNamesPrompt_preV2: String = """
+    Rôle : expert en extraction d'entités nommées.
+
+    Tâche : extraire tous les noms propres du texte fourni et les regrouper par type, dans la même langue que le texte original.
+
+    Procédure :
+    1. Repère tous les noms propres : personnes, lieux, organisations.
+    2. Classe chaque nom dans sa catégorie.
+    3. Présente les résultats sous forme de liste structurée par type.
+
+    Règles d'extraction :
+    - **Personnes** : prénoms, noms de famille, personnages, fonctions nommées (le président Macron, etc.).
+    - **Lieux** : villes, pays, régions, lieux-dits, monuments, adresses.
+    - **Organisations** : entreprises, institutions, associations, marques, partis politiques.
+    - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
+    - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
+    - Rédiger la sortie en français, quelle que soit la langue du texte source.
+    - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
+
+    Format de sortie (Markdown) :
+
+    ## Personnes
+    - Nom 1
+    - Nom 2
+
+    ## Lieux
+    - Lieu 1
+    - Lieu 2
+
+    ## Organisations
+    - Organisation 1
+    - Organisation 2
+
+    Cas particuliers :
+    - Si une catégorie est vide, l'omettre du résultat.
+    - Si aucun nom propre n'est trouvé, répondre uniquement : "Aucun nom propre identifié dans le texte."
+
+    Sortie attendue :
+    - Répondre uniquement avec la liste structurée par catégorie.
+    - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
+    - Pas d'introduction, pas de commentaire.
     """
 
     // MARK: - Seed des nouveaux utilisateurs (K.unify.1, 2026-05-20)
@@ -1771,48 +1916,7 @@ class ActionsStore: ObservableObject {
         Action(
             name: "Extrais les noms propres",
             icon: "🏷️",
-            prompt: """
-        Rôle : expert en extraction d'entités nommées.
-
-        Tâche : extraire tous les noms propres du texte fourni et les regrouper par type, dans la même langue que le texte original.
-
-        Procédure :
-        1. Repère tous les noms propres : personnes, lieux, organisations.
-        2. Classe chaque nom dans sa catégorie.
-        3. Présente les résultats sous forme de liste structurée par type.
-
-        Règles d'extraction :
-        - **Personnes** : prénoms, noms de famille, personnages, fonctions nommées (le président Macron, etc.).
-        - **Lieux** : villes, pays, régions, lieux-dits, monuments, adresses.
-        - **Organisations** : entreprises, institutions, associations, marques, partis politiques.
-        - Ne pas inclure les noms communs même importants (le ministre, l'entreprise).
-        - Dédupliquer les occurrences multiples (un même nom n'apparaît qu'une fois par catégorie).
-        - Rédiger la sortie en français, quelle que soit la langue du texte source.
-        - Rédiger directement en Markdown brut, sans encapsuler la réponse dans un bloc de code ```...```.
-
-        Format de sortie (Markdown) :
-
-        ## Personnes
-        - Nom 1
-        - Nom 2
-
-        ## Lieux
-        - Lieu 1
-        - Lieu 2
-
-        ## Organisations
-        - Organisation 1
-        - Organisation 2
-
-        Cas particuliers :
-        - Si une catégorie est vide, l'omettre du résultat.
-        - Si aucun nom propre n'est trouvé, répondre uniquement : "Aucun nom propre identifié dans le texte."
-
-        Sortie attendue :
-        - Répondre uniquement avec la liste structurée par catégorie.
-        - Réponds avec le contenu Markdown directement, pas de délimiteurs ```...``` ni de mention de format de code.
-        - Pas d'introduction, pas de commentaire.
-        """,
+            prompt: ActionsStore.extractNamesPrompt,
             actionType: .ai,
             shortDescription: "Lister les personnes lieux et organisations mentionnés",
             isFavorite: false,
