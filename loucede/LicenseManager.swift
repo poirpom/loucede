@@ -299,6 +299,23 @@ final class LicenseManager: ObservableObject {
         do {
             let result = try await LicenseService.shared.activate(key: key, label: label)
 
+            // Garde d'acceptation : n'accepter QUE les clés effectivement
+            // actives. Polar peut renvoyer 200 avec un license_key non
+            // `granted` (revoked/disabled/unknown) ou une expiration dépassée ;
+            // dans ce cas on ne persiste RIEN en Keychain et on throw, pour que
+            // le caller affiche l'erreur au lieu d'un faux « activée ! ». Le
+            // throw retombe dans le `catch let error as LicenseError` ci-dessous
+            // (status .unlicensed + lastError + re-throw). (audit lot 1, FN-003)
+            if let expires = result.licenseKey.expiresAt, expires < Date() {
+                throw LicenseError.expired
+            }
+            switch result.licenseKey.status {
+            case .granted:  break
+            case .revoked:  throw LicenseError.revoked
+            case .disabled: throw LicenseError.disabled
+            case .unknown:  throw LicenseError.invalidKey
+            }
+
             // Stockage Keychain
             KeychainService.License.key = key
             KeychainService.License.activationId = result.id
