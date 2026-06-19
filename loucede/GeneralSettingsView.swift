@@ -182,7 +182,14 @@ struct GeneralSettingsView: View {
                                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                             .onChange(of: apiKeyInput) { _, newValue in
-                                store.saveApiKey(newValue, for: selectedProvider)
+                                // L7-FN-002 : trim avant persistance Keychain. Un
+                                // coller avec espace/newline en fin était stocké
+                                // verbatim puis envoyé dans le header Authorization
+                                // → 401 silencieux. On ne touche pas `apiKeyInput`
+                                // (affichage live intact), seule la valeur persistée
+                                // est nettoyée.
+                                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                                store.saveApiKey(trimmed, for: selectedProvider)
                             }
                     }
 
