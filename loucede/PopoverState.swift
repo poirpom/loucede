@@ -730,12 +730,21 @@ final class PopoverState: ObservableObject {
             self.flushTask = nil
             self.isProcessing = false
 
+            // L5-FN-003 / L1-XF-001 : sur clé API vide, `chatStream` retourne
+            // sans throw (il émet juste le message « Aucune clé API » via
+            // `onChunk`) → `streamSucceeded` vaut `true` alors qu'aucun appel
+            // IA n'a eu lieu. On exige donc une clé non vide avant de compter
+            // l'usage, conformément au commentaire ci-dessous (« pas brûler
+            // d'essai sur […] clé API absente »). Le message « Aucune clé API »
+            // reste affiché tel quel.
+            let didStream = streamSucceeded && !apiKey.isEmpty
+
             // Incrémente le compteur trial UNIQUEMENT après un stream
             // réussi (pas brûler d'essai sur une erreur réseau / clé
             // API absente / token expiré côté provider). Le snapshot
             // `consumesTrial` capture l'état au lancement — pas
             // affecté par un changement de licence en cours de stream.
-            if streamSucceeded && consumesTrial {
+            if didStream && consumesTrial {
                 license.incrementTrialUsage()
             }
 
@@ -744,7 +753,7 @@ final class PopoverState: ObservableObject {
             // statut de licence. K.4-lot3 (L2) : on incrémente AUSSI le
             // compteur par action (clé = action.id) sur le MÊME événement
             // « stream réussi » → total et par-action restent cohérents.
-            if streamSucceeded {
+            if didStream {
                 UsageTracker.shared.recordSuccessfulUse()
                 // Q.2.h.1 : pas de compteur par-action pour une action
                 // générée non sauvegardée (id absent du catalogue → orphelin).
