@@ -126,9 +126,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ActionsStore.shared.$mainShortcut
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                if let ref = self?.hotKeyRef {
-                    UnregisterEventHotKey(ref)
-                }
+                // setupGlobalHotkey est désormais idempotent (Unregister avant
+                // Register, cf. L9-FN-002) → plus besoin d'unregister ici.
                 self?.setupGlobalHotkey()
             }
             .store(in: &cancellables)
@@ -257,6 +256,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // et produit le mauvais keycode sur un clavier AZERTY.
         let keyCode = UInt32(store.mainShortcutKeyCode)
 
+        // L9-FN-002 : Unregister systématique avant Register → idempotence.
+        // setupGlobalHotkey est appelé au lancement, par resumeHotkeys() et par
+        // le publisher Combine (changement de raccourci) ; sans ce nettoyage,
+        // les appels successifs empilaient des hotkeys (leak + double-register).
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
+        }
         RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
 
         print("Hotkey registered: \(store.mainShortcutModifiers.joined()) + \(store.mainShortcut) (keycode \(keyCode))")
@@ -1139,6 +1146,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func suspendHotkeys() {
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
+            // L9-FN-002 : nil le ref → un 2ᵉ suspend devient un no-op (pas de
+            // double-unregister sur ref obsolète) et resume/register repart propre.
+            hotKeyRef = nil
         }
     }
 

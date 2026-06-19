@@ -18,10 +18,11 @@ struct GeneralSettingsView: View {
     @State private var apiKeyInput: String = ""
     @State private var selectedProvider: AIProvider = .openai
     @State private var selectedModelId: String = ""
-    @State private var isRecordingMainShortcut = false
-    @State private var mainRecordedKeys: [String] = []
-    @State private var mainShortcutConflict: String? = nil
-    @State private var mainShortcutMonitor: Any? = nil
+    /// U.5.c (batch C) : adoption du helper canonique `ShortcutRecorder`
+    /// (l'ex-copie privée + sa `keyCodeMap` morte ont été supprimées). Le
+    /// hotkey Carbon est suspendu pendant la capture et rétabli sur tous les
+    /// chemins de sortie (commit, Esc, disparition de la vue).
+    @StateObject private var recorder = ShortcutRecorder()
     /// Phase 6.5a : toggle « Lancer au démarrage ». Synchronisé avec
     /// `SMAppService.mainApp.status` au .onAppear ; un .onChange relaye
     /// la modification au système. En cas d'échec (rare : profil MDM,
@@ -226,8 +227,8 @@ struct GeneralSettingsView: View {
                         .foregroundColor(.primary)
 
                     VStack(spacing: 0) {
-                        if isRecordingMainShortcut {
-                            ShortcutTooltip(recordedKeys: mainRecordedKeys, conflictName: mainShortcutConflict)
+                        if recorder.isRecording {
+                            ShortcutTooltip(recordedKeys: recorder.liveKeys, conflictName: nil)
                                 .transition(.asymmetric(
                                     insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
                                     removal: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity)
@@ -246,7 +247,15 @@ struct GeneralSettingsView: View {
                             }
                             Spacer()
                             Button(action: {
-                                startRecordingMainShortcut()
+                                // Suspend le hotkey Carbon pendant la capture ;
+                                // rétabli sur commit OU annulation Esc. La
+                                // disparition de la vue (`.onDisappear`) couvre
+                                // le cas « fenêtre fermée pendant l'écoute ».
+                                globalAppDelegate?.suspendHotkeys()
+                                recorder.start(
+                                    onCommit: { globalAppDelegate?.resumeHotkeys() },
+                                    onCancel: { globalAppDelegate?.resumeHotkeys() }
+                                )
                             }) {
                                 HStack(spacing: 6) {
                                     ForEach(store.mainShortcutModifiers, id: \.self) { mod in
@@ -264,7 +273,7 @@ struct GeneralSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingMainShortcut)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: recorder.isRecording)
 
                     // Phase 6.5a (2026-04-25) : toggle « Lancer au démarrage ».
                     // S'appuie sur SMAppService (macOS 13+) — pas de helper
@@ -444,106 +453,13 @@ struct GeneralSettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
-    }
-
-    private func stopRecordingMainShortcut() {
-        if let monitor = mainShortcutMonitor {
-            NSEvent.removeMonitor(monitor)
-            mainShortcutMonitor = nil
-        }
-        isRecordingMainShortcut = false
-        mainShortcutConflict = nil
-        mainRecordedKeys = []
-        globalAppDelegate?.resumeHotkeys()
-    }
-
-    private func startRecordingMainShortcut() {
-        if let monitor = mainShortcutMonitor {
-            NSEvent.removeMonitor(monitor)
-            mainShortcutMonitor = nil
-        }
-
-        isRecordingMainShortcut = true
-        mainRecordedKeys = []
-        mainShortcutConflict = nil
-
-        globalAppDelegate?.suspendHotkeys()
-
-        let keyCodeMap: [UInt16: String] = [
-            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
-            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
-            16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
-            23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
-            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 37: "L",
-            38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/",
-            45: "N", 46: "M", 47: "."
-        ]
-
-        mainShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            guard self.isRecordingMainShortcut else { return event }
-
-            if event.type == .keyDown && event.keyCode == 53 {
-                withAnimation {
-                    self.stopRecordingMainShortcut()
-                }
-                return nil
-            }
-
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-
-            var currentModifiers: [String] = []
-            if modifiers.contains(.control) { currentModifiers.append("^") }
-            if modifiers.contains(.option) { currentModifiers.append("\u{2325}") }
-            if modifiers.contains(.shift) { currentModifiers.append("\u{21E7}") }
-            if modifiers.contains(.command) { currentModifiers.append("\u{2318}") }
-
-            if event.type == .flagsChanged {
-                self.mainShortcutConflict = nil
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                    self.mainRecordedKeys = currentModifiers
-                }
-                return event
-            }
-
-            if event.type == .keyDown {
-                let hasCommand = modifiers.contains(.command)
-                let hasOption = modifiers.contains(.option)
-
-                if !hasCommand && !hasOption {
-                    return event
-                }
-
-                // On prend la lettre telle que le layout courant la produit
-                // (charactersIgnoringModifiers respecte AZERTY/QWERTY), et on
-                // ne retombe sur le dictionnaire QWERTY qu'en dernier recours.
-                let key = event.charactersIgnoringModifiers?.uppercased() ?? keyCodeMap[event.keyCode] ?? ""
-                if !key.isEmpty && key.count == 1 {
-                    var finalKeys = currentModifiers
-                    finalKeys.append(key)
-
-                    // Depuis Phase 2 (2026-04-22) les actions n'ont plus de raccourci global
-                    // individuel — la sélection se fait via les touches 1-9/0 *à l'intérieur*
-                    // du popup, donc aucun conflit possible avec le main shortcut ici.
-
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        self.mainRecordedKeys = finalKeys
-                    }
-
-                    // Save the new main shortcut
-                    self.store.mainShortcutModifiers = currentModifiers
-                    self.store.mainShortcut = key
-                    self.store.mainShortcutKeyCode = event.keyCode
-                    self.store.saveMainShortcut()
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        withAnimation {
-                            self.stopRecordingMainShortcut()
-                        }
-                    }
-                    return nil
-                }
-            }
-            return event
+        .onDisappear {
+            // L7-FN-001 : si la vue disparaît (fermeture fenêtre / switch
+            // d'onglet) pendant une capture, on arrête le monitor ET on
+            // rétablit le hotkey Carbon suspendu — sinon ⌥& resterait mort.
+            let wasRecording = recorder.isRecording
+            recorder.stop()
+            if wasRecording { globalAppDelegate?.resumeHotkeys() }
         }
     }
 }
