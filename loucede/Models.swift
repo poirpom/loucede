@@ -205,6 +205,15 @@ struct Action: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
+/// Wrapper de décodage tolérant : décode un élément optionnellement, un
+/// élément corrompu devient `nil` au lieu de faire échouer tout le tableau
+/// (L4-FN-001 — `decode([Action].self)` est atomique, une seule entrée fautive
+/// — champ requis manquant, valeur d'enum inconnue, etc. — tuait le catalogue).
+private struct FailableDecodable<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+}
+
 class ActionsStore: ObservableObject {
     @Published var actions: [Action] = []
     @Published var apiKeys: [AIProvider: String] = [:]
@@ -345,10 +354,32 @@ class ActionsStore: ObservableObject {
     }
 
     func loadActions() {
-        if let data = UserDefaults.standard.data(forKey: actionsKey),
-           let decoded = try? JSONDecoder().decode([Action].self, from: data),
-           !decoded.isEmpty {
-            actions = decoded
+        guard let data = UserDefaults.standard.data(forKey: actionsKey) else {
+            // Premier lancement (aucun blob persisté) → seed.
+            seedDefaultActions()
+            return
+        }
+
+        // L4-FN-001 : décodage élément par élément. `FailableDecodable` isole
+        // les entrées corrompues (elles deviennent `nil`) au lieu de faire
+        // throw le tableau entier. Un échec au niveau TABLEAU (blob tronqué /
+        // JSON cassé) fait throw le `decode` global → `raw == nil`.
+        guard let raw = try? JSONDecoder().decode([FailableDecodable<Action>].self, from: data) else {
+            // Corruption totale : blob illisible. On reste utilisable avec les
+            // defaults EN MÉMOIRE, mais on NE réécrit PAS le blob (récupérable /
+            // inspectable au prochain lancement) et on ne pose PAS les flags de
+            // migration (un blob restauré doit pouvoir se re-migrer normalement).
+            actions = Self.defaultActions
+            return
+        }
+
+        let salvaged = raw.compactMap(\.value)
+        if !salvaged.isEmpty {
+            // ≥1 action valide → on garde les valides, on ignore les corrompues.
+            // Pas de save forcé ici : le blob original reste tel quel tant qu'une
+            // migration ou l'utilisateur ne le réécrit pas (les entrées
+            // corrompues disparaîtront au prochain `saveActions()`).
+            actions = salvaged
             migrateSeed26IfNeeded()
             migrateIconsToEmojiIfNeeded()
             migrateSeed69cIfNeeded()
@@ -359,25 +390,37 @@ class ActionsStore: ObservableObject {
             migrateK4RecipePromptIfNeeded()
             migrateProposePlanRenameIfNeeded()
             migrateExtractNamesV2IfNeeded()
+        } else if raw.isEmpty {
+            // Tableau `[]` décodé proprement (état légitime, ex. l'utilisateur a
+            // supprimé toutes ses actions) → reseed comme un premier lancement.
+            seedDefaultActions()
         } else {
+            // Tableau non vide mais AUCUN élément valide → corruption de contenu.
+            // Même traitement que la corruption totale : defaults en mémoire,
+            // blob préservé, pas de flags.
             actions = Self.defaultActions
-            saveActions()
-            // Premier lancement : le seed contient déjà la version courante
-            // des prompts + les emojis 6.4 ; on pose tous les flags de
-            // migration pour ne jamais re-déclencher si l'utilisateur vide
-            // sa config.
-            UserDefaults.standard.set(true, forKey: seed26MigrationKey)
-            UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
-            UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
-            UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
-            UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
-            UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
-            UserDefaults.standard.set(true, forKey: unify2MigrationKey)
-            UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
-            UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
-            UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
-            UserDefaults.standard.set(true, forKey: extractNamesV2MigrationKey)
         }
+    }
+
+    /// Pose le catalogue par défaut, le persiste, et marque tous les flags de
+    /// migration (le seed contient déjà la version courante des prompts +
+    /// emojis → ne jamais re-déclencher une migration). Utilisé uniquement sur
+    /// les chemins LÉGITIMES (premier lancement, `[]` explicite) — jamais sur un
+    /// chemin de corruption, pour ne pas écraser un blob récupérable.
+    private func seedDefaultActions() {
+        actions = Self.defaultActions
+        saveActions()
+        UserDefaults.standard.set(true, forKey: seed26MigrationKey)
+        UserDefaults.standard.set(true, forKey: iconsEmojiMigrationKey)
+        UserDefaults.standard.set(true, forKey: seed69cMigrationKey)
+        UserDefaults.standard.set(true, forKey: planActionsEmojiMigrationKey)
+        UserDefaults.standard.set(true, forKey: planToTodoMigrationKey)
+        UserDefaults.standard.set(true, forKey: summarizeV2MigrationKey)
+        UserDefaults.standard.set(true, forKey: unify2MigrationKey)
+        UserDefaults.standard.set(true, forKey: unify2SeedsAddedKey)
+        UserDefaults.standard.set(true, forKey: k4RecipePromptFixKey)
+        UserDefaults.standard.set(true, forKey: proposePlanRenameKey)
+        UserDefaults.standard.set(true, forKey: extractNamesV2MigrationKey)
     }
 
     /// Migration one-shot (Phase 2.6, 2026-04-23) : pour les utilisateurs
