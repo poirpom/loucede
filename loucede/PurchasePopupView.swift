@@ -58,9 +58,14 @@ struct PurchasePopupView: NSViewRepresentable {
                      decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if let url = navigationAction.request.url,
+               url.scheme == "https",
                url.host == LicenseConfig.successURLHost {
                 // Achat réussi : on stoppe la navigation (pas besoin que le
                 // domaine de retour soit résolu) et on remonte l'info.
+                // `scheme == "https"` exigé : le redirect Polar est en https,
+                // donc on ferme la forge du signal via une nav en clair
+                // (http/MITM/nav in-page). (audit lot 1, FN-004 — scheme ;
+                // contrôle du fragment reporté V1.x, nécessite re-test e2e.)
                 decisionHandler(.cancel)
                 onSuccessDetected()
                 return
