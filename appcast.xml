@@ -5,5 +5,66 @@
         <link>https://poirpom.github.io/loucede/appcast.xml</link>
         <description>Mises à jour de loucedé</description>
         <language>fr</language>
+        <item>
+            <title>loucedé 1.0.0</title>
+            <pubDate>Wed, 24 Jun 2026 17:06:25 +0200</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <description><![CDATA[# loucedé 1.0.0 — L’IA qui chuchote à l’oreille des humains
+
+## 🖼️ Présentation = le pitch pour personnes pressées
+
+**loucedé est une application macOS effectuant des actions IA sur du texte sélectionné**. Sans copier-coller, sans ouvrir un *chat*, sans délai.
+
+## 🔠 Utilisation = comment ça marche
+
+Turbo-fastoche :
+
+1. Sélectionne du texte dans n'importe quelle application
+2. Active le raccourci `⌥&` (configurable)
+3. Choisis une action dans le popup (ou génère-la à la volée si elle n’existe pas)
+4. Le résultat s'affiche dans une fenêtre dédiée
+
+## 🧰 Fonctionnalités = laisse la magie se produire
+
+### Actions par défaut
+
+**loucedé propose plus de 20 actions, que tu peux afficher ou masquer à ta guise** : résumer un texte, traduire un article, corriger des fautes, reformuler un message, générer une *todo list* ou même extraire une recette de cuisine… 
+
+### Générateur d'actions à la volée
+
+**loucedé peut générer une action à la volée** (lorsqu'aucune action existante ne correspond à ta recherche). Et tu peux même la sauvegarder pour l’avoir à dispo par la suite. En clair : tu décides ce que loucedé fait pour toi.
+
+## ℹ️ Infos annexes = tu t’en fous mais c’est bien de le savoir
+
+### Fournisseurs d'IA
+
+Trois fournisseurs au choix : Anthropic, OpenAI ou Mistral. Reco perso : Mistral Medium, le meilleur compromis qualité/coût.
+
+### Estimation du coût
+
+Suivi du nombre de tokens consommés et estimation du coût en euros par fournisseur, accessible depuis `Réglages` → `Général`.
+
+## 💸 Tarification = make it rain
+
+- 12 utilisations gratuites
+- Licence à 10 € en achat unique, sans abonnement
+- Tu payes les tokens IA à l’utilisation, directement au fournisseur.
+
+## ⚙️ Caractéristiques techniques = boooring
+
+- macOS 15 et ultérieur
+- Application native SwiftUI
+- Vit dans la barre des menus, n'apparaît pas dans le Dock
+- Code source publié sous licence GPL v3
+- Aucune télémétrie, aucun compte utilisateur requis
+- Clés API et licences stockées localement dans le Trousseau macOS
+
+## 🌐 Liens = cliquety click
+
+- Site : [loucede.app](https://loucede.app/)
+- Code source : [github.com/poirpom/loucede](https://github.com/poirpom/loucede)]]></description>
+            <enclosure url="https://github.com/poirpom/loucede/releases/latest/download/loucede.dmg" sparkle:edSignature="scQk6ryYqA3Z4ol8jybpvadjQVyhptqw6I/rVcxhLPRus+jq1y6AJjR/UokxKjCOMGw0fezaYOsPI+/e47NIAw==" length="6341844" type="application/octet-stream" />
+        </item>
     </channel>
 </rss>
