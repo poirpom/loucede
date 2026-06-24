@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/46196d13-9102-4bb6-b52d-12a1771bbd47
 
 ### Actions prédéfinies
 
-loucedé est livré avec une vingtaine d'actions prédéfinies organisées par catégorie : traduire, analyser, transformer, structurer, proposer. Quelques exemples emblématiques :
+loucedé est livré avec une vingtaine d'actions prédéfinies organisées par catégorie : traduire, analyser, transformer, structurer, proposer. Quelques exemples :
 
 - 🤏 Résume ce texte
 - 🌍 Traduire en anglais
@@ -106,7 +106,7 @@ Distribué sous **[GPL v3](LICENSE)**.
 
 ## Crédits
 
-- Fork de **[TexTab](https://github.com/ELPROFUG0/TexTab)** par [ELPROFUG0](https://github.com/ELPROFUG0) — merci pour le travail de base
+- Fork de **[TexTab](https://github.com/ELPROFUG0/TexTab)** par [ELPROFUG0](https://github.com/ELPROFUG0) — merci à lui pour son travail
 - Gestion de licence : **[Polar.sh](https://polar.sh)**
 - APIs IA : **[Anthropic](https://anthropic.com)**, **[OpenAI](https://openai.com)**, **[Mistral](https://mistral.ai)**
 - Mises à jour : **[Sparkle](https://sparkle-project.org)**
