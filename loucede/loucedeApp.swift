@@ -65,6 +65,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingAction: Action?
     var cancellables = Set<AnyCancellable>()
     var previousActiveApp: NSRunningApplication?
+
+    /// O.1.c (Snapshot OCR) — overlay de sélection de zone actif, s'il y en a
+    /// un. Sert aussi de GARDE anti-double-overlay : `startOCRCapture()` est
+    /// no-op tant que cette référence est non-nil (vigilance « ⌥& pendant
+    /// overlay/fenêtre OCR actif → ignoré », cf. details/snapshot-ocr.md).
+    var captureOverlayController: CaptureOverlayController?
     var menuBarMenuController = MenuBarMenuWindowController()
 
     /// M.2.3 — en mode tuto, le handler hotkey Carbon délègue ici (lecture
@@ -214,6 +220,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Monitor local para ESC dentro de la app
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // 53 = Escape
+                // O.1.c — si un overlay de capture est actif, Esc l'annule
+                // (le monitor intercepte le keyDown avant la vue overlay).
+                if let overlay = self?.captureOverlayController {
+                    overlay.cancel()
+                    return nil
+                }
                 self?.hidePopoverAndRestoreFocus()
                 return nil // Consume el evento
             }
@@ -376,56 +388,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
     ///
-    /// O.1.b — HARNESS DEV (transitoire) : exerce `OCRService` sur une image
-    /// de test rendue en mémoire (aucun asset bundlé, aucune capture d'écran),
-    /// puis injecte le texte reconnu dans le cartouche et présente le popup.
-    /// Prouve la chaîne Vision → cartouche en isolation. Le corps
-    /// (`makeOCRTestImage` + son OCR) sera remplacé en O.1.c→O.1.e par la
-    /// chaîne réelle overlay maison → capture (ScreenCaptureKit) → OCR.
+    /// O.1.c — présente l'overlay maison de sélection de zone. Au relâchement
+    /// du drag, la zone (coords globales AppKit) est renvoyée ; HARNESS
+    /// transitoire : on l'affiche dans le cartouche pour rendre l'overlay
+    /// testable en isolation. La capture réelle (ScreenCaptureKit) puis l'OCR
+    /// sur cette zone seront câblés en O.1.d/O.1.e. Esc / clic sans drag =
+    /// annulation → aucun popup.
     ///
+    /// GARDE anti-double-overlay : no-op si un overlay est déjà actif.
     /// `previousActiveApp` est déjà mémorisé par l'appelant (`showPopover`)
     /// AVANT cette bascule — le paste ⌘↵ vers l'app source reste fonctionnel
-    /// même si l'overlay de capture volera le focus ensuite.
+    /// même si l'overlay vole le focus.
     ///
     /// Injection via `CapturedTextManager` puis `presentPopoverWindow()` :
-    /// exactement le pattern éprouvé par le flow tuto (`TutorialWindowController`).
-    /// `reset()` (dans `presentPopoverWindow`) ne touche pas
+    /// pattern éprouvé par le flow tuto ; `reset()` ne touche pas
     /// `CapturedTextManager` → le texte injecté survit à la présentation.
     func startOCRCapture() {
-        Task { @MainActor in
-            let testImage = Self.makeOCRTestImage(
-                text: "Bonjour loucedé\nReconnaissance de texte locale — Test OCR 123"
-            )
-            let recognized = await OCRService.recognizeText(in: testImage)
-            CapturedTextManager.shared.capturedText = recognized.isEmpty
-                ? "[OCR O.1.b] Aucun texte reconnu sur l'image de test."
-                : recognized
-            CapturedTextManager.shared.hasSelection = true
-            presentPopoverWindow()
-        }
-    }
+        guard captureOverlayController == nil else { return }
 
-    /// O.1.b — HARNESS DEV (transitoire, supprimé en O.1.e) : rend `text` en
-    /// image bitmap (texte noir sur fond blanc) pour alimenter `OCRService`
-    /// sans dépendre de la capture d'écran (pas encore câblée). Force-unwrap
-    /// assumé : entrée contrôlée, code de test.
-    private static func makeOCRTestImage(text: String) -> CGImage {
-        let size = NSSize(width: 640, height: 200)
-        let image = NSImage(size: size)
-        image.lockFocus()
-        NSColor.white.setFill()
-        NSRect(origin: .zero, size: size).fill()
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 34, weight: .medium),
-            .foregroundColor: NSColor.black
-        ]
-        (text as NSString).draw(
-            in: NSRect(x: 24, y: 24, width: size.width - 48, height: size.height - 48),
-            withAttributes: attrs
-        )
-        image.unlockFocus()
-        var rect = NSRect(origin: .zero, size: size)
-        return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)!
+        let overlay = CaptureOverlayController { [weak self] rect, screen in
+            guard let self else { return }
+            self.captureOverlayController = nil
+
+            // Annulation (Esc / clic sans drag) → on ne présente rien.
+            guard let rect else { return }
+
+            // HARNESS O.1.c : rend la zone sélectionnée visible dans le
+            // cartouche (remplacé par capture(rect) → OCR en O.1.d/e).
+            CapturedTextManager.shared.capturedText = String(
+                format: "[O.1.c] Zone capturée : origine (%.0f, %.0f) — taille %.0f × %.0f (écran %.0f × %.0f)",
+                rect.origin.x, rect.origin.y, rect.width, rect.height,
+                screen?.frame.width ?? 0, screen?.frame.height ?? 0
+            )
+            CapturedTextManager.shared.hasSelection = true
+            self.presentPopoverWindow()
+        }
+        captureOverlayController = overlay
+        overlay.present()
     }
 
     /// Queue commune d'affichage du popover (reset état + positionnement +
