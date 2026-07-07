@@ -13,6 +13,12 @@
 //  (origine bas-gauche). Esc annule. La conversion vers le référentiel de la
 //  capture (ScreenCaptureKit) est à la charge de O.1.d.
 //
+//  Curseur : grand crosshair custom (dessiné par code, mode-agnostique via
+//  liseré sombre) POUSSÉ sur la pile NSCursor à la présentation et DÉPILÉ à la
+//  fermeture — les cursor-rects et `cursorUpdate + .set()` sont écrasés par le
+//  système pour cette fenêtre borderless .screenSaver en app .accessory (pas
+//  propriétaire du curseur) ; seul push/pop persiste de bout en bout.
+//
 
 import AppKit
 
@@ -23,6 +29,11 @@ final class CaptureOverlayController {
     private let onComplete: (CGRect?, NSScreen?) -> Void
     private let screen: NSScreen
     private var window: NSWindow?
+    /// Garde d'idempotence : `finish()` peut être atteint par plusieurs chemins
+    /// (relâchement, clic sans drag, Esc via le monitor local). On garantit un
+    /// `NSCursor.pop()` EXACTEMENT UNE FOIS (pas de curseur fantôme, pas de
+    /// double-pop qui dépilerait un curseur étranger).
+    private var didFinish = false
 
     init(onComplete: @escaping (CGRect?, NSScreen?) -> Void) {
         self.onComplete = onComplete
@@ -55,10 +66,9 @@ final class CaptureOverlayController {
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         win.makeFirstResponder(view)
-        // Force le crosshair dès la présentation (cursorUpdate ne se déclenche
-        // qu'au 1er mouvement souris ; sans ça, curseur flèche tant qu'on ne
-        // bouge pas).
-        NSCursor.crosshair.set()
+        // Persiste le grand crosshair custom sur la pile de curseurs (tient de
+        // l'ouverture au drag, quel que soit le « propriétaire » système).
+        Self.captureCursor.push()
         window = win
     }
 
@@ -69,6 +79,10 @@ final class CaptureOverlayController {
     }
 
     private func finish(rectInView: NSRect?) {
+        guard !didFinish else { return }
+        didFinish = true
+        NSCursor.pop()   // dépile le curseur poussé dans present()
+
         var globalRect: CGRect?
         if let r = rectInView, r.width > 2, r.height > 2, let win = window {
             // vue → fenêtre → écran (coords globales AppKit, origine bas-gauche).
@@ -78,41 +92,67 @@ final class CaptureOverlayController {
         window = nil
         onComplete(globalRect, screen)
     }
+
+    // MARK: - Grand curseur crosshair custom
+
+    /// Grand crosshair compact dessiné par code (aucun asset) : deux traits
+    /// blancs ~66×2px à liseré sombre + repère central en anneau. Le liseré
+    /// garantit la lisibilité sur TOUT fond (contenu clair comme sombre survolé)
+    /// indépendamment du mode système. `hotSpot` = centre exact = intersection
+    /// des traits = repère central (sinon cadrage décalé de la visée).
+    static let captureCursor: NSCursor = {
+        let dim: CGFloat = 72
+        let size = NSSize(width: dim, height: dim)
+        let image = NSImage(size: size, flipped: false) { _ in
+            let c = dim / 2
+            let arm: CGFloat = 33      // demi-longueur (trait total 66)
+            let gap: CGFloat = 5       // trou central autour du repère
+            let whiteW: CGFloat = 2
+            let darkW: CGFloat = 4     // 1px de liseré de chaque côté du blanc
+            let white = NSColor.white
+            let dark = NSColor.black.withAlphaComponent(0.9)
+
+            func hSeg(_ x0: CGFloat, _ x1: CGFloat, _ t: CGFloat, _ color: NSColor) {
+                color.setFill()
+                NSRect(x: x0, y: c - t / 2, width: x1 - x0, height: t).fill()
+            }
+            func vSeg(_ y0: CGFloat, _ y1: CGFloat, _ t: CGFloat, _ color: NSColor) {
+                color.setFill()
+                NSRect(x: c - t / 2, y: y0, width: t, height: y1 - y0).fill()
+            }
+
+            // Liseré sombre (dessous, plus large), puis blanc (dessus).
+            for (t, color) in [(darkW, dark), (whiteW, white)] {
+                hSeg(c - arm, c - gap, t, color)   // gauche
+                hSeg(c + gap, c + arm, t, color)   // droite
+                vSeg(c - arm, c - gap, t, color)   // bas
+                vSeg(c + gap, c + arm, t, color)   // haut
+            }
+
+            // Repère central : anneau (centre blanc + contour sombre).
+            let ringR: CGFloat = 3
+            let ringRect = NSRect(x: c - ringR, y: c - ringR, width: ringR * 2, height: ringR * 2)
+            let ring = NSBezierPath(ovalIn: ringRect)
+            white.setFill(); ring.fill()
+            dark.setStroke(); ring.lineWidth = 1; ring.stroke()
+            return true
+        }
+        return NSCursor(image: image, hotSpot: NSPoint(x: dim / 2, y: dim / 2))
+    }()
 }
 
 /// Vue de tracking : assombrit l'écran, laisse la zone en cours claire + une
-/// bordure, et remonte la sélection au relâchement.
+/// bordure, et remonte la sélection au relâchement. Le curseur est géré par le
+/// contrôleur (push/pop) — la vue ne touche pas au curseur.
 private final class CaptureOverlayView: NSView {
     var onSelect: ((NSRect) -> Void)?
     var onCancel: (() -> Void)?
 
     private var startPoint: NSPoint?
     private var currentRect: NSRect = .zero
-    private var cursorTrackingArea: NSTrackingArea?
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { false }   // origine bas-gauche (cohérent AppKit)
-
-    // Curseur crosshair via NSTrackingArea + cursorUpdate (les cursor-rects
-    // legacy ne s'engagent pas sur une fenêtre borderless .screenSaver en app
-    // .accessory : le système ne traite pas l'agent-app comme propriétaire du
-    // curseur → la flèche persiste).
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let existing = cursorTrackingArea { removeTrackingArea(existing) }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.activeAlways, .cursorUpdate, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        cursorTrackingArea = area
-    }
-
-    override func cursorUpdate(with event: NSEvent) {
-        NSCursor.crosshair.set()
-    }
 
     override func draw(_ dirtyRect: NSRect) {
         let dim = NSColor.black.withAlphaComponent(0.28)
@@ -139,15 +179,12 @@ private final class CaptureOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        // cursorUpdate n'est pas rappelé bouton enfoncé → on ré-assère ici.
-        NSCursor.crosshair.set()
         startPoint = convert(event.locationInWindow, from: nil)
         currentRect = .zero
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
-        NSCursor.crosshair.set()
         guard let s = startPoint else { return }
         let p = convert(event.locationInWindow, from: nil)
         currentRect = NSRect(
