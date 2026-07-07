@@ -388,21 +388,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
     ///
-    /// O.1.c — présente l'overlay maison de sélection de zone. Au relâchement
-    /// du drag, la zone (coords globales AppKit) est renvoyée ; HARNESS
-    /// transitoire : on l'affiche dans le cartouche pour rendre l'overlay
-    /// testable en isolation. La capture réelle (ScreenCaptureKit) puis l'OCR
-    /// sur cette zone seront câblés en O.1.d/O.1.e. Esc / clic sans drag =
-    /// annulation → aucun popup.
+    /// O.1.d — présente l'overlay de sélection de zone puis, au relâchement,
+    /// CAPTURE la zone (ScreenCaptureKit) et OCR le résultat. HARNESS
+    /// transitoire (nettoyé en O.1.e) : dump PNG de la capture (vérif visuelle
+    /// de la correspondance zone cadrée ↔ zone capturée) + injection du texte
+    /// OCR dans le cartouche. Esc / clic sans drag = annulation → aucun popup.
     ///
     /// GARDE anti-double-overlay : no-op si un overlay est déjà actif.
     /// `previousActiveApp` est déjà mémorisé par l'appelant (`showPopover`)
     /// AVANT cette bascule — le paste ⌘↵ vers l'app source reste fonctionnel
     /// même si l'overlay vole le focus.
     ///
-    /// Injection via `CapturedTextManager` puis `presentPopoverWindow()` :
-    /// pattern éprouvé par le flow tuto ; `reset()` ne touche pas
-    /// `CapturedTextManager` → le texte injecté survit à la présentation.
+    /// ⚠️ Permission Screen Recording NON gérée à ce stade (O.4) : le 1er appel
+    /// SCK déclenche le prompt TCC système sur la build Debug ; accorder +
+    /// relancer si la capture échoue.
     func startOCRCapture() {
         guard captureOverlayController == nil else { return }
 
@@ -411,20 +410,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.captureOverlayController = nil
 
             // Annulation (Esc / clic sans drag) → on ne présente rien.
-            guard let rect else { return }
+            guard let rect, let screen else { return }
 
-            // HARNESS O.1.c : rend la zone sélectionnée visible dans le
-            // cartouche (remplacé par capture(rect) → OCR en O.1.d/e).
-            CapturedTextManager.shared.capturedText = String(
-                format: "[O.1.c] Zone capturée : origine (%.0f, %.0f) — taille %.0f × %.0f (écran %.0f × %.0f)",
-                rect.origin.x, rect.origin.y, rect.width, rect.height,
-                screen?.frame.width ?? 0, screen?.frame.height ?? 0
-            )
-            CapturedTextManager.shared.hasSelection = true
-            self.presentPopoverWindow()
+            Task { @MainActor in
+                do {
+                    let image = try await ScreenCaptureService.captureImage(
+                        globalRect: rect, screen: screen
+                    )
+                    // HARNESS O.1.d (debug, retiré en O.1.e) : dump PNG ouvert
+                    // dans Aperçu → vérification pixel de la conversion de coords.
+                    Self.debugDumpCapture(image)
+
+                    let text = await OCRService.recognizeText(in: image)
+                    CapturedTextManager.shared.capturedText = text.isEmpty
+                        ? "[O.1.d] Capture OK (\(image.width)×\(image.height) px) — aucun texte reconnu dans la zone."
+                        : text
+                } catch {
+                    CapturedTextManager.shared.capturedText =
+                        "[O.1.d] Échec de la capture (probable permission Screen Recording manquante — voir O.4) : \(error)"
+                }
+                CapturedTextManager.shared.hasSelection = true
+                self.presentPopoverWindow()
+            }
         }
         captureOverlayController = overlay
         overlay.present()
+    }
+
+    /// O.1.d — HARNESS DEBUG (transitoire, supprimé en O.1.e) : écrit la capture
+    /// en PNG dans le dossier temporaire et l'ouvre dans Aperçu, pour vérifier
+    /// visuellement que la zone capturée correspond EXACTEMENT à la zone cadrée
+    /// (validation du maillon de conversion de coordonnées). N'existe PAS dans
+    /// le flow de production (décision A : zéro fichier sur disque).
+    private static func debugDumpCapture(_ image: CGImage) {
+        let rep = NSBitmapImageRep(cgImage: image)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return }
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("loucede-ocr-capture-debug.png")
+        try? data.write(to: url)
+        print("O.1.d — capture debug PNG : \(url.path)")
+        NSWorkspace.shared.open(url)
     }
 
     /// Queue commune d'affichage du popover (reset état + positionnement +
