@@ -361,19 +361,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Capturer le texte sélectionné
         captureSelectedText()
 
-        // Si le raccourci clavier exige une sélection et qu'il n'y en a pas,
-        // on abandonne silencieusement — ouvrir un popup vide n'a pas de sens.
+        // O.1 (Snapshot OCR) — ⌥& SANS sélection : au lieu d'abandonner
+        // silencieusement (ancien comportement : ouvrir un popup vide n'avait
+        // pas de sens), on bascule sur le flow Snapshot OCR (capture d'écran →
+        // OCR → cartouche). C'est le point d'accroche unique de la
+        // généralisation de l'entrée (cf. details/snapshot-ocr.md).
         if requireSelection && !CapturedTextManager.shared.hasSelection {
+            startOCRCapture()
             return
         }
 
         presentPopoverWindow()
     }
 
+    /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
+    ///
+    /// O.1.a — STUB : injecte un texte de test dans le cartouche puis présente
+    /// le popup, pour dérisquer le routing d'entrée + l'injection AVANT toute
+    /// capture/OCR. Le corps sera remplacé en O.1.c→O.1.e par la chaîne réelle
+    /// overlay maison → capture (ScreenCaptureKit) → OCR (Vision).
+    ///
+    /// `previousActiveApp` est déjà mémorisé par l'appelant (`showPopover`)
+    /// AVANT cette bascule — le paste ⌘↵ vers l'app source reste fonctionnel
+    /// même si l'overlay de capture volera le focus ensuite.
+    ///
+    /// Injection via `CapturedTextManager` puis `presentPopoverWindow()` :
+    /// exactement le pattern éprouvé par le flow tuto (`TutorialWindowController`).
+    /// `reset()` (dans `presentPopoverWindow`) ne touche pas
+    /// `CapturedTextManager` → le texte injecté survit à la présentation.
+    func startOCRCapture() {
+        CapturedTextManager.shared.capturedText =
+            "[STUB OCR — O.1.a] Texte de test injecté dans le cartouche via le flow Snapshot OCR. Sera remplacé par le texte réellement capturé à l'écran en O.1.e."
+        CapturedTextManager.shared.hasSelection = true
+        presentPopoverWindow()
+    }
+
     /// Queue commune d'affichage du popover (reset état + positionnement +
     /// présentation + monitor). Factorisé (M.2.3) pour être réutilisé par le
     /// flow tuto (`presentPopoverForTutorial`), qui pose lui-même la sélection.
-    private func presentPopoverWindow() {
+    /// O.1 (Snapshot OCR) : exposé (`internal`) pour être appelé aussi par le
+    /// flow OCR (`startOCRCapture`), qui pose son texte dans `CapturedTextManager`
+    /// avant présentation — même contrat que le flow tuto.
+    func presentPopoverWindow() {
         // Reset de l'état (active action, result, selection, stream en cours)
         // — la fenêtre elle-même reste la même, préchargée au démarrage.
         Task { @MainActor in
