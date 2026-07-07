@@ -92,6 +92,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             showOnboarding()
         } else {
             setupApp()
+            switchToAccessory()
         }
     }
 
@@ -106,6 +107,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Bascule l'app en app menu-bar (hors Dock). Isolé de setupApp pour
+    /// pouvoir DIFFÉRER la sortie du Dock à la fin du tuto (Bug 2 : sinon
+    /// .accessory + fenêtre onboarding fermée = instant sans fenêtre visible
+    /// = « quit perçu »).
+    func switchToAccessory() {
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     func setupApp() {
         setupMenuBar()
         setupGlobalHotkey()
@@ -118,9 +127,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // détruisait/recréait la fenêtre à chaque hotkey → latence
         // perceptible et instanciation complète de l'arbre SwiftUI.
         createPopoverWindow()
-
-        // Menu bar uniquement, app cachée du dock
-        NSApp.setActivationPolicy(.accessory)
 
         // Ré-enregistre le raccourci principal quand il change
         ActionsStore.shared.$mainShortcut
@@ -170,10 +176,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let onboardingView = OnboardingView(
-            onComplete: finalize,
-            // M.2.7 : « Faire le tuto » finalise l'onboarding (ferme la fenêtre +
-            // setupApp → app lancée) PUIS ouvre la fenêtre tuto WKWebView.
-            onStartTutorial: { finalize(); TutorialWindowController.present() }
+            onComplete: { [weak self] in finalize(); self?.switchToAccessory() },
+            // M.2.7 / Bug 2 : « Faire le tuto » ouvre et fronte la fenêtre tuto
+            // AVANT de fermer l'onboarding et sans basculer en .accessory —
+            // l'app reste .regular (Dock + fenêtre) pendant tout le tuto, et ne
+            // sort du Dock qu'à sa fermeture (hook onClose → switchToAccessory).
+            onStartTutorial: { [weak self] in
+                TutorialWindowController.present(onClose: { self?.switchToAccessory() })
+                finalize()
+            }
         )
 
         let window = NSWindow(
