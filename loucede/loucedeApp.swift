@@ -388,20 +388,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
     ///
-    /// O.1.d — présente l'overlay de sélection de zone puis, au relâchement,
-    /// CAPTURE la zone (ScreenCaptureKit) et OCR le résultat. HARNESS
-    /// transitoire (nettoyé en O.1.e) : dump PNG de la capture (vérif visuelle
-    /// de la correspondance zone cadrée ↔ zone capturée) + injection du texte
-    /// OCR dans le cartouche. Esc / clic sans drag = annulation → aucun popup.
+    /// O.1.e (Snapshot OCR) — flow de production NU : présente l'overlay de
+    /// sélection de zone, puis CAPTURE la zone (ScreenCaptureKit) et l'OCR
+    /// (Vision, 100 % local) → injecte le texte dans le cartouche → présente le
+    /// popup (flow d'actions normal, comme si le texte avait été sélectionné).
+    /// **Zéro fichier sur disque** (décision A).
+    ///
+    /// À ce stade (nu), les cas non-nominaux sont **abandonnés silencieusement** :
+    /// - Esc / clic sans drag → annulation ;
+    /// - capture impossible (souvent permission Screen Recording manquante) ;
+    /// - zone sans texte reconnu.
+    /// Les UX dédiées arrivent en habillage : gestion permission + toast (O.4),
+    /// fenêtre « Capture de texte » avec états lecture / édition / aucun-texte (O.2).
     ///
     /// GARDE anti-double-overlay : no-op si un overlay est déjà actif.
-    /// `previousActiveApp` est déjà mémorisé par l'appelant (`showPopover`)
-    /// AVANT cette bascule — le paste ⌘↵ vers l'app source reste fonctionnel
-    /// même si l'overlay vole le focus.
-    ///
-    /// ⚠️ Permission Screen Recording NON gérée à ce stade (O.4) : le 1er appel
-    /// SCK déclenche le prompt TCC système sur la build Debug ; accorder +
-    /// relancer si la capture échoue.
+    /// `previousActiveApp` est déjà mémorisé par `showPopover` AVANT la bascule
+    /// → le paste ⌘↵ vers l'app source reste fonctionnel malgré le vol de focus.
     func startOCRCapture() {
         guard captureOverlayController == nil else { return }
 
@@ -409,47 +411,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.captureOverlayController = nil
 
-            // Annulation (Esc / clic sans drag) → on ne présente rien.
+            // Annulation (Esc / clic sans drag).
             guard let rect, let screen else { return }
 
             Task { @MainActor in
+                let image: CGImage
                 do {
-                    let image = try await ScreenCaptureService.captureImage(
+                    image = try await ScreenCaptureService.captureImage(
                         globalRect: rect, screen: screen
                     )
-                    // HARNESS O.1.d (debug, retiré en O.1.e) : dump PNG ouvert
-                    // dans Aperçu → vérification pixel de la conversion de coords.
-                    Self.debugDumpCapture(image)
-
-                    let text = await OCRService.recognizeText(in: image)
-                    CapturedTextManager.shared.capturedText = text.isEmpty
-                        ? "[O.1.d] Capture OK (\(image.width)×\(image.height) px) — aucun texte reconnu dans la zone."
-                        : text
                 } catch {
-                    CapturedTextManager.shared.capturedText =
-                        "[O.1.d] Échec de la capture (probable permission Screen Recording manquante — voir O.4) : \(error)"
+                    // Capture impossible (permission manquante, etc.) → abandon.
+                    // Gestion propre (toast + lien Réglages Système) en O.4.
+                    return
                 }
+
+                let text = await OCRService.recognizeText(in: image)
+                // Zone sans texte → abandon. Fenêtre « aucun texte détecté »
+                // (état 3) en O.2.c.
+                guard !text.isEmpty else { return }
+
+                CapturedTextManager.shared.capturedText = text
                 CapturedTextManager.shared.hasSelection = true
                 self.presentPopoverWindow()
             }
         }
         captureOverlayController = overlay
         overlay.present()
-    }
-
-    /// O.1.d — HARNESS DEBUG (transitoire, supprimé en O.1.e) : écrit la capture
-    /// en PNG dans le dossier temporaire et l'ouvre dans Aperçu, pour vérifier
-    /// visuellement que la zone capturée correspond EXACTEMENT à la zone cadrée
-    /// (validation du maillon de conversion de coordonnées). N'existe PAS dans
-    /// le flow de production (décision A : zéro fichier sur disque).
-    private static func debugDumpCapture(_ image: CGImage) {
-        let rep = NSBitmapImageRep(cgImage: image)
-        guard let data = rep.representation(using: .png, properties: [:]) else { return }
-        let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("loucede-ocr-capture-debug.png")
-        try? data.write(to: url)
-        print("O.1.d — capture debug PNG : \(url.path)")
-        NSWorkspace.shared.open(url)
     }
 
     /// Queue commune d'affichage du popover (reset état + positionnement +
