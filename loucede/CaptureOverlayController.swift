@@ -105,11 +105,11 @@ final class CaptureOverlayController {
     /// indépendamment du mode système. `hotSpot` = centre exact = intersection
     /// des traits = repère central (sinon cadrage décalé de la visée).
     static let captureCursor: NSCursor = {
-        let dim: CGFloat = 72
+        let dim: CGFloat = 56
         let size = NSSize(width: dim, height: dim)
         let image = NSImage(size: size, flipped: false) { _ in
             let c = dim / 2
-            let arm: CGFloat = 33      // demi-longueur (trait total 66)
+            let arm: CGFloat = 24      // demi-longueur (trait total 48)
             let gap: CGFloat = 5       // trou central autour du repère
             let whiteW: CGFloat = 2
             let darkW: CGFloat = 4     // 1px de liseré de chaque côté du blanc
@@ -220,7 +220,7 @@ private final class CaptureOverlayView: NSView {
         if let existing = mouseTrackingArea { removeTrackingArea(existing) }
         let area = NSTrackingArea(
             rect: bounds,
-            options: [.activeAlways, .mouseMoved, .inVisibleRect],
+            options: [.activeAlways, .mouseMoved, .cursorUpdate, .inVisibleRect],
             owner: self,
             userInfo: nil
         )
@@ -228,7 +228,17 @@ private final class CaptureOverlayView: NSView {
         mouseTrackingArea = area
     }
 
+    // Ré-assertion secondaire best-effort (souris immobile après ouverture) —
+    // canal peu fiable pour cet overlay, d'où le relais principal par les
+    // événements souris ci-dessous.
+    override func cursorUpdate(with event: NSEvent) {
+        CaptureOverlayController.captureCursor.set()
+    }
+
     override func mouseMoved(with event: NSEvent) {
+        // Ré-assertion PRINCIPALE du curseur (canal fiable, prouvé par le hint
+        // qui suit parfaitement) : push() seul ne persiste pas l'affichage.
+        CaptureOverlayController.captureCursor.set()
         let p = convert(event.locationInWindow, from: nil)
         positionHint(at: p)
         if !isDragging { hintView.isHidden = false }
@@ -259,6 +269,7 @@ private final class CaptureOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        CaptureOverlayController.captureCursor.set()
         // Le geste commence → le hint a fait son office, on le masque.
         isDragging = true
         hintView.isHidden = true
@@ -268,6 +279,8 @@ private final class CaptureOverlayView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        // cursorUpdate/mouseMoved ne fire pas bouton enfoncé → ré-assertion ici.
+        CaptureOverlayController.captureCursor.set()
         guard let s = startPoint else { return }
         let p = convert(event.locationInWindow, from: nil)
         currentRect = NSRect(
