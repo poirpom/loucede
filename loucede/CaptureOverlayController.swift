@@ -55,6 +55,10 @@ final class CaptureOverlayController {
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         win.makeFirstResponder(view)
+        // Force le crosshair dès la présentation (cursorUpdate ne se déclenche
+        // qu'au 1er mouvement souris ; sans ça, curseur flèche tant qu'on ne
+        // bouge pas).
+        NSCursor.crosshair.set()
         window = win
     }
 
@@ -84,12 +88,30 @@ private final class CaptureOverlayView: NSView {
 
     private var startPoint: NSPoint?
     private var currentRect: NSRect = .zero
+    private var cursorTrackingArea: NSTrackingArea?
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { false }   // origine bas-gauche (cohérent AppKit)
 
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .crosshair)
+    // Curseur crosshair via NSTrackingArea + cursorUpdate (les cursor-rects
+    // legacy ne s'engagent pas sur une fenêtre borderless .screenSaver en app
+    // .accessory : le système ne traite pas l'agent-app comme propriétaire du
+    // curseur → la flèche persiste).
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = cursorTrackingArea { removeTrackingArea(existing) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .cursorUpdate, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        cursorTrackingArea = area
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.crosshair.set()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -117,12 +139,15 @@ private final class CaptureOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // cursorUpdate n'est pas rappelé bouton enfoncé → on ré-assère ici.
+        NSCursor.crosshair.set()
         startPoint = convert(event.locationInWindow, from: nil)
         currentRect = .zero
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
+        NSCursor.crosshair.set()
         guard let s = startPoint else { return }
         let p = convert(event.locationInWindow, from: nil)
         currentRect = NSRect(
