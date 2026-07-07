@@ -214,7 +214,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            if let menuBarIcon = NSImage(named: "MenuBarIcon") {
+            #if DEBUG
+            let iconName = "MenuBarIcon-Debug"
+            #else
+            let iconName = "MenuBarIcon"
+            #endif
+            if let menuBarIcon = NSImage(named: iconName) {
                 menuBarIcon.isTemplate = true
                 button.image = menuBarIcon
             } else {
