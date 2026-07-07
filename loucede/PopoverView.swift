@@ -1634,7 +1634,7 @@ struct PopoverView: View {
                         NSPasteboard.general.setString(state.resultText, forType: .string)
                         if state.tutorialMode { state.tutorialCopyHandler?() }  // coche « copy »
                         showConfirmation("Copié", duration: 0.3) {
-                            globalAppDelegate?.hidePopover()
+                            globalAppDelegate?.hidePopoverAndRestoreFocus()
                         }
                     } label: {
                         HStack(spacing: 6) {

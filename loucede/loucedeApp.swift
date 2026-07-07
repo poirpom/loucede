@@ -203,7 +203,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Monitor local para ESC dentro de la app
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // 53 = Escape
-                self?.hidePopover()
+                self?.hidePopoverAndRestoreFocus()
                 return nil // Consume el evento
             }
             return event
@@ -776,7 +776,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             eventMonitor = nil
         }
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.hidePopover()
+            self?.hidePopoverAndRestoreFocus()
         }
     }
 
@@ -952,8 +952,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func hidePopoverAndRestoreFocus() {
         hidePopover()
-        // Restaurar el foco a la app anterior
-        if let previousApp = previousActiveApp {
+        // Restaure le focus de l'app source à la fermeture (dismissal).
+        // Gardes : app source encore vivante, et jamais loucedé lui-même
+        // (sinon on perpétue le frontmost erroné — cf. bug réouverture popup).
+        if let previousApp = previousActiveApp,
+           !previousApp.isTerminated,
+           previousApp != NSRunningApplication.current {
             previousApp.activate()
         }
     }
@@ -1007,7 +1011,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // désormais par PopoverState.shared (voir showPopoverWithAction).
         let contentView = PopoverView(
             onClose: { [weak self] in
-                self?.hidePopover()
+                self?.hidePopoverAndRestoreFocus()
             },
             onOpenSettings: { [weak self] in
                 self?.hidePopover()
