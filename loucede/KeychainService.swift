@@ -2,12 +2,17 @@
 //  KeychainService.swift
 //  loucede
 //
-//  Wrapper léger autour de Security.framework. Deux espaces logiques :
-//    - le service par défaut `app.loucede.loucede.apikey` pour les clés
-//      API par provider (Phase 4.1a)
+//  Wrapper léger autour de Security.framework. Deux espaces logiques,
+//  dérivés du Bundle ID runtime (fallback littéral Release) :
+//    - le service par défaut `<bundleID>.apikey` pour les clés API par
+//      provider (Phase 4.1a)
 //    - le sous-namespace `KeychainService.License` (service séparé
-//      `app.loucede.loucede.license`) pour la licence Polar.sh et le
-//      compteur du trial gratuit (Phase 6.2, 2026-04-27)
+//      `<bundleID>.license`) pour la licence Polar.sh et le compteur du
+//      trial gratuit (Phase 6.2, 2026-04-27)
+//
+//  Debug (`app.loucede.loucede.debug`) et Release (`app.loucede.loucede`)
+//  ont donc des trousseaux distincts, sans migration en Release : le
+//  service dérivé y est identique à l'ancien littéral hardcodé.
 //
 //  Sécurité commune :
 //    - kSecClassGenericPassword
@@ -22,7 +27,7 @@ enum KeychainService {
 
     /// Identifiant de service par défaut (clés API par provider).
     /// Visible dans Trousseaux d'accès.app sous ce nom.
-    private static let apiKeyService = "app.loucede.loucede.apikey"
+    private static let apiKeyService = (Bundle.main.bundleIdentifier ?? "app.loucede.loucede") + ".apikey"
 
     // MARK: - Public API par défaut (service = clés API)
 
@@ -99,13 +104,13 @@ enum KeychainService {
 extension KeychainService {
 
     /// Stockage Keychain dédié au système de licence Polar.sh.
-    /// Service séparé (`app.loucede.loucede.license`) pour isoler des
+    /// Service séparé (`<bundleID>.license`) pour isoler des
     /// clés API : la licence n'est pas un secret API, elle peut avoir
     /// des règles de backup différentes, et la séparation rend le
     /// debug plus simple dans Trousseaux d'accès.
     enum License {
 
-        private static let service = "app.loucede.loucede.license"
+        private static let service = (Bundle.main.bundleIdentifier ?? "app.loucede.loucede") + ".license"
 
         // MARK: - Accounts
 

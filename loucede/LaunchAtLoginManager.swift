@@ -16,7 +16,7 @@ import os.log
 @MainActor
 final class LaunchAtLoginManager {
     static let shared = LaunchAtLoginManager()
-    private let logger = Logger(subsystem: "app.loucede.loucede", category: "LaunchAtLogin")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "app.loucede.loucede", category: "LaunchAtLogin")
 
     private init() {}
 
