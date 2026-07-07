@@ -56,6 +56,7 @@ final class CaptureOverlayController {
         win.hasShadow = false
         win.level = .screenSaver          // au-dessus de tout le reste
         win.ignoresMouseEvents = false
+        win.acceptsMouseMovedEvents = true   // pour le suivi du hint en survol
         win.setFrame(screen.frame, display: true)
 
         let view = CaptureOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
@@ -69,6 +70,9 @@ final class CaptureOverlayController {
         // Persiste le grand crosshair custom sur la pile de curseurs (tient de
         // l'ouverture au drag, quel que soit le « propriétaire » système).
         Self.captureCursor.push()
+        // Affiche le hint « cadre pour extraire le texte » dès l'ouverture
+        // (positionné sur la souris courante, avant même le 1er mouvement).
+        view.showHintAtCurrentMouse()
         window = win
     }
 
@@ -150,9 +154,85 @@ private final class CaptureOverlayView: NSView {
 
     private var startPoint: NSPoint?
     private var currentRect: NSRect = .zero
+    private var isDragging = false
+    private var mouseTrackingArea: NSTrackingArea?
+
+    /// Hint suiveur « cadre pour extraire le texte » : petit cartouche façon
+    /// popup loucedé (matériau `.hudWindow` → light/dark natif), accolé en
+    /// bas-droite du curseur, masqué dès le début du geste (mouseDown).
+    private lazy var hintView: NSView = Self.makeHintView()
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { false }   // origine bas-gauche (cohérent AppKit)
+
+    // MARK: Hint
+
+    private static func makeHintView() -> NSView {
+        let effect = NSVisualEffectView()
+        effect.material = .hudWindow
+        effect.state = .active
+        effect.blendingMode = .withinWindow
+        effect.wantsLayer = true
+        effect.layer?.cornerRadius = 8
+        effect.layer?.masksToBounds = true
+        effect.isHidden = true
+
+        let label = NSTextField(labelWithString: "cadre pour extraire le texte")
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .labelColor       // s'adapte light/dark
+        label.translatesAutoresizingMaskIntoConstraints = false
+        effect.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 10),
+            label.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -10),
+            label.topAnchor.constraint(equalTo: effect.topAnchor, constant: 6),
+            label.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -6)
+        ])
+        effect.layoutSubtreeIfNeeded()
+        effect.frame.size = effect.fittingSize
+        return effect
+    }
+
+    /// Positionne le hint accolé en bas-droite du point `p` (coords vue),
+    /// clampé pour rester entièrement à l'écran.
+    private func positionHint(at p: NSPoint) {
+        let gap: CGFloat = 20
+        let w = hintView.frame.width
+        let h = hintView.frame.height
+        var origin = NSPoint(x: p.x + gap, y: p.y - gap - h)   // droite + dessous
+        origin.x = min(max(origin.x, bounds.minX + 4), bounds.maxX - w - 4)
+        origin.y = min(max(origin.y, bounds.minY + 4), bounds.maxY - h - 4)
+        hintView.setFrameOrigin(origin)
+    }
+
+    /// Affiche le hint à la position souris courante (appelé à l'ouverture,
+    /// avant le 1er mouseMoved).
+    func showHintAtCurrentMouse() {
+        if hintView.superview == nil { addSubview(hintView) }
+        guard let window else { return }
+        let p = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        positionHint(at: p)
+        if !isDragging { hintView.isHidden = false }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = mouseTrackingArea { removeTrackingArea(existing) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseMoved, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        mouseTrackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        positionHint(at: p)
+        if !isDragging { hintView.isHidden = false }
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         let dim = NSColor.black.withAlphaComponent(0.28)
@@ -179,6 +259,9 @@ private final class CaptureOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // Le geste commence → le hint a fait son office, on le masque.
+        isDragging = true
+        hintView.isHidden = true
         startPoint = convert(event.locationInWindow, from: nil)
         currentRect = .zero
         needsDisplay = true
