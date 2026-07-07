@@ -376,10 +376,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
     ///
-    /// O.1.a — STUB : injecte un texte de test dans le cartouche puis présente
-    /// le popup, pour dérisquer le routing d'entrée + l'injection AVANT toute
-    /// capture/OCR. Le corps sera remplacé en O.1.c→O.1.e par la chaîne réelle
-    /// overlay maison → capture (ScreenCaptureKit) → OCR (Vision).
+    /// O.1.b — HARNESS DEV (transitoire) : exerce `OCRService` sur une image
+    /// de test rendue en mémoire (aucun asset bundlé, aucune capture d'écran),
+    /// puis injecte le texte reconnu dans le cartouche et présente le popup.
+    /// Prouve la chaîne Vision → cartouche en isolation. Le corps
+    /// (`makeOCRTestImage` + son OCR) sera remplacé en O.1.c→O.1.e par la
+    /// chaîne réelle overlay maison → capture (ScreenCaptureKit) → OCR.
     ///
     /// `previousActiveApp` est déjà mémorisé par l'appelant (`showPopover`)
     /// AVANT cette bascule — le paste ⌘↵ vers l'app source reste fonctionnel
@@ -390,10 +392,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// `reset()` (dans `presentPopoverWindow`) ne touche pas
     /// `CapturedTextManager` → le texte injecté survit à la présentation.
     func startOCRCapture() {
-        CapturedTextManager.shared.capturedText =
-            "[STUB OCR — O.1.a] Texte de test injecté dans le cartouche via le flow Snapshot OCR. Sera remplacé par le texte réellement capturé à l'écran en O.1.e."
-        CapturedTextManager.shared.hasSelection = true
-        presentPopoverWindow()
+        Task { @MainActor in
+            let testImage = Self.makeOCRTestImage(
+                text: "Bonjour loucedé\nReconnaissance de texte locale — Test OCR 123"
+            )
+            let recognized = await OCRService.recognizeText(in: testImage)
+            CapturedTextManager.shared.capturedText = recognized.isEmpty
+                ? "[OCR O.1.b] Aucun texte reconnu sur l'image de test."
+                : recognized
+            CapturedTextManager.shared.hasSelection = true
+            presentPopoverWindow()
+        }
+    }
+
+    /// O.1.b — HARNESS DEV (transitoire, supprimé en O.1.e) : rend `text` en
+    /// image bitmap (texte noir sur fond blanc) pour alimenter `OCRService`
+    /// sans dépendre de la capture d'écran (pas encore câblée). Force-unwrap
+    /// assumé : entrée contrôlée, code de test.
+    private static func makeOCRTestImage(text: String) -> CGImage {
+        let size = NSSize(width: 640, height: 200)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 34, weight: .medium),
+            .foregroundColor: NSColor.black
+        ]
+        (text as NSString).draw(
+            in: NSRect(x: 24, y: 24, width: size.width - 48, height: size.height - 48),
+            withAttributes: attrs
+        )
+        image.unlockFocus()
+        var rect = NSRect(origin: .zero, size: size)
+        return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)!
     }
 
     /// Queue commune d'affichage du popover (reset état + positionnement +
