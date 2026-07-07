@@ -29,6 +29,12 @@ final class CaptureOverlayController {
     private let onComplete: (CGRect?, NSScreen?) -> Void
     private let screen: NSScreen
     private var window: NSWindow?
+    /// Ré-assertion périodique du curseur (~50 ms) tant que l'overlay est ouvert.
+    /// Couvre le cas « souris rigoureusement immobile juste après l'ouverture »
+    /// (⌥& = raccourci clavier, mains au clavier) : les événements souris ne
+    /// fire pas, `push()` seul ne persiste pas → sans ce timer, la croix
+    /// repasse en flèche jusqu'au 1er mouvement. Invalidé dans `finish()`.
+    private var cursorTimer: Timer?
     /// Garde d'idempotence : `finish()` peut être atteint par plusieurs chemins
     /// (relâchement, clic sans drag, Esc via le monitor local). On garantit un
     /// `NSCursor.pop()` EXACTEMENT UNE FOIS (pas de curseur fantôme, pas de
@@ -70,6 +76,11 @@ final class CaptureOverlayController {
         // Persiste le grand crosshair custom sur la pile de curseurs (tient de
         // l'ouverture au drag, quel que soit le « propriétaire » système).
         Self.captureCursor.push()
+        // Filet immobilité : ré-assère le curseur tant que l'overlay est ouvert
+        // (le closure ne capture rien — `captureCursor` est static, pas de cycle).
+        cursorTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            CaptureOverlayController.captureCursor.set()
+        }
         // Affiche le hint « cadre pour extraire le texte » dès l'ouverture
         // (positionné sur la souris courante, avant même le 1er mouvement).
         view.showHintAtCurrentMouse()
@@ -85,6 +96,8 @@ final class CaptureOverlayController {
     private func finish(rectInView: NSRect?) {
         guard !didFinish else { return }
         didFinish = true
+        cursorTimer?.invalidate()   // arrête la ré-assertion (symétrique du push)
+        cursorTimer = nil
         NSCursor.pop()   // dépile le curseur poussé dans present()
 
         var globalRect: CGRect?
