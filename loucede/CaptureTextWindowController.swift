@@ -221,27 +221,41 @@ private struct CaptureTextView: View {
         .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
-    // Footer : esc Annuler (clic ; Esc clavier via monitor AppDelegate) /
-    // ⌘↵ Valider (calqué generatorEditableBottomBar). ⌘↵ grisé si vide.
+    // Footer : VRAIS boutons (l'OCR est un geste souris → boutons cliquables
+    // naturels). Raccourci affiché DANS le bouton. Secondaire Annuler (stroké,
+    // transparent) à gauche · Primaire Valider (bleu plein = token action
+    // loucedé) à droite ; ⌘↵ conservé + grisé si vide (comportement #3).
     private var footer: some View {
         HStack(spacing: 8) {
+            // Secondaire : fond transparent + bordure neutre adaptative.
             Button { onCancel() } label: {
                 HStack(spacing: 6) {
                     KeyboardKey("esc")
                     Text("Annuler").font(.system(size: 13))
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.primary.opacity(0.2), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
 
             Spacer()
 
+            // Primaire : bleu plein (PolishTokens.selectionBackground = le bleu
+            // d'action déjà en prod) + texte blanc + capsule ⌘↵ onAccent.
             Button { onValidate(text) } label: {
                 HStack(spacing: 6) {
-                    KeyboardKey("⌘↵")
-                    Text("Valider").font(.system(size: 13))
+                    KeyboardKey("⌘↵", onAccent: true)
+                    Text("Valider").font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .tint(PolishTokens.selectionBackground)
+            .controlSize(.large)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(isEmpty)
         }
