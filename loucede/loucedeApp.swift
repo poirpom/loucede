@@ -71,6 +71,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// no-op tant que cette référence est non-nil (vigilance « ⌥& pendant
     /// overlay/fenêtre OCR actif → ignoré », cf. details/snapshot-ocr.md).
     var captureOverlayController: CaptureOverlayController?
+
+    /// O.2.b — flag « flow OCR en cours », posé au tout début de
+    /// `startOCRCapture()` et levé sur TOUS les chemins de sortie (annulation
+    /// overlay, capture impossible, texte vide, validation, annulation fenêtre).
+    /// Ferme le trou de la garde ⌥& pendant l'await capture+OCR (moment où
+    /// l'overlay est fermé mais la fenêtre pas encore présentée).
+    private var isOCRFlowActive = false
     var menuBarMenuController = MenuBarMenuWindowController()
 
     /// M.2.3 — en mode tuto, le handler hotkey Carbon délègue ici (lecture
@@ -411,15 +418,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// `previousActiveApp` est déjà mémorisé par `showPopover` AVANT la bascule
     /// → le paste ⌘↵ vers l'app source reste fonctionnel malgré le vol de focus.
     func startOCRCapture() {
-        // Garde ⌥&-pendant-overlay ET pendant la fenêtre « Capture de texte ».
-        guard captureOverlayController == nil, !CaptureTextWindowController.isPresented else { return }
+        // Garde ⌥& : ni overlay actif, ni fenêtre « Capture de texte », ni flow
+        // OCR en cours (couvre l'await capture+OCR — cf. isOCRFlowActive).
+        guard captureOverlayController == nil,
+              !CaptureTextWindowController.isPresented,
+              !isOCRFlowActive
+        else { return }
+        isOCRFlowActive = true
 
         let overlay = CaptureOverlayController { [weak self] rect, screen in
             guard let self else { return }
             self.captureOverlayController = nil
 
-            // Annulation (Esc / clic sans drag).
-            guard let rect, let screen else { return }
+            // Annulation (Esc / clic sans drag) → fin du flow.
+            guard let rect, let screen else {
+                self.isOCRFlowActive = false
+                return
+            }
 
             Task { @MainActor in
                 let image: CGImage
@@ -430,27 +445,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } catch {
                     // Capture impossible (permission manquante, etc.) → abandon.
                     // Gestion propre (toast + lien Réglages Système) en O.4.
+                    self.isOCRFlowActive = false
                     return
                 }
 
-                let text = await OCRService.recognizeText(in: image)
-                // Zone sans texte → abandon. Fenêtre « aucun texte détecté »
-                // (état 3) en O.2.c.
-                guard !text.isEmpty else { return }
-
-                // O.2.a — la fenêtre « Capture de texte » s'intercale : l'user
-                // vérifie/corrige, puis ⌘↵ déclenche l'injection + popup (le
-                // pattern d'injection ne change pas, il est déplacé après ⌘↵).
-                CaptureTextWindowController.present(
-                    ocrText: text,
+                // O.2.b — la fenêtre « Capture de texte » s'ouvre en LECTURE
+                // (spinner) AVANT l'OCR, puis est alimentée : texte → bascule
+                // édition (⌘↵ → injection + popup) ; vide → fermeture silencieuse.
+                let controller = CaptureTextWindowController.present(
                     onValidate: { [weak self] edited in
+                        self?.isOCRFlowActive = false
                         CapturedTextManager.shared.capturedText = edited
                         CapturedTextManager.shared.hasSelection = true
                         self?.presentPopoverWindow()
                     },
                     onCancel: { [weak self] in
-                        // Esc = annule tout le flow, retour à l'app source
-                        // (previousActiveApp intact depuis le ⌥& initial).
+                        // Esc / Annuler / texte vide (fail) : annule le flow,
+                        // retour à l'app source (previousActiveApp intact).
+                        self?.isOCRFlowActive = false
                         if let prev = self?.previousActiveApp,
                            !prev.isTerminated,
                            prev != NSRunningApplication.current {
@@ -458,6 +470,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                 )
+
+                let text = await OCRService.recognizeText(in: image)
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    controller.fail()          // → onCancel (flag levé + retour source)
+                } else {
+                    controller.setText(text)   // bascule LECTURE → ÉDITION
+                }
             }
         }
         captureOverlayController = overlay
