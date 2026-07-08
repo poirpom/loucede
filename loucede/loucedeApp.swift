@@ -226,6 +226,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     overlay.cancel()
                     return nil
                 }
+                // O.2.a — idem pour la fenêtre « Capture de texte » : Esc annule
+                // tout le flow (le monitor intercepte avant le SwiftUI).
+                if CaptureTextWindowController.isPresented {
+                    CaptureTextWindowController.current?.cancel()
+                    return nil
+                }
                 self?.hidePopoverAndRestoreFocus()
                 return nil // Consume el evento
             }
@@ -405,7 +411,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// `previousActiveApp` est déjà mémorisé par `showPopover` AVANT la bascule
     /// → le paste ⌘↵ vers l'app source reste fonctionnel malgré le vol de focus.
     func startOCRCapture() {
-        guard captureOverlayController == nil else { return }
+        // Garde ⌥&-pendant-overlay ET pendant la fenêtre « Capture de texte ».
+        guard captureOverlayController == nil, !CaptureTextWindowController.isPresented else { return }
 
         let overlay = CaptureOverlayController { [weak self] rect, screen in
             guard let self else { return }
@@ -431,9 +438,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // (état 3) en O.2.c.
                 guard !text.isEmpty else { return }
 
-                CapturedTextManager.shared.capturedText = text
-                CapturedTextManager.shared.hasSelection = true
-                self.presentPopoverWindow()
+                // O.2.a — la fenêtre « Capture de texte » s'intercale : l'user
+                // vérifie/corrige, puis ⌘↵ déclenche l'injection + popup (le
+                // pattern d'injection ne change pas, il est déplacé après ⌘↵).
+                CaptureTextWindowController.present(
+                    ocrText: text,
+                    onValidate: { [weak self] edited in
+                        CapturedTextManager.shared.capturedText = edited
+                        CapturedTextManager.shared.hasSelection = true
+                        self?.presentPopoverWindow()
+                    },
+                    onCancel: { [weak self] in
+                        // Esc = annule tout le flow, retour à l'app source
+                        // (previousActiveApp intact depuis le ⌥& initial).
+                        if let prev = self?.previousActiveApp,
+                           !prev.isTerminated,
+                           prev != NSRunningApplication.current {
+                            prev.activate()
+                        }
+                    }
+                )
             }
         }
         captureOverlayController = overlay
