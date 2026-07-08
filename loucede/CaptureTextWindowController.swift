@@ -57,8 +57,38 @@ final class CaptureTextWindowController {
         finish { $0.onCancel() }
     }
 
+    /// Largeur fixe de la fenêtre (comportement #1).
+    private static let windowWidth: CGFloat = 600
+    /// Plancher confortable même pour un texte court.
+    private static let windowFloor: CGFloat = 400
+
+    /// Hauteur calculée UNE FOIS à l'ouverture selon la quantité de texte OCR,
+    /// bornée `[plancher, plafond]`. Plafond = celui de la fenêtre de réponse
+    /// du popup (`resultPlafondHeight`, surface sœur → cohérence, zéro nouveau
+    /// token). Au-delà, le TextEditor scrolle en interne. Pas de live-grow
+    /// (cf. details/snapshot-ocr.md — compromis assumé, aligné calculatedPopoverHeight).
+    private static func computeWindowHeight(for text: String) -> CGFloat {
+        // Largeur utile du texte : fenêtre − padding body (12×2) − padding
+        // field (6×2) − inset interne du TextEditor (~10).
+        let textWidth = windowWidth - 24 - 12 - 10
+        let font = NSFont.systemFont(ofSize: PolishTokens.resultBodyFontSize)
+        let bounding = (text as NSString).boundingRect(
+            with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        // Fudge : la lineSpacing SwiftUI (~0.3em) n'entre pas dans boundingRect.
+        let textHeight = ceil(bounding.height * 1.3)
+        // Chrome (header + hint + paddings + footer) — légèrement surestimé pour
+        // ne jamais couper la dernière ligne à l'ouverture.
+        let chrome: CGFloat = 180
+        let plafond = AppDelegate.resultPlafondHeight()
+        return min(max(windowFloor, chrome + textHeight), plafond)
+    }
+
     private func show(ocrText: String) {
-        let width: CGFloat = 600, height: CGFloat = 400
+        let width = Self.windowWidth
+        let height = Self.computeWindowHeight(for: ocrText)
         // Réutilise KeyablePanel (canBecomeKey/Main) → focus TextEditor garanti,
         // une seule façon de faire les fenêtres-surfaces loucedé. Montage calqué
         // sur createPopoverWindow.
@@ -77,6 +107,7 @@ final class CaptureTextWindowController {
 
         let root = CaptureTextView(
             ocrText: ocrText,
+            windowHeight: height,
             onValidate: { [weak self] text in self?.finish { $0.onValidate(text) } },
             onCancel: { [weak self] in self?.finish { $0.onCancel() } }
         )
@@ -109,6 +140,7 @@ final class CaptureTextWindowController {
 /// éditable / footer capsules), via les composants partagés.
 private struct CaptureTextView: View {
     let ocrText: String
+    let windowHeight: CGFloat
     let onValidate: (String) -> Void
     let onCancel: () -> Void
 
@@ -116,9 +148,11 @@ private struct CaptureTextView: View {
     @FocusState private var focused: Bool
 
     init(ocrText: String,
+         windowHeight: CGFloat,
          onValidate: @escaping (String) -> Void,
          onCancel: @escaping () -> Void) {
         self.ocrText = ocrText
+        self.windowHeight = windowHeight
         self.onValidate = onValidate
         self.onCancel = onCancel
         _text = State(initialValue: ocrText)
@@ -134,7 +168,7 @@ private struct CaptureTextView: View {
             bodyEditor
             footer
         }
-        .frame(width: 600, height: 400)
+        .frame(width: 600, height: windowHeight)
         .polishVibrancy()
     }
 
