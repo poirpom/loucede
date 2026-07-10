@@ -399,24 +399,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         presentPopoverWindow()
     }
 
-    /// O.1 (Snapshot OCR) — entrée du flow « ⌥& sans sélection ».
+    /// O.1 (Snapshot OCR) — entrée publique du flow « ⌥& sans sélection ».
     ///
-    /// O.1.e (Snapshot OCR) — flow de production NU : présente l'overlay de
-    /// sélection de zone, puis CAPTURE la zone (ScreenCaptureKit) et l'OCR
-    /// (Vision, 100 % local) → injecte le texte dans le cartouche → présente le
-    /// popup (flow d'actions normal, comme si le texte avait été sélectionné).
-    /// **Zéro fichier sur disque** (décision A).
-    ///
-    /// À ce stade (nu), les cas non-nominaux sont **abandonnés silencieusement** :
-    /// - Esc / clic sans drag → annulation ;
-    /// - capture impossible (souvent permission Screen Recording manquante) ;
-    /// - zone sans texte reconnu.
-    /// Les UX dédiées arrivent en habillage : gestion permission + toast (O.4),
-    /// fenêtre « Capture de texte » avec états lecture / édition / aucun-texte (O.2).
-    ///
-    /// GARDE anti-double-overlay : no-op si un overlay est déjà actif.
-    /// `previousActiveApp` est déjà mémorisé par `showPopover` AVANT la bascule
-    /// → le paste ⌘↵ vers l'app source reste fonctionnel malgré le vol de focus.
+    /// Garde ⌥& (no-op si un cycle est déjà en cours), pose le flag, puis lance
+    /// un cycle de capture. `previousActiveApp` est déjà mémorisé par
+    /// `showPopover` AVANT la bascule → le paste ⌘↵ vers l'app source reste
+    /// fonctionnel malgré le vol de focus.
     func startOCRCapture() {
         // Garde ⌥& : ni overlay actif, ni fenêtre « Capture de texte », ni flow
         // OCR en cours (couvre l'await capture+OCR — cf. isOCRFlowActive).
@@ -425,12 +413,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               !isOCRFlowActive
         else { return }
         isOCRFlowActive = true
+        beginCaptureCycle()
+    }
 
+    /// Un cycle capture → OCR → fenêtre. Isolé de `startOCRCapture` (garde +
+    /// flag) pour être RÉUTILISÉ par « Réessayer » (O.2.c) : le flag
+    /// `isOCRFlowActive` reste posé entre cycles → ⌥& toujours ignoré, aucun
+    /// gap. Le flag n'est levé QUE sur les sorties définitives (annulation
+    /// overlay, capture KO, Fermer/Esc de l'état aucun-texte, validation ou
+    /// annulation du nominal) — voir `endOCRFlowAndRestoreSource`.
+    private func beginCaptureCycle() {
         let overlay = CaptureOverlayController { [weak self] rect, screen in
             guard let self else { return }
             self.captureOverlayController = nil
 
-            // Annulation (Esc / clic sans drag) → fin du flow.
+            // Annulation (Esc / clic sans drag) → sortie définitive du flow.
             guard let rect, let screen else {
                 self.isOCRFlowActive = false
                 return
@@ -450,40 +447,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
 
                 let text = await OCRService.recognizeText(in: image)
-                // Zone sans texte → abandon silencieux (sans fenêtre). Fenêtre
-                // « aucun texte détecté » (état 3) = O.2.c. Lever le flag : ce
-                // guard est un chemin de sortie du flow OCR.
-                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    self.isOCRFlowActive = false
-                    return
-                }
 
-                // La fenêtre « Capture de texte » s'ouvre pré-remplie (état
-                // nominal), après l'OCR. ⌘↵ déclenche l'injection + popup ;
-                // l'injection ne change pas, elle est déplacée après ⌘↵.
-                CaptureTextWindowController.present(
-                    ocrText: text,
-                    onValidate: { [weak self] edited in
-                        self?.isOCRFlowActive = false
-                        CapturedTextManager.shared.capturedText = edited
-                        CapturedTextManager.shared.hasSelection = true
-                        self?.presentPopoverWindow()
-                    },
-                    onCancel: { [weak self] in
-                        // Esc / Annuler : annule le flow, retour à l'app source
-                        // (previousActiveApp intact depuis le ⌥& initial).
-                        self?.isOCRFlowActive = false
-                        if let prev = self?.previousActiveApp,
-                           !prev.isTerminated,
-                           prev != NSRunningApplication.current {
-                            prev.activate()
-                        }
-                    }
-                )
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // O.2.c — aucun texte détecté : la fenêtre reste ouverte sur
+                    // l'état dédié. Réessayer relance un cycle (flag conservé) ;
+                    // Fermer sort du flow (retour app source).
+                    CaptureTextWindowController.presentEmpty(
+                        onRetry: { [weak self] in self?.beginCaptureCycle() },
+                        onClose: { [weak self] in self?.endOCRFlowAndRestoreSource() }
+                    )
+                } else {
+                    // Nominal : fenêtre pré-remplie. ⌘↵ déclenche l'injection +
+                    // popup (le pattern d'injection est déplacé après ⌘↵).
+                    CaptureTextWindowController.present(
+                        ocrText: text,
+                        onValidate: { [weak self] edited in
+                            self?.isOCRFlowActive = false
+                            CapturedTextManager.shared.capturedText = edited
+                            CapturedTextManager.shared.hasSelection = true
+                            self?.presentPopoverWindow()
+                        },
+                        onCancel: { [weak self] in self?.endOCRFlowAndRestoreSource() }
+                    )
+                }
             }
         }
         captureOverlayController = overlay
         overlay.present()
+    }
+
+    /// Sortie définitive du flow OCR sans injection : lève le flag et rend le
+    /// focus à l'app source (previousActiveApp intact depuis le ⌥& initial).
+    /// Commun à Annuler (nominal), Fermer/Esc (aucun-texte).
+    private func endOCRFlowAndRestoreSource() {
+        isOCRFlowActive = false
+        if let prev = previousActiveApp,
+           !prev.isTerminated,
+           prev != NSRunningApplication.current {
+            prev.activate()
+        }
     }
 
     /// Queue commune d'affichage du popover (reset état + positionnement +
