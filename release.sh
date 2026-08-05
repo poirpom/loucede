@@ -113,6 +113,14 @@ preflight() {
   done
   xcrun --find notarytool >/dev/null 2>&1 || die "notarytool introuvable (xcrun)"
 
+  # Module Python 'markdown' — requis par update_appcast (conversion des
+  # notes en HTML pour le <description> de l'appcast, cf. décision appcast-md).
+  # Vérifié ICI (avant tout build/tag/push) pour ne pas échouer tard comme le
+  # compte gh ci-dessous — un die en fin de pipeline laisserait une release
+  # GitHub publiée sans appcast à jour.
+  python3 -c 'import markdown' >/dev/null 2>&1 \
+    || die "module Python « markdown » absent — installe-le : python3 -m pip install --user markdown"
+
   # Auth GitHub
   gh auth status >/dev/null 2>&1 || die "gh non authentifié — lance « gh auth login »"
 
@@ -370,11 +378,22 @@ update_appcast() {
   ITEM_URL="$ENCLOSURE_URL" ITEM_SIG="$ED_SIGNATURE" ITEM_LEN="$LENGTH" \
   python3 <<'PY' || die "édition de l'appcast échouée"
 import os, re, sys
+import markdown
 from email.utils import formatdate
 
-f      = os.environ["APPCAST_FILE"]
-notes  = open(os.environ["RN_FILE"], encoding="utf-8").read()
-notes  = notes.replace("]]>", "]]]]><![CDATA[>")   # défense CDATA
+f        = os.environ["APPCAST_FILE"]
+notes_md = open(os.environ["RN_FILE"], encoding="utf-8").read()
+# Sparkle affiche le <description> comme du HTML (WebView), pas du markdown
+# brut — sans conversion, les #/**/backticks des notes s'affichaient
+# littéralement dans la fenêtre de mise à jour (constaté en 1.1.0).
+# 'extra' = tables/blocs de code/listes de définitions en plus du markdown de
+# base ; sortie identique au markdown de base tant que les notes n'en usent
+# pas (vérifié sur v1.1.0.md).
+notes  = markdown.markdown(notes_md, extensions=["extra"])
+# Défense CDATA sur le HTML PRODUIT (pas sur le markdown source) : c'est lui
+# qui est inséré dans le CDATA, un ]]> généré par la conversion doit être
+# neutralisé après coup, pas avant.
+notes  = notes.replace("]]>", "]]]]><![CDATA[>")
 ver    = os.environ["ITEM_VERSION"]
 build  = os.environ["ITEM_BUILD"]
 url    = os.environ["ITEM_URL"]
