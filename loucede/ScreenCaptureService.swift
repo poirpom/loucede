@@ -19,6 +19,20 @@ import ScreenCaptureKit
 enum ScreenCaptureService {
     enum CaptureError: Error { case noDisplay }
 
+    /// O.4 — lecture immédiate de l'état TCC (source de vérité système).
+    /// Ne reflète PAS forcément la capacité réelle de SCK à capturer : un
+    /// octroi frais n'est pris en compte par SCK qu'au redémarrage du process
+    /// (cf. `beginCaptureCycle` catch dans `loucedeApp.swift`).
+    static func hasScreenRecordingAccess() -> Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// Déclenche le prompt système natif (no-op silencieux si déjà accordée
+    /// ou déjà refusée définitivement).
+    static func requestScreenRecordingAccess() {
+        CGRequestScreenCaptureAccess()
+    }
+
     /// Capture la zone `globalRect` (coords GLOBALES AppKit, origine bas-gauche)
     /// de l'écran `screen`. Renvoie un `CGImage` en résolution native (Retina).
     static func captureImage(globalRect: CGRect, screen: NSScreen) async throws -> CGImage {

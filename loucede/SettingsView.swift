@@ -14,6 +14,13 @@ func openAccessibilitySettings() {
     }
 }
 
+/// O.4 (Snapshot OCR) — deep-link Réglages Système, section Screen Recording.
+func openScreenRecordingSettings() {
+    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+        NSWorkspace.shared.open(url)
+    }
+}
+
 // MARK: - Notification deeplink
 
 extension Notification.Name {

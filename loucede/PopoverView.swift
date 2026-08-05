@@ -1766,6 +1766,9 @@ struct ConfirmationToast: View {
         var paddingV: CGFloat   { self == .standard ? 30 : 20 }
     }
     var style: Style = .standard
+    /// O.4 — action optionnelle au clic (ex. toast permission → Réglages).
+    /// `nil` par défaut : aucun changement de comportement pour Copié/Collé.
+    var onTap: (() -> Void)? = nil
 
     // Phase 1.4a : toutes les dimensions ×3 (+200 %).
     // Picto 14→42, texte 13→39, padding 14/10→42/30, spacing 8→24, shadow 8→24.
@@ -1786,6 +1789,8 @@ struct ConfirmationToast: View {
             Capsule().stroke(Color.gray.opacity(0.2), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.15), radius: 24, y: 6)
+        .contentShape(Capsule())
+        .onTapGesture { onTap?() }
     }
 }
 

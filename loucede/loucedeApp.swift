@@ -412,6 +412,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               !CaptureTextWindowController.isPresented,
               !isOCRFlowActive
         else { return }
+
+        // O.4 — gate preflight AVANT de poser le flag : si la permission
+        // manque, aucun overlay ne s'ouvre pour rien et il n'y a rien à
+        // lever (le flag n'a jamais été posé sur ce chemin).
+        guard ScreenCaptureService.hasScreenRecordingAccess() else {
+            CapturePermissionToast.showMissing()
+            ScreenCaptureService.requestScreenRecordingAccess()
+            return
+        }
+
         isOCRFlowActive = true
         beginCaptureCycle()
     }
@@ -440,9 +450,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         globalRect: rect, screen: screen
                     )
                 } catch {
-                    // Capture impossible (permission manquante, etc.) → abandon.
-                    // Gestion propre (toast + lien Réglages Système) en O.4.
-                    self.isOCRFlowActive = false
+                    // O.4 — capture impossible malgré le gate amont : soit la
+                    // permission a été révoquée entre-temps (filet, rare),
+                    // soit (cas le plus probable) elle vient d'être accordée
+                    // mais SCK ne la relit qu'au redémarrage du process. On
+                    // distingue les deux en re-checkant le preflight ICI,
+                    // à l'instant de l'échec (source de vérité système,
+                    // indépendante de la forme exacte de l'erreur SCK).
+                    self.endOCRFlowAndRestoreSource()
+                    if ScreenCaptureService.hasScreenRecordingAccess() {
+                        CapturePermissionToast.showNeedsRestart()
+                    } else {
+                        CapturePermissionToast.showMissing()
+                        ScreenCaptureService.requestScreenRecordingAccess()
+                    }
                     return
                 }
 
