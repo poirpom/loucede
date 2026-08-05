@@ -26,6 +26,7 @@ TEAM_ID="LAUYMPKAS2"
 NOTARY_PROFILE="loucede-notary"
 SCHEME="loucede"
 REPO="poirpom/loucede"
+GH_ACCOUNT="poirpom"   # compte gh attendu (Faab a aussi un compte boulot actif en parallèle)
 CODE_BRANCH="main"
 APPCAST_BRANCH="gh-pages"
 DMG_NAME="loucede.dmg"
@@ -114,6 +115,18 @@ preflight() {
 
   # Auth GitHub
   gh auth status >/dev/null 2>&1 || die "gh non authentifié — lance « gh auth login »"
+
+  # Compte gh ACTIF — Faab garde en permanence 2 comptes authentifiés
+  # (poirpom perso = propriétaire du repo, poirpomcirculab boulot). Un run
+  # avec le mauvais compte actif échoue tard (après build/tag/push) et laisse
+  # un état sale à nettoyer à la main (vécu en 1.1.0). Lecture seule : ce
+  # script ne bascule JAMAIS le compte lui-même (le switch pourrait laisser
+  # gh dans un état inattendu pour le workflow boulot) — il vérifie et die.
+  local gh_account
+  gh_account="$(gh api user --jq .login 2>&1)" \
+    || die "impossible de lire le compte gh actif — $gh_account"
+  [ "$gh_account" = "$GH_ACCOUNT" ] \
+    || die "Compte gh actif = « $gh_account » (attendu : $GH_ACCOUNT). Bascule d'abord : gh auth switch --hostname github.com --user $GH_ACCOUNT"
 
   # Profil notarytool disponible dans le Keychain
   xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
