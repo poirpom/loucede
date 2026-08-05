@@ -6,6 +6,69 @@
         <description>Mises à jour de loucedé</description>
         <language>fr</language>
         <item>
+            <title>loucedé 1.1.0</title>
+            <pubDate>Wed, 05 Aug 2026 13:08:55 +0200</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <description><![CDATA[# loucedé 1.1.0 — Baby release
+
+## 🤏 Version courte : capture de texte et correctifs de bugs
+
+- **loucedé sait désormais lire le texte à l'écran.** (donc sans besoin de sélectionner du texte au préalable)
+- **correctifs de bugs récalcitrants** (Maximum respect à Baby pour les avoir spottés — je te dois une *boîte à meuh*)
+
+## 📸 La nouveauté = le mode OCR de la flemme
+
+**loucedé sait désormais lire le texte à l'écran.** Officieusement appelé en interne : *Le mode OCR de la flemme* (terminologie technique ultra-pointue, cherche pas à comprendre).
+
+Jusqu'ici, loucedé agissait sur du texte sélectionné. Maintenant, il agit aussi sur du texte que tu ne peux pas sélectionner : une capture d'écran, une image, un PDF récalcitrant, un bout d'interface…
+
+Comment laisser la magie se produire :
+
+1. Active `⌥&` **sans rien avoir sélectionné**
+2. Un curseur en croix apparaît → cadre la zone contenant le texte
+3. loucedé lit le texte (reconnaissance de caractères) et te l'affiche dans une fenêtre
+4. Vérifie, corrige au besoin, puis valide (`⌘↵`)
+5. Choisis ton action comme d'habitude — traduire, résumer, reformuler…
+
+### 🔒 Tout se passe en local
+
+Parce que *merci mais non merci*, pas besoin d’internet pour faire de la reconnaissance de texte. Les ordis le font très bien depuis des années, sans avoir besoin de serveur, d’IA ou chaipakoi.
+
+La reconnaissance de texte utilise le framework **Vision** d'Apple, directement sur ta machine. **Aucune image n'est envoyée dans le cloud, aucun serveur tiers n'est sollicité, rien n'est stocké sur ton disque dur.** La capture existe le temps de lire le texte, puis disparaît. La détection de la langue est automatique.
+
+### 🖐️ Une fenêtre pour vérifier
+
+Parce que personne n’est parfait. Pas même nos ordis : la reconnaissance de caractères commet parfois des erreurs (un `l` confondu avec un `I`, un `O` avec un `0`…). 
+
+C'est pourquoi loucedé te montre toujours le texte extrait dans une fenêtre **éditable** avant d'agir : tu corriges ce qu'il faut, puis tu valides. Si aucun texte n'est détecté, un simple bouton te permet de réessayer.
+
+### ⚙️ La permission « Enregistrement de l'écran »
+
+Pour laisser la magie se produire, il faut que tu lâches un peu de lest, mais sans gravité.
+
+Pour capturer une zone, macOS demande l'autorisation « Enregistrement de l'écran ». loucedé te guide : au premier usage, il t'indique comment l'accorder et t'ouvre directement le bon réglage. Cette autorisation est **optionnelle** — tout le reste de loucedé fonctionne sans elle, seule la capture de texte en a besoin.
+
+## 🔧 Correctifs = le ménage de la honte
+
+Depuis la 1.0, quelques frictions ont été gommées (merci aux retours de bêta-test) :
+
+- **Le focus revient à la bonne application** à la fermeture du popup — plus besoin de recliquer sur ta fenêtre de départ.
+- **loucedé reste dans le Dock pendant le tutoriel** — fini l'impression que l'app venait de se fermer.
+- **Le bouton « Regénérer » du générateur d'action** ne s'étire plus bizarrement en hauteur.
+
+## ℹ️ Le reste n'a pas changé
+
+Trois fournisseurs d'IA au choix (Anthropic, OpenAI, Mistral), suivi du coût en euros, licence à 10 € en achat unique, 12 utilisations gratuites pour essayer. macOS 15+, vit dans la barre des menus, code source sous GPL v3, aucune télémétrie, clés et licences dans le Trousseau macOS. Bref, simple et propre.
+
+## 🌐 Liens = cliquety click
+
+- Site : [loucede.app](https://loucede.app/)
+- Code source : [github.com/poirpom/loucede](https://github.com/poirpom/loucede)
+]]></description>
+            <enclosure url="https://github.com/poirpom/loucede/releases/latest/download/loucede.dmg" sparkle:edSignature="q2iffvBagwItcYUZ/pmYYSXh2/A+msUWvh7Ajor/ux74I/OfOOZ+8ZM+bTnYXkiTwFtbmD79UwX90XKVsigABA==" length="6462611" type="application/octet-stream" />
+        </item>
+        <item>
             <title>loucedé 1.0.0</title>
             <pubDate>Wed, 24 Jun 2026 17:06:25 +0200</pubDate>
             <sparkle:version>2</sparkle:version>
